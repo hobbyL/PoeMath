@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:convert';
 
@@ -132,25 +133,29 @@ void main() {
     }
     final llm = LlmClient(httpClient: httpClient, usage: usage);
     await expectLater(
-      llm.testConnection(
-        const LlmConfig(
-          baseUrl: 'https://api.example.com',
-          apiKey: 'key',
-          model: 'm',
-        ),
-      ),
-      throwsA(isA<LlmNetworkError>()),
-    );
-    await expectLater(
-      llm.chatStream(
+      llm.explain(
         config: const LlmConfig(
           baseUrl: 'https://api.example.com',
           apiKey: 'key',
           model: 'm',
         ),
-        systemPrompt: '学习助手',
-        messages: const [],
-      ).toList(),
+        systemPrompt: '',
+        userPrompt: '',
+      ),
+      throwsA(isA<LlmNetworkError>()),
+    );
+    await expectLater(
+      llm
+          .chatStream(
+            config: const LlmConfig(
+              baseUrl: 'https://api.example.com',
+              apiKey: 'key',
+              model: 'm',
+            ),
+            systemPrompt: '学习助手',
+            messages: const [],
+          )
+          .toList(),
       throwsA(isA<LlmNetworkError>()),
     );
     final asr = TencentAsrClient(httpClient: httpClient, usage: usage);
@@ -163,8 +168,11 @@ void main() {
         ),
       ),
       throwsA(
-        isA<TencentAsrException>()
-            .having((e) => e.kind, 'kind', TencentAsrErrorKind.quota),
+        isA<TencentAsrException>().having(
+          (e) => e.kind,
+          'kind',
+          TencentAsrErrorKind.quota,
+        ),
       ),
     );
     final tts = WorkerTtsClient(httpClient: httpClient, usage: usage);
@@ -181,80 +189,301 @@ void main() {
     expect(CloudUsageKind.values.map(usage.used), everyElement(0));
   });
 
-  test('发送后失败仍计数，再次请求达额不发网', () async {
+  const config = LlmConfig(
+    baseUrl: 'https://api.example.com',
+    apiKey: 'key',
+    model: 'm',
+  );
+
+  http.Response answer(String text) => http.Response.bytes(
+    utf8.encode(
+      jsonEncode({
+        'choices': [
+          {
+            'message': {'content': text},
+            'finish_reason': 'stop',
+          },
+        ],
+      }),
+    ),
+    200,
+  );
+
+  test('失败不扣次，成功后才达额，连接测试不扣且可在达额后使用', () async {
     await unlockParentForTesting();
-    var sends = 0;
     final usage = CloudUsageService();
     await usage.setLimit(CloudUsageKind.llm, 1);
-    final llm = LlmClient(
+    var sends = 0;
+    var fail = true;
+    LlmClient client() => LlmClient(
       usage: usage,
-      httpClient: MockClient((request) async {
+      httpClient: MockClient((_) async {
         sends++;
-        return http.Response('', 500);
+        return fail ? http.Response('', 500) : answer('有效回答');
       }),
     );
-    const config = LlmConfig(
-      baseUrl: 'https://api.example.com',
-      apiKey: 'key',
-      model: 'm',
-    );
+    final first = client();
+    addTearDown(first.close);
     await expectLater(
-      llm.testConnection(config),
+      first.explain(config: config, systemPrompt: '', userPrompt: ''),
       throwsA(isA<LlmServerError>()),
     );
+    expect(usage.used(CloudUsageKind.llm), 0);
+    fail = false;
+    final retry = client();
+    addTearDown(retry.close);
+    expect(
+      (await retry.explain(
+        config: config,
+        systemPrompt: '',
+        userPrompt: '',
+      )).text,
+      '有效回答',
+    );
+    expect(usage.used(CloudUsageKind.llm), 1);
     await expectLater(
-      llm.testConnection(config),
+      retry.explain(config: config, systemPrompt: '', userPrompt: ''),
       throwsA(isA<LlmNetworkError>()),
     );
-    expect(sends, 1);
-    expect(HiveBoxes.meta.get('cloud_usage:${usage.dayKey}:llm'), 1);
+    expect(sends, 2);
+    await retry.testConnection(config);
+    expect(sends, 3);
+    expect(usage.used(CloudUsageKind.llm), 1);
   });
 
   for (final crossProvider in [false, true]) {
-    test('${crossProvider ? '跨供应商' : '模型'}切换按每次请求计数，额度用完立即停止遍历', () async {
-      await unlockParentForTesting();
-      var sends = 0;
-      final usage = CloudUsageService();
-      await usage.setLimit(CloudUsageKind.llm, 1);
-      final promoted = <String>[];
-      final client = LlmClient(
-        usage: usage,
-        onModelSucceeded: (_, model) async => promoted.add(model),
-        httpClient: MockClient((_) async {
-          sends++;
-          return http.Response('', 500);
-        }),
+    for (final succeeds in [false, true]) {
+      test(
+        '${crossProvider ? '跨供应商' : '模型'}重试${succeeds ? '最终成功只扣一次' : '全部失败不扣次'}',
+        () async {
+          await unlockParentForTesting();
+          var sends = 0;
+          final usage = CloudUsageService();
+          await usage.setLimit(CloudUsageKind.llm, 1);
+          final promoted = <String>[];
+          final client = LlmClient(
+            usage: usage,
+            onModelSucceeded: (_, model) async => promoted.add(model),
+            httpClient: MockClient((_) async {
+              sends++;
+              return succeeds && sends == 2
+                  ? answer('回退成功')
+                  : http.Response('', 500);
+            }),
+          );
+          addTearDown(client.close);
+          final result = client.explain(
+            config: LlmConfig(
+              baseUrl: 'https://example.com',
+              apiKey: '',
+              model: 'A',
+              models: crossProvider ? const ['A'] : const ['A', 'B', 'C'],
+              fallbacks: crossProvider
+                  ? const [
+                      LlmConfig(
+                        baseUrl: 'https://other.example',
+                        apiKey: 'other',
+                        model: 'B',
+                      ),
+                    ]
+                  : const [],
+            ),
+            systemPrompt: '',
+            userPrompt: '',
+          );
+          if (succeeds) {
+            expect((await result).text, '回退成功');
+            expect(sends, 2);
+            expect(usage.used(CloudUsageKind.llm), 1);
+            expect(promoted, ['B']);
+          } else {
+            await expectLater(result, throwsA(isA<LlmServerError>()));
+            expect(sends, crossProvider ? 2 : 3);
+            expect(usage.used(CloudUsageKind.llm), 0);
+            expect(promoted, isEmpty);
+          }
+        },
       );
-      addTearDown(client.close);
-      await expectLater(
-        client.explain(
-          config: LlmConfig(
-            baseUrl: 'https://example.com',
-            apiKey: '',
-            model: 'A',
-            models: crossProvider ? const ['A'] : const ['A', 'B', 'C'],
-            fallbacks: crossProvider
-                ? const [
-                    LlmConfig(
-                      baseUrl: 'https://other.example',
-                      apiKey: 'other',
-                      model: 'B',
-                    ),
-                  ]
-                : const [],
-          ),
-          systemPrompt: '',
-          userPrompt: '',
-        ),
-        throwsA(
-          isA<LlmNetworkError>()
-              .having((error) => error.retryable, 'retryable', isFalse),
-        ),
-      );
-      expect(sends, 1);
-      expect(usage.used(CloudUsageKind.llm), 1);
-      expect(promoted, isEmpty);
+    }
+  }
+
+  test('升级后保留旧请求计数但不拿它判断成功次数，成功计数跨重启保留', () async {
+    await unlockParentForTesting();
+    final usage = CloudUsageService();
+    await usage.setLimit(CloudUsageKind.llm, 1);
+    final oldKey = 'cloud_usage:${usage.dayKey}:llm';
+    await HiveBoxes.meta.put(oldKey, 30);
+    expect(usage.used(CloudUsageKind.llm), 0);
+    await usage.trackLlmSuccess(() async => '回答');
+    expect(HiveBoxes.meta.get(oldKey), 30);
+    expect(usage.used(CloudUsageKind.llm), 1);
+    await HiveBoxes.close();
+    await HiveBoxes.init();
+    expect(CloudUsageService().used(CloudUsageKind.llm), 1);
+    await expectLater(
+      CloudUsageService().trackLlmSuccess(() async => '不应执行'),
+      throwsA(isA<CloudQuotaExceededException>()),
+    );
+  });
+
+  test('嵌套客户端操作和内部流合并一次，工具结果不单独扣次', () async {
+    final usage = CloudUsageService();
+    await usage.trackLlmSuccess(() async {
+      await CloudUsageService().trackLlmSuccess(() async => '工具结果');
+      expect(usage.used(CloudUsageKind.llm), 0);
+      expect(await usage.trackLlmStream(() => Stream.value('最终回答')).toList(), [
+        '最终回答',
+      ]);
+      return true;
     });
+    expect(usage.used(CloudUsageKind.llm), 1);
+  });
+
+  test('在途名额不落盘且区分忙碌提示，失败释放名额后可继续请求', () async {
+    await unlockParentForTesting();
+    final usage = CloudUsageService();
+    await usage.setLimit(CloudUsageKind.llm, 1);
+    final started = Completer<void>();
+    final finish = Completer<void>();
+    final first = usage.trackLlmSuccess(() async {
+      started.complete();
+      await finish.future;
+      throw StateError('失败');
+    });
+    final failure = expectLater(first, throwsStateError);
+    await started.future;
+    expect(usage.used(CloudUsageKind.llm), 0);
+    await expectLater(
+      CloudUsageService().trackLlmSuccess(() async => '不应执行'),
+      throwsA(
+        isA<CloudQuotaExceededException>().having(
+          (error) => error.message,
+          'message',
+          'AI 正在处理中，请稍后重试',
+        ),
+      ),
+    );
+    finish.complete();
+    await failure;
+    await usage.trackLlmSuccess(() async => '成功');
+    expect(usage.used(CloudUsageKind.llm), 1);
+  });
+
+  test('无效结果与完成前取消不扣，队列仍可接受成功结果', () async {
+    final usage = CloudUsageService();
+    await usage.trackLlmSuccess(() async => false, isSuccessful: (ok) => ok);
+    var active = true;
+    await expectLater(
+      usage.trackLlmSuccess(
+        () async {
+          active = false;
+        },
+        check: () {
+          if (!active) throw StateError('已取消');
+        },
+      ),
+      throwsStateError,
+    );
+    expect(usage.used(CloudUsageKind.llm), 0);
+    await usage.trackLlmSuccess(() async => '成功');
+    expect(usage.used(CloudUsageKind.llm), 1);
+  });
+
+  test('流式提前取消和部分回答后异常不扣，完整结束扣一次', () async {
+    final usage = CloudUsageService();
+    Stream<String> partial() async* {
+      yield '部分回答';
+      throw StateError('流中断');
+    }
+
+    expect(await usage.trackLlmStream(partial).take(1).toList(), ['部分回答']);
+    expect(usage.used(CloudUsageKind.llm), 0);
+    await expectLater(usage.trackLlmStream(partial).toList(), throwsStateError);
+    expect(usage.used(CloudUsageKind.llm), 0);
+    expect(await usage.trackLlmStream(() => Stream.value('完成')).toList(), [
+      '完成',
+    ]);
+    expect(usage.used(CloudUsageKind.llm), 1);
+  });
+
+  test('跨午夜按操作开始日计次，新一天可独立使用且清理过期用量', () async {
+    await unlockParentForTesting();
+    var now = DateTime(2026, 10, 16, 23, 59);
+    final usage = CloudUsageService(clock: () => now);
+    await usage.setLimit(CloudUsageKind.llm, 1);
+    await HiveBoxes.meta.put('cloud_usage:2026-09-01:llm', 10);
+    await usage.trackLlmSuccess(() async {
+      now = DateTime(2026, 10, 17);
+    });
+    expect(usage.used(CloudUsageKind.llm), 0);
+    expect(usage.usedOn(DateTime(2026, 10, 16), CloudUsageKind.llm), 1);
+    expect(HiveBoxes.meta.containsKey('cloud_usage:2026-09-01:llm'), isFalse);
+    await usage.trackLlmSuccess(() async => '新一天');
+    expect(usage.used(CloudUsageKind.llm), 1);
+  });
+
+  for (final explain in [false, true]) {
+    for (final ending in ['EOF', 'length', 'content_filter', 'error', 'stop']) {
+      test(
+        '${explain ? '讲解' : '助手'}流遇到 $ending ${ending == 'stop' ? '正常完成才扣次' : '不扣次数'}',
+        () async {
+          await unlockParentForTesting();
+          final usage = CloudUsageService();
+          await usage.setLimit(CloudUsageKind.llm, 1);
+          String event(Map<String, Object?> payload) =>
+              'data: ${jsonEncode(payload)}\n\n';
+          final partial = event({
+            'choices': [
+              {
+                'delta': {'content': '先回答了一部分'},
+              },
+            ],
+          });
+          final end = ending == 'EOF'
+              ? ''
+              : ending == 'error'
+              ? event({
+                  'error': {'message': 'synthetic error'},
+                })
+              : event({
+                  'choices': [
+                    {'delta': <String, Object?>{}, 'finish_reason': ending},
+                  ],
+                });
+          final promoted = <String>[];
+          final client = LlmClient(
+            usage: usage,
+            onModelSucceeded: (_, model) async => promoted.add(model),
+            httpClient: MockClient(
+              (_) async =>
+                  http.Response.bytes(utf8.encode('$partial$end'), 200),
+            ),
+          );
+          addTearDown(client.close);
+          final stream = explain
+              ? client.explainStream(
+                  config: config,
+                  systemPrompt: '',
+                  userPrompt: '',
+                )
+              : client.chatStream(
+                  config: config,
+                  systemPrompt: '',
+                  messages: const [],
+                );
+          if (ending == 'stop') {
+            expect(await stream.toList(), ['先回答了一部分']);
+            expect(usage.used(CloudUsageKind.llm), 1);
+          } else {
+            await expectLater(stream.toList(), throwsA(isA<LlmException>()));
+            expect(usage.used(CloudUsageKind.llm), 0);
+            expect(promoted, isEmpty);
+            await usage.trackLlmSuccess(() async => '下次成功');
+            expect(usage.used(CloudUsageKind.llm), 1);
+          }
+        },
+      );
+    }
   }
 
   group('recentDaily 历史读取', () {
@@ -264,7 +493,7 @@ void main() {
 
     String key(DateTime d, CloudUsageKind k) =>
         'cloud_usage:${d.year}-${d.month.toString().padLeft(2, '0')}'
-        '-${d.day.toString().padLeft(2, '0')}:${k.key}';
+        '-${d.day.toString().padLeft(2, '0')}:${k.counterKey}';
 
     test('返回连续 7 天、升序、末项为今天', () async {
       final usage = svc();
@@ -286,8 +515,10 @@ void main() {
     test('缺失日期补 0，不跳过', () async {
       final usage = svc();
       // 只在"3 天前"写一条，其余日期无记录。
-      await HiveBoxes.meta
-          .put(key(DateTime(2026, 10, 14), CloudUsageKind.llm), 5);
+      await HiveBoxes.meta.put(
+        key(DateTime(2026, 10, 14), CloudUsageKind.llm),
+        5,
+      );
 
       final daily = usage.recentDaily(7);
       expect(daily, hasLength(7), reason: '不能因为缺数据而少返回天数');

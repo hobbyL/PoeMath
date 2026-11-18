@@ -84,8 +84,9 @@ class AssistantChatController extends Notifier<AssistantChatState> {
   Future<void> regenerate() async {
     if (state.isBusy) return;
     final messages = state.messages;
-    final lastUserIndex =
-        messages.lastIndexWhere((m) => m.role == ChatRole.user);
+    final lastUserIndex = messages.lastIndexWhere(
+      (m) => m.role == ChatRole.user,
+    );
     if (lastUserIndex < 0) return;
     final token = ++_sessionToken;
     state = AssistantChatState(
@@ -238,7 +239,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
         for (final tool in tools) tool.name: tool,
       };
 
-      client = _activeClient = createRuntimeLlmClient(
+      final activeClient = client = _activeClient = createRuntimeLlmClient(
         httpClient: ref.read(llmExplainHttpClientProvider),
         settings: repo,
         isActive: () => !_disposed && token == _sessionToken,
@@ -246,69 +247,76 @@ class AssistantChatController extends Notifier<AssistantChatState> {
             ref.read(llmSelectionVersionProvider.notifier).state++,
       );
 
-      // 工具循环：非流式 chatComplete 判定是否调工具；有则执行并回灌
-      // role:tool，循环（≤4 轮）；无 tool_calls 或到顶即跳出走流式收尾。
-      // 从 contextBaseIndex 起取历史：清除上下文后旧消息仅存档、不入请求。
-      final base = state.contextBaseIndex.clamp(0, state.messages.length);
-      final prefix = state.messages.sublist(0, base);
-      final working = <ChatMessage>[...state.messages.sublist(base)];
-      for (var round = 0; round < kAssistantMaxToolRounds; round++) {
-        final completion = await client.chatComplete(
-          config: config,
-          systemPrompt: systemPrompt,
-          messages: working,
-          tools: toolSchemas,
-          maxTokens: kAssistantMaxTokens,
-        );
-        if (token != _sessionToken) return;
-        if (completion.toolCalls.isEmpty) break;
+      final answer = await activeClient.trackSuccessfulOperation<String?>(
+        () async {
+          // 工具循环：非流式 chatComplete 判定是否调工具；有则执行并回灌
+          // role:tool，循环（≤4 轮）；无 tool_calls 或到顶即跳出走流式收尾。
+          // 从 contextBaseIndex 起取历史：清除上下文后旧消息仅存档、不入请求。
+          final base = state.contextBaseIndex.clamp(0, state.messages.length);
+          final prefix = state.messages.sublist(0, base);
+          final working = <ChatMessage>[...state.messages.sublist(base)];
+          for (var round = 0; round < kAssistantMaxToolRounds; round++) {
+            final completion = await activeClient.chatComplete(
+              config: config,
+              systemPrompt: systemPrompt,
+              messages: working,
+              tools: toolSchemas,
+              maxTokens: kAssistantMaxTokens,
+            );
+            if (token != _sessionToken) return null;
+            if (completion.toolCalls.isEmpty) break;
 
-        // assistant 发起工具调用的轮次（content 可空）并入历史与 UI。
-        working.add(
-          ChatMessage(
-            role: ChatRole.assistant,
-            content: completion.content ?? '',
-            toolCalls: completion.toolCalls,
-          ),
-        );
-        for (final call in completion.toolCalls) {
-          final result = await _runTool(toolsByName, call, token);
-          if (token != _sessionToken) return;
-          working.add(
-            ChatMessage(
-              role: ChatRole.tool,
-              content: result.content,
-              toolCallId: call.id,
-              name: call.name,
-            ),
-          );
-        }
-        // 工具轮次并入 state → UI 渲染工具卡；仍 loading，等流式收尾。
-        state = state.copyWith(
-          status: AssistantChatStatus.loading,
-          messages: List<ChatMessage>.unmodifiable([...prefix, ...working]),
-          streamingText: '',
-        );
-      }
+            // assistant 发起工具调用的轮次（content 可空）并入历史与 UI。
+            working.add(
+              ChatMessage(
+                role: ChatRole.assistant,
+                content: completion.content ?? '',
+                toolCalls: completion.toolCalls,
+              ),
+            );
+            for (final call in completion.toolCalls) {
+              final result = await _runTool(toolsByName, call, token);
+              if (token != _sessionToken) return null;
+              working.add(
+                ChatMessage(
+                  role: ChatRole.tool,
+                  content: result.content,
+                  toolCallId: call.id,
+                  name: call.name,
+                ),
+              );
+            }
+            // 工具轮次并入 state → UI 渲染工具卡；仍 loading，等流式收尾。
+            state = state.copyWith(
+              status: AssistantChatStatus.loading,
+              messages: List<ChatMessage>.unmodifiable([...prefix, ...working]),
+              streamingText: '',
+            );
+          }
 
-      // 收尾：流式产出最终自然语言回答（保留逐段渐显 UX）。
-      final buffer = StringBuffer();
-      await for (final chunk in client.chatStream(
-        config: config,
-        systemPrompt: systemPrompt,
-        messages: working,
-        maxTokens: kAssistantMaxTokens,
-      )) {
-        // 每片校验令牌：切会话 / stop 后立即丢弃在途流，不写 state。
-        if (token != _sessionToken) return;
-        buffer.write(chunk);
-        state = state.copyWith(
-          status: AssistantChatStatus.streaming,
-          streamingText: buffer.toString(),
-        );
-      }
+          // 收尾：流式产出最终自然语言回答（保留逐段渐显 UX）。
+          final buffer = StringBuffer();
+          await for (final chunk in activeClient.chatStream(
+            config: config,
+            systemPrompt: systemPrompt,
+            messages: working,
+            maxTokens: kAssistantMaxTokens,
+          )) {
+            // 每片校验令牌：切会话 / stop 后立即丢弃在途流，不写 state。
+            if (token != _sessionToken) return null;
+            buffer.write(chunk);
+            state = state.copyWith(
+              status: AssistantChatStatus.streaming,
+              streamingText: buffer.toString(),
+            );
+          }
+          if (token != _sessionToken) return null;
+          return buffer.toString();
+        },
+        isSuccessful: (text) => text?.trim().isNotEmpty ?? false,
+      );
       if (token != _sessionToken) return;
-      _finalize(buffer.toString());
+      _finalize(answer ?? '');
     } on LlmException catch (e) {
       if (token != _sessionToken) return;
       state = state.copyWith(
@@ -393,5 +401,5 @@ class AssistantChatController extends Notifier<AssistantChatState> {
 /// AI 助手对话状态 provider。
 final assistantChatControllerProvider =
     NotifierProvider<AssistantChatController, AssistantChatState>(
-  AssistantChatController.new,
-);
+      AssistantChatController.new,
+    );

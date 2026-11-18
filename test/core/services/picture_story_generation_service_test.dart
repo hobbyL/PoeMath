@@ -459,7 +459,7 @@ void main() {
     ]);
     expect(draft.candidates.every((item) => item.edit.image != null), isTrue);
     expect(repository.catalogState().versions, isEmpty);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 5);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 4);
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 3);
   });
 
@@ -496,7 +496,7 @@ void main() {
     expect(imageCalls, 1);
     expect(imageClients, 1);
     expect(captionCalls, 3);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
     expect(repository.catalogState().versions, isEmpty);
   });
@@ -637,6 +637,7 @@ void main() {
     expect(repair, contains('严格生成 2 个'));
     expect(repair, contains('孩子在公园观察蝴蝶。'));
     expect(imageCalls, 3);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 4);
   });
 
   test('规划流中断且普通响应失败后停止，不当作缺题重复请求', () async {
@@ -653,6 +654,7 @@ void main() {
     expect(planCalls, 2);
     expect(imageCalls, 0);
     expect(service.readDraft('default')!.candidates, isEmpty);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
   });
 
   test('规划格式修复有界，重复失败保留草稿且不消耗生图额度', () async {
@@ -664,6 +666,7 @@ void main() {
     expect(planCalls, 2);
     expect(imageCalls, 0);
     expect(service.readDraft('default')!.candidates, isEmpty);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
   });
 
   for (final status in [200, 429]) {
@@ -701,7 +704,7 @@ void main() {
         draft.candidates.skip(1).map((candidate) => candidate.edit.image),
         [null, null],
       );
-      expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
+      expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
       expect(
         CloudUsageService.instance.used(CloudUsageKind.imageGeneration),
         1,
@@ -725,7 +728,7 @@ void main() {
       expect(imageCalls, 1);
       expect(planCalls, 1);
       expect(captionCalls, 3);
-      expect(CloudUsageService.instance.used(CloudUsageKind.llm), 4);
+      expect(CloudUsageService.instance.used(CloudUsageKind.llm), 2);
       expect(
         CloudUsageService.instance.used(CloudUsageKind.imageGeneration),
         1,
@@ -857,7 +860,7 @@ void main() {
     expect(completed.edit.toPrompt().title, '观察花朵 2');
     expect(completed.edit.toPrompt().questions, ['你看到了什么？', '想象孩子接下来会做什么？']);
     expect(await images.readImage(image.value), stored);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 2);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
     expect(repository.catalogState().versions, isEmpty);
   });

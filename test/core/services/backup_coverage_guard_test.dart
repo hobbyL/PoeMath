@@ -185,7 +185,7 @@ void main() {
     final now = DateTime.now();
     final day =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    await HiveBoxes.meta.put('cloud_usage:$day:llm', 2);
+    await HiveBoxes.meta.put('cloud_usage:$day:llm_success_v1', 2);
     await HiveBoxes.meta.put('cloud_usage:2026-10-18:llm', 9);
     final before = CloudUsageService.exportCounts();
     final data =

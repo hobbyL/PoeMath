@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
+import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/core/services/picture_story_feedback_service.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
@@ -41,6 +42,7 @@ void main() {
   });
 
   test('发送完整题目和图片，非法原话触发备用；只回写独立点评绑定', () async {
+    await CloudUsageService.instance.setLimit(CloudUsageKind.llm, 1);
     await settings.setScenarioSelection(
       LlmScenario.assistant,
       providerId: 'a',
@@ -97,6 +99,7 @@ void main() {
     );
     expect(settings.providerIdForScenario(LlmScenario.assistant), 'a');
     expect(selections, 1);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
   });
 
   test('空答案、超长答案、缺图和取消均不发请求，也不产生虚假本地评价', () async {
@@ -130,6 +133,7 @@ void main() {
       expect(result['text'], '本次未获得 AI 点评');
     }
     expect(requests, 0);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
   });
 
   test('晚到的有效结果不能接受或回写模型选择', () async {
@@ -159,5 +163,6 @@ void main() {
     );
     expect(jsonDecode(await pending)['source'], 'unavailable');
     expect(promoted, 0);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
   });
 }

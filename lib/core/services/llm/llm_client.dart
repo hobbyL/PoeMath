@@ -83,6 +83,23 @@ final class LlmClient {
     }
   }
 
+  /// 将工具循环或有界修复合并成一次成功操作；失败、取消和探测不扣次数。
+  /// 嵌套客户端继承同一操作范围，最终结果成功后才落盘。
+  Future<T> trackSuccessfulOperation<T>(
+    Future<T> Function() action, {
+    bool Function(T result)? isSuccessful,
+  }) async {
+    try {
+      return await _usage.trackLlmSuccess(
+        action,
+        check: _checkActive,
+        isSuccessful: isSuccessful,
+      );
+    } on CloudQuotaExceededException catch (error) {
+      throw LlmNetworkError(error.message, retryable: false);
+    }
+  }
+
   List<String> _modelsFor(LlmConfig config) {
     final preferred = _preferredModels[config];
     final failed = _failedModels[config] ?? const <String>{};
@@ -173,6 +190,27 @@ final class LlmClient {
     bool requiresVision = false,
     void Function(int attempt)? onAttempt,
     void Function(T result)? validate,
+    bool countSuccess = true,
+  }) => trackSuccessfulOperation(
+    () => _requestWithModels(
+      config,
+      request,
+      reportSuccess: reportSuccess,
+      requiresVision: requiresVision,
+      onAttempt: onAttempt,
+      validate: validate,
+    ),
+    isSuccessful: (result) =>
+        countSuccess && (result is! ChatCompletion || result.toolCalls.isEmpty),
+  );
+
+  Future<T> _requestWithModels<T>(
+    LlmConfig config,
+    Future<T> Function(LlmConfig candidate) request, {
+    required bool reportSuccess,
+    required bool requiresVision,
+    void Function(int attempt)? onAttempt,
+    void Function(T result)? validate,
   }) async {
     final attempts = _attemptsFor(config, requiresVision: requiresVision);
     var attempt = 0;
@@ -252,6 +290,22 @@ final class LlmClient {
   }
 
   Stream<String> _streamWithModels(
+    LlmConfig config,
+    Stream<String> Function(LlmConfig candidate) request,
+  ) async* {
+    try {
+      await for (final chunk in _usage.trackLlmStream(
+        () => _streamFromModels(config, request),
+        check: _checkActive,
+      )) {
+        yield chunk;
+      }
+    } on CloudQuotaExceededException catch (error) {
+      throw LlmNetworkError(error.message, retryable: false);
+    }
+  }
+
+  Stream<String> _streamFromModels(
     LlmConfig config,
     Stream<String> Function(LlmConfig candidate) request,
   ) async* {
@@ -386,6 +440,23 @@ final class LlmClient {
     required int grade,
     required String semester,
     required String topic,
+  }) => trackSuccessfulOperation(
+    () => _generateWordProblems(
+      config: config,
+      skeletons: skeletons,
+      grade: grade,
+      semester: semester,
+      topic: topic,
+    ),
+    isSuccessful: (result) => result.drafts.isNotEmpty,
+  );
+
+  Future<LlmBatchResult> _generateWordProblems({
+    required LlmConfig config,
+    required List<ProblemSkeleton> skeletons,
+    required int grade,
+    required String semester,
+    required String topic,
   }) async {
     if (skeletons.isEmpty) {
       return const LlmBatchResult(drafts: <LlmWordProblemDraft>[]);
@@ -431,6 +502,27 @@ final class LlmClient {
 
   /// 只选择候选情境；N 个供应商/模型组合共享 N + 2 次请求，保留有效结果。
   Future<LlmWordProblemSceneResult> chooseWordProblemScenes({
+    required LlmConfig config,
+    required List<WordProblemPlan> plans,
+    required int grade,
+    required String semester,
+    required String topic,
+    required bool Function() isActive,
+    String? promptOverride,
+  }) => trackSuccessfulOperation(
+    () => _chooseWordProblemScenes(
+      config: config,
+      plans: plans,
+      grade: grade,
+      semester: semester,
+      topic: topic,
+      isActive: isActive,
+      promptOverride: promptOverride,
+    ),
+    isSuccessful: (result) => result.choices.isNotEmpty,
+  );
+
+  Future<LlmWordProblemSceneResult> _chooseWordProblemScenes({
     required LlmConfig config,
     required List<WordProblemPlan> plans,
     required int grade,
@@ -728,6 +820,7 @@ final class LlmClient {
     if (content.isEmpty) {
       throw const LlmResponseFormatError('模型输出内容为空');
     }
+    _checkContentLimit(content);
     return LlmExplainResult(text: content);
   }
 
@@ -779,6 +872,7 @@ final class LlmClient {
     );
 
     var emitted = false;
+    var finished = false;
     // stream.transform(utf8.decoder) 在 chunk 边界保留不完整多字节尾字节，
     // 中文跨分片不乱码；逐 chunk utf8.decode 则会乱码。
     // .timeout 作用于字节流：两事件间隔超 timeout → TimeoutException。
@@ -797,12 +891,23 @@ final class LlmClient {
         final trimmed = line.trim();
         if (!trimmed.startsWith('data:')) continue; // 注释/空行跳过
         final payload = trimmed.substring(5).trim();
-        if (payload == '[DONE]') break;
+        if (payload == '[DONE]') {
+          finished = true;
+          break;
+        }
         if (payload.isEmpty) continue;
-        final content = _extractDeltaContent(payload);
+        final delta = _extractTextStreamDelta(payload);
+        final content = delta?.content;
         if (content != null && content.isNotEmpty) {
           emitted = true;
           yield content;
+        }
+        if (delta?.finishReason != null) {
+          if (delta!.finishReason != 'stop') {
+            throw const LlmResponseFormatError('模型输出未完整结束，请重试');
+          }
+          finished = true;
+          break;
         }
       }
     } on TimeoutException {
@@ -815,6 +920,9 @@ final class LlmClient {
 
     if (!emitted) {
       throw const LlmResponseFormatError('模型输出内容为空');
+    }
+    if (!finished) {
+      throw const LlmStreamResponseError('模型流式响应未完成，请重试');
     }
   }
 
@@ -870,6 +978,7 @@ final class LlmClient {
     );
 
     var emitted = false;
+    var finished = false;
     // 同 explainStream：transform(utf8.decoder) 保留跨 chunk 的多字节尾
     // 字节，中文不乱码；.timeout 作用于字节流，两事件间隔超时即报错。
     final lines = boundedLines(
@@ -887,12 +996,23 @@ final class LlmClient {
         final trimmed = line.trim();
         if (!trimmed.startsWith('data:')) continue; // 注释/空行跳过
         final payload = trimmed.substring(5).trim();
-        if (payload == '[DONE]') break;
+        if (payload == '[DONE]') {
+          finished = true;
+          break;
+        }
         if (payload.isEmpty) continue;
-        final content = _extractDeltaContent(payload);
+        final delta = _extractTextStreamDelta(payload);
+        final content = delta?.content;
         if (content != null && content.isNotEmpty) {
           emitted = true;
           yield content;
+        }
+        if (delta?.finishReason != null) {
+          if (delta!.finishReason != 'stop') {
+            throw const LlmResponseFormatError('模型输出未完整结束，请重试');
+          }
+          finished = true;
+          break;
         }
       }
     } on TimeoutException {
@@ -905,6 +1025,9 @@ final class LlmClient {
 
     if (!emitted) {
       throw const LlmResponseFormatError('模型输出内容为空');
+    }
+    if (!finished) {
+      throw const LlmStreamResponseError('模型流式响应未完成，请重试');
     }
   }
 
@@ -993,6 +1116,7 @@ final class LlmClient {
       },
       // 工具探测并非最终回答，只有后续流完整成功才持久化。
       reportSuccess: false,
+      countSuccess: tools.isEmpty,
       requiresVision: requiresVision,
       onAttempt: (_) => started(),
       validate: validate,
@@ -1266,12 +1390,6 @@ final class LlmClient {
     if (body.length > 1024 * 1024 || utf8.encode(body).length > 1024 * 1024) {
       throw const LlmResponseFormatError('请求内容过长，请缩短后重试', retryable: false);
     }
-    try {
-      await _usage.reserve(CloudUsageKind.llm, check: _checkActive);
-    } on CloudQuotaExceededException catch (error) {
-      throw LlmNetworkError(error.message, retryable: false);
-    }
-    _checkActive();
     http.Response response;
     try {
       response = await _httpClient.request(
@@ -1319,12 +1437,6 @@ final class LlmClient {
     if (body.length > 1024 * 1024 || utf8.encode(body).length > 1024 * 1024) {
       throw const LlmResponseFormatError('请求内容过长，请缩短后重试', retryable: false);
     }
-    try {
-      await _usage.reserve(CloudUsageKind.llm, check: _checkActive);
-    } on CloudQuotaExceededException catch (error) {
-      throw LlmNetworkError(error.message, retryable: false);
-    }
-    _checkActive();
     http.StreamedResponse response;
     try {
       final request = http.Request('POST', uri)
@@ -1421,6 +1533,10 @@ final class LlmClient {
     if (choice is! Map<Object?, Object?>) {
       throw const LlmResponseFormatError('模型响应 choices 结构无效');
     }
+    final finishReason = choice['finish_reason'];
+    if (finishReason != null && finishReason != 'stop') {
+      throw const LlmResponseFormatError('模型输出未完整结束，请重试');
+    }
     final message = choice['message'];
     if (message is! Map<Object?, Object?>) {
       throw const LlmResponseFormatError('模型响应缺少 message');
@@ -1490,10 +1606,11 @@ final class LlmClient {
     return ChatCompletion(content: content, toolCalls: toolCalls);
   }
 
-  /// 从单条 SSE data payload 提取 `choices[0].delta.content`。
-  /// 非 JSON / 结构不符 / 无 content 一律返回 null（调用方跳过该行，
-  /// 不中断整个流——容忍 keep-alive 心跳与个别格式瑕疵）。
-  static String? _extractDeltaContent(String payload) {
+  /// 从单条 SSE data payload 提取正文及结束原因。
+  /// 跳过非 JSON、结构不符的心跳帧；明确的服务错误必须中止当前回答。
+  static ({String? content, String? finishReason})? _extractTextStreamDelta(
+    String payload,
+  ) {
     Object? decoded;
     try {
       decoded = jsonDecode(payload);
@@ -1501,7 +1618,10 @@ final class LlmClient {
       return null;
     }
     if (decoded is! Map<String, dynamic>) return null;
-    return _extractStreamDelta(decoded)?.content;
+    if (decoded['error'] != null) {
+      throw const LlmStreamResponseError('模型服务返回错误，请稍后重试或请家长检查配置');
+    }
+    return _extractStreamDelta(decoded);
   }
 
   static ({String? content, String? finishReason})? _extractStreamDelta(

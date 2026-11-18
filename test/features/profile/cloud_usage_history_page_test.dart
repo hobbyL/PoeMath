@@ -25,7 +25,7 @@ void main() {
 
   String key(DateTime d, CloudUsageKind k) =>
       'cloud_usage:${d.year}-${d.month.toString().padLeft(2, '0')}'
-      '-${d.day.toString().padLeft(2, '0')}:${k.key}';
+      '-${d.day.toString().padLeft(2, '0')}:${k.counterKey}';
 
   Future<void> pump(WidgetTester tester, CloudUsageService usage) async {
     tester.view.physicalSize = const Size(800, 1800);

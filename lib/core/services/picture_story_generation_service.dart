@@ -454,6 +454,26 @@ class PictureStoryGenerationService {
         ),
       ];
     }
+    return client.trackSuccessfulOperation(
+      () => _planMultiple(
+        draft,
+        config,
+        client,
+        systemPrompt,
+        onAttempt: onAttempt,
+        onSelectionSaved: onSelectionSaved,
+      ),
+    );
+  }
+
+  Future<List<PictureStoryGenerationCandidate>> _planMultiple(
+    PictureStoryGenerationDraft draft,
+    LlmConfig config,
+    LlmClient client,
+    String systemPrompt, {
+    void Function(int attempt)? onAttempt,
+    void Function(String signature)? onSelectionSaved,
+  }) async {
     final timer = Stopwatch()..start();
     final items = <PictureStoryGenerationCandidate>[];
     var attempt = 0;
@@ -578,47 +598,52 @@ class PictureStoryGenerationService {
     void Function(int attempt)? onAttempt,
     void Function(String signature)? onSelectionSaved,
   }) async {
-    final timer = Stopwatch()..start();
-    final bytes = await _images.readForVision(item.edit.image!.value);
-    AppLogger.d(
-      '看图上传准备：${timer.elapsedMilliseconds}ms，${bytes.length} bytes',
-      tag: 'PictureStory',
-    );
-    timer.reset();
-    final text =
-        '观察这张实际图片，为${level.label}难度编写看图说话练习。'
-        '不要以原始生图描述作为画面事实。';
-    late PictureStoryEditorDraft edit;
-    final response = await client.chatComplete(
-      config: config,
-      requiresVision: true,
-      systemPrompt: systemPrompt,
-      stream: true,
-      retryWithoutStreaming: true,
-      messages: [
-        ChatMessage(
-          role: ChatRole.user,
-          content: text,
-          contentParts: [
-            {'type': 'text', 'text': text},
-            {
-              'type': 'image_url',
-              'image_url': {
-                'url': 'data:image/png;base64,${base64Encode(bytes)}',
+    return client.trackSuccessfulOperation(() async {
+      final timer = Stopwatch()..start();
+      final bytes = await _images.readForVision(item.edit.image!.value);
+      AppLogger.d(
+        '看图上传准备：${timer.elapsedMilliseconds}ms，${bytes.length} bytes',
+        tag: 'PictureStory',
+      );
+      timer.reset();
+      final text =
+          '观察这张实际图片，为${level.label}难度编写看图说话练习。'
+          '不要以原始生图描述作为画面事实。';
+      late PictureStoryEditorDraft edit;
+      final response = await client.chatComplete(
+        config: config,
+        requiresVision: true,
+        systemPrompt: systemPrompt,
+        stream: true,
+        retryWithoutStreaming: true,
+        messages: [
+          ChatMessage(
+            role: ChatRole.user,
+            content: text,
+            contentParts: [
+              {'type': 'text', 'text': text},
+              {
+                'type': 'image_url',
+                'image_url': {
+                  'url': 'data:image/png;base64,${base64Encode(bytes)}',
+                },
               },
-            },
-          ],
-        ),
-      ],
-      maxTokens: 3000,
-      onAttempt: onAttempt,
-      validate: (response) {
-        edit = _parseDescription(item, level, response.content);
-      },
-    );
-    AppLogger.d('看图出题响应：${timer.elapsedMilliseconds}ms', tag: 'PictureStory');
-    await client.acceptCompletion(response, onSelectionSaved: onSelectionSaved);
-    return edit;
+            ],
+          ),
+        ],
+        maxTokens: 3000,
+        onAttempt: onAttempt,
+        validate: (response) {
+          edit = _parseDescription(item, level, response.content);
+        },
+      );
+      AppLogger.d('看图出题响应：${timer.elapsedMilliseconds}ms', tag: 'PictureStory');
+      await client.acceptCompletion(
+        response,
+        onSelectionSaved: onSelectionSaved,
+      );
+      return edit;
+    });
   }
 
   static PictureStoryEditorDraft _parseDescription(

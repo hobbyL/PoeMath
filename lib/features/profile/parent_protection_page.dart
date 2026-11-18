@@ -144,7 +144,9 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
     final value = await showDialog<String>(
       context: context,
       builder: (dialog) => AlertDialog(
-        title: Text('${kind.label}每日请求额度'),
+        title: Text(
+          kind == CloudUsageKind.llm ? 'AI每日成功次数' : '${kind.label}每日请求额度',
+        ),
         content: TextField(
           controller: input,
           keyboardType: TextInputType.number,
@@ -328,15 +330,15 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
                 iconColor: theme.colorScheme.primary,
                 title: kind.label,
                 subtitle:
-                    '已用 ${usage.used(kind)} 次 · ${usage.limit(kind) == null ? '不限' : '每日上限 ${usage.limit(kind)} 次'}',
+                    '${kind == CloudUsageKind.llm ? '已成功' : '已用'} ${usage.used(kind)} 次 · ${usage.limit(kind) == null ? '不限' : '每日上限 ${usage.limit(kind)} 次'}',
                 onTap: () => _changeLimit(kind),
               ),
             ],
             const SizedBox(height: SpacingTokens.md),
-            const Text('默认每天 AI 30 次、语音识别 60 次、云朗读 120 次。可按需调整、暂停或设为不限。'),
+            const Text('默认每天 AI 成功 30 次、图片生成 10 次、语音识别 60 次、云朗读 120 次。可按需调整、暂停或设为不限。'),
             const SizedBox(height: SpacingTokens.sm),
             const Text(
-              '额度按本设备当天实际发送的请求计数，跨重启保留，不随备份重置。失败、验证与重试也计数；AI 一次操作可能有多次请求，云朗读按新合成的段落计数，缓存和本地朗读不计。模型/音色目录读取不计。额度不是精确费用账单，请同时设置供应商账户预算。',
+              'AI 按成功结果计次：一次完整回答、讲解或有效生成扣 1 次，同轮工具探测、自动重试、失败、取消和连接测试不扣。旧版 AI 请求计数不沿用。图片生成、识别和云朗读仍按实际请求计次，失败、验证与重试也计数；朗读缓存和本地朗读不计。次数跨重启保留，不随备份重置，调整上限后下次操作立即生效。额度不是精确费用账单，请同时设置供应商账户预算。',
             ),
           ],
         ],

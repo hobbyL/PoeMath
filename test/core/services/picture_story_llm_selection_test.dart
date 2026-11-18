@@ -318,7 +318,7 @@ void main() {
       ('good.example.com', 'gpt-4o-mini', 'caption', true),
       ('good.example.com', 'gpt-4o', 'caption', true),
     ]);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 4);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
     expect(imageRequests, 1);
     expect(settings.llmActiveProviderId, 'p2');
     expect(settings.llmProviders.last.model, 'gpt-4o');
@@ -352,7 +352,7 @@ void main() {
         ('good.example.com', 'gpt-4o', 'caption', true),
         ('good.example.com', 'gpt-4o', 'caption', true),
       ]);
-      expect(CloudUsageService.instance.used(CloudUsageKind.llm), 6);
+      expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
       expect(settings.llmActiveProviderId, explicit ? 'p1' : 'p2');
       expect(
         settings.providerIdForScenario(LlmScenario.pictureStory),
@@ -394,7 +394,7 @@ void main() {
       ('good.example.com', 'gpt-4o-mini', 'caption', false),
       ('good.example.com', 'gpt-4o-mini', 'caption', false),
     ]);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 6);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
     expect(imageRequests, 2);
     expect(settings.llmActiveProviderId, 'p2');
     expect(settings.llmProviders.last.model, 'gpt-4o-mini');
@@ -414,7 +414,7 @@ void main() {
       ('bad.example.com', 'gpt-4o-bad', 'caption', true),
       ('good.example.com', 'gpt-4o-mini', 'caption', true),
     ]);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 2);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
     expect(imageRequests, 1);
     expect(settings.llmActiveProviderId, 'p2');
     expect(settings.llmProviders.last.model, 'gpt-4o-mini');
@@ -439,7 +439,7 @@ void main() {
       ('bad.example.com', 'gpt-4o-bad', 'plan', false),
       ('good.example.com', 'gpt-4o-mini', 'plan', true),
     ]);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 0);
   });
 
@@ -463,7 +463,7 @@ void main() {
       ('good.example.com', 'gpt-4o-mini', 'caption', true),
       ('good.example.com', 'gpt-4o', 'caption', true),
     ]);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 4);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
     expect(imageRequests, 1);
     expect(settings.llmActiveProviderId, 'p2');
     expect(settings.llmProviders.last.model, 'gpt-4o');

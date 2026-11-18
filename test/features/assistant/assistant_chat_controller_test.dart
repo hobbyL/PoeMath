@@ -25,6 +25,7 @@ import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/features/assistant/assistant_chat_controller.dart';
 
 import '../../helpers/hive_test_helper.dart';
@@ -167,6 +168,7 @@ void main() {
 
   test('仅重试失败单跳，工具不重放，最终回答成功才提升默认并刷新选择', () async {
     await unlockParentForTesting();
+    await CloudUsageService.instance.setLimit(CloudUsageKind.llm, 1);
     final repo = SettingsRepository(credentialStore: store);
     await repo.saveLlmProviderConfig(
       id: 'p1',
@@ -227,6 +229,7 @@ void main() {
       identical(container.read(settingsRepositoryProvider), settingsInstance),
       isTrue,
     );
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
   });
 
   test('工具执行后跨供应商恢复只重试失败单跳，最终成功只更新助手绑定', () async {
@@ -540,6 +543,64 @@ void main() {
     expect(state.messages.single.content, '你好');
   });
 
+  test('历史失败请求耗尽旧额度时仍可成功回答，成功后再达额', () async {
+    await seedProviders();
+    final usage = CloudUsageService.instance;
+    await usage.setLimit(CloudUsageKind.llm, 1);
+    await HiveBoxes.meta.put('cloud_usage:${usage.dayKey}:llm', 30);
+    var requests = 0;
+    final container = containerWith(
+      MockClient((request) async {
+        requests++;
+        return _isStream(request.body)
+            ? _sseResponse('第一次成功')
+            : _completionResponse();
+      }),
+    );
+    final notifier = container.read(assistantChatControllerProvider.notifier);
+    await notifier.send('你好');
+    expect(
+      container.read(assistantChatControllerProvider).messages.last.content,
+      '第一次成功',
+    );
+    expect(usage.used(CloudUsageKind.llm), 1);
+    await notifier.send('再问一次');
+    expect(container.read(assistantChatControllerProvider).isError, isTrue);
+    expect(requests, 2);
+  });
+
+  for (final failure in ['探测失败', '回答失败', '回答中断']) {
+    test('$failure不扣次，限额为1时可再次成功回答', () async {
+      await seedProviders();
+      final usage = CloudUsageService.instance;
+      await usage.setLimit(CloudUsageKind.llm, 1);
+      var fail = true;
+      final container = containerWith(
+        MockClient((request) async {
+          final stream = _isStream(request.body);
+          if (fail && stream == (failure != '探测失败')) {
+            return failure == '回答中断'
+                ? http.Response.bytes(utf8.encode(_sseData('部分内容')), 200)
+                : http.Response('', 503);
+          }
+          return stream ? _sseResponse('重试成功') : _completionResponse();
+        }),
+      );
+      final notifier = container.read(assistantChatControllerProvider.notifier);
+      await notifier.send('第一次提问');
+      expect(container.read(assistantChatControllerProvider).isError, isTrue);
+      expect(usage.used(CloudUsageKind.llm), 0);
+      fail = false;
+      await notifier.regenerate();
+      expect(container.read(assistantChatControllerProvider).isReady, isTrue);
+      expect(
+        container.read(assistantChatControllerProvider).messages.last.content,
+        '重试成功',
+      );
+      expect(usage.used(CloudUsageKind.llm), 1);
+    });
+  }
+
   for (final retry in ['再次提问', '重新生成', '重发提问']) {
     test('本机 AI 额度用尽后改为不限，$retry立即使用新额度', () async {
       await seedProviders();
@@ -555,13 +616,17 @@ void main() {
       );
       final notifier = container.read(assistantChatControllerProvider.notifier);
 
-      // 工具探测消耗最后一次额度，流式回答在发网前被本机限额拒绝。
+      // 最后一次额度足以完成工具探测和最终回答，只扣一次。
       await notifier.send('第一次提问');
+      expect(container.read(assistantChatControllerProvider).isReady, isTrue);
+      expect(requests, [false, true]);
+      expect(usage.used(CloudUsageKind.llm), 1);
+      await notifier.send('达额后的提问');
       final limited = container.read(assistantChatControllerProvider);
       expect(limited.isError, isTrue);
-      expect(limited.message, '今日AI请求额度已用完，可请家长调整额度');
-      expect(limited.messages.single.content, '第一次提问');
-      expect(requests, [false]);
+      expect(limited.message, '今日AI成功次数已达上限，可请家长调整额度');
+      expect(limited.messages.last.content, '达额后的提问');
+      expect(requests, [false, true]);
       expect(usage.used(CloudUsageKind.llm), 1);
 
       // 模拟去设置修改，再回到同一个常驻对话控制器；孩子提问无需家长解锁。
@@ -581,9 +646,9 @@ void main() {
       expect(recovered.isReady, isTrue);
       expect(recovered.message, isNull);
       expect(recovered.messages.last.content, '恢复后的回答');
-      expect(requests, [false, false, true]);
+      expect(requests, [false, true, false, true]);
       expect(usage.limit(CloudUsageKind.llm), isNull);
-      expect(usage.used(CloudUsageKind.llm), 3);
+      expect(usage.used(CloudUsageKind.llm), 2);
     });
   }
 
@@ -615,12 +680,14 @@ void main() {
       expect(failed.streamingText, isEmpty);
       expect(failed.messages.single.content, '第一次提问');
 
+      expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
       limited = false;
       await notifier.send('第二次提问');
       final recovered = container.read(assistantChatControllerProvider);
       expect(recovered.isReady, isTrue);
       expect(recovered.message, isNull);
       expect(recovered.messages.last.content, '下一次正常回答');
+      expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
     });
   }
 
@@ -704,14 +771,14 @@ void main() {
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     final received = Completer<void>();
-    final subscription = container.listen(
-      assistantChatControllerProvider,
-      (_, state) {
-        if (state.streamingText == '在的' && !received.isCompleted) {
-          received.complete();
-        }
-      },
-    );
+    final subscription = container.listen(assistantChatControllerProvider, (
+      _,
+      state,
+    ) {
+      if (state.streamingText == '在的' && !received.isCompleted) {
+        received.complete();
+      }
+    });
     addTearDown(subscription.close);
     final done = notifier.send('在吗');
     sse.add(utf8.encode(_sseData('在的')));
@@ -734,6 +801,7 @@ void main() {
     final finalState = container.read(assistantChatControllerProvider);
     expect(finalState.messages, hasLength(2)); // user + 固化的 assistant
     expect(finalState.messages.last.content, '在的'); // 未被晚到分片污染
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
   });
 
   test('切新会话后在途分片不写回旧状态（令牌护栏）', () async {
@@ -750,14 +818,14 @@ void main() {
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     final received = Completer<void>();
-    final subscription = container.listen(
-      assistantChatControllerProvider,
-      (_, state) {
-        if (state.streamingText == '旧回答片段' && !received.isCompleted) {
-          received.complete();
-        }
-      },
-    );
+    final subscription = container.listen(assistantChatControllerProvider, (
+      _,
+      state,
+    ) {
+      if (state.streamingText == '旧回答片段' && !received.isCompleted) {
+        received.complete();
+      }
+    });
     addTearDown(subscription.close);
     final done = notifier.send('旧会话问题');
     sse.add(utf8.encode(_sseData('旧回答片段')));
@@ -776,6 +844,7 @@ void main() {
     expect(state.isIdle, isTrue);
     expect(state.messages, isEmpty);
     expect(state.streamingText, isEmpty);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
   });
 
   test('在途防重入：loading 中再次 send 不发第二次请求、不入历史', () async {
@@ -973,7 +1042,10 @@ void main() {
           {'role': 'user', 'content': '清除后的第二问'},
         ]);
       }
-      expect(container.read(assistantChatControllerProvider).contextBaseIndex, 2);
+      expect(
+        container.read(assistantChatControllerProvider).contextBaseIndex,
+        2,
+      );
     });
   }
 
@@ -983,15 +1055,17 @@ void main() {
     final firstResponse = Completer<http.Response>();
     final nextResponse = Completer<http.Response>();
     var probes = 0;
-    final container = containerWith(MockClient((request) {
-      if (_isStream(request.body)) return Future.value(_sseResponse('新回答'));
-      probes++;
-      if (probes == 1) {
-        entered.complete();
-        return firstResponse.future;
-      }
-      return nextResponse.future;
-    }));
+    final container = containerWith(
+      MockClient((request) {
+        if (_isStream(request.body)) return Future.value(_sseResponse('新回答'));
+        probes++;
+        if (probes == 1) {
+          entered.complete();
+          return firstResponse.future;
+        }
+        return nextResponse.future;
+      }),
+    );
     final notifier = container.read(assistantChatControllerProvider.notifier);
     final first = notifier.send('旧问题');
     await entered.future;
@@ -1009,7 +1083,10 @@ void main() {
       await Future.wait([first, next]);
     }
     expect(
-      container.read(assistantChatControllerProvider).messages.map((m) => m.content),
+      container
+          .read(assistantChatControllerProvider)
+          .messages
+          .map((m) => m.content),
       ['新问题', '新回答'],
     );
   });
@@ -1018,16 +1095,19 @@ void main() {
     await seedProviders();
     final entered = Completer<void>();
     final response = Completer<http.Response>();
-    final container = containerWith(MockClient((_) {
-      entered.complete();
-      return response.future;
-    }));
+    final container = containerWith(
+      MockClient((_) {
+        entered.complete();
+        return response.future;
+      }),
+    );
     final notifier = container.read(assistantChatControllerProvider.notifier);
     final pending = notifier.send('问题');
     await entered.future;
     container.invalidate(assistantChatControllerProvider);
     response.complete(_completionResponse());
     await expectLater(pending, completes);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
   });
 
   test('页面销毁在 streaming：discardPending 收敛状态（固化增量），不卡 busy', () async {
@@ -1087,6 +1167,7 @@ void main() {
       container.read(assistantChatControllerProvider).messages.last.content,
       '在的',
     );
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
   });
 
   test('页面销毁在 loading（判定中无增量）：discardPending 收敛回 ready，不新增消息', () async {
@@ -1103,12 +1184,12 @@ void main() {
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     final discarded = Completer<void>();
-    final subscription = container.listen(
-      assistantChatControllerProvider,
-      (_, next) {
-        if (next.isReady && !discarded.isCompleted) discarded.complete();
-      },
-    );
+    final subscription = container.listen(assistantChatControllerProvider, (
+      _,
+      next,
+    ) {
+      if (next.isReady && !discarded.isCompleted) discarded.complete();
+    });
     addTearDown(subscription.close);
     final done = notifier.send('在吗');
     await entered.future.timeout(const Duration(seconds: 5));
@@ -1132,6 +1213,7 @@ void main() {
 
   test('工具一轮：chatComplete 回 tool_calls → 执行 → 回灌 role:tool → 流式收尾', () async {
     await seedProviders();
+    await CloudUsageService.instance.setLimit(CloudUsageKind.llm, 1);
     final completeBodies = <String>[];
     var completeCall = 0;
     final container = containerWith(
@@ -1172,10 +1254,12 @@ void main() {
     final msgs = round2['messages'] as List<dynamic>;
     expect(msgs.any((m) => m['role'] == 'tool'), isTrue);
     expect(completeBodies[1], isNot(contains('key-p1')));
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
   });
 
   test('工具循环 4 轮硬上限：始终回 tool_calls → 到顶强制流式收尾', () async {
     await seedProviders();
+    await CloudUsageService.instance.setLimit(CloudUsageKind.llm, 1);
     var completeCall = 0;
     final container = containerWith(
       MockClient((request) async {
@@ -1204,5 +1288,6 @@ void main() {
     );
     expect(state.messages.last.role, ChatRole.assistant);
     expect(state.messages.last.content, '我们先练一练吧！');
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
   });
 }

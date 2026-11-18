@@ -14,6 +14,31 @@ class _ObservedUsage extends CloudUsageService {
   void Function()? onQueued;
 
   @override
+  Future<T> trackLlmSuccess<T>(
+    Future<T> Function() action, {
+    void Function()? check,
+    bool Function(T result)? isSuccessful,
+  }) {
+    final result = super.trackLlmSuccess(
+      action,
+      check: check,
+      isSuccessful: isSuccessful,
+    );
+    onQueued?.call();
+    return result;
+  }
+
+  @override
+  Stream<T> trackLlmStream<T>(
+    Stream<T> Function() action, {
+    void Function()? check,
+  }) {
+    final stream = super.trackLlmStream(action, check: check);
+    onQueued?.call();
+    return stream;
+  }
+
+  @override
   Future<void> reserve(CloudUsageKind kind, {void Function()? check}) {
     final reservation = super.reserve(kind, check: check);
     onQueued?.call();
@@ -38,10 +63,12 @@ void main() {
     addTearDown(client.close);
     usage.onQueued = client.cancelPending;
     await expectLater(
-      client.verify(WorkerTtsConfig(
-        base: Uri.parse('https://example.com'),
-        apiKey: 'synthetic',
-      )),
+      client.verify(
+        WorkerTtsConfig(
+          base: Uri.parse('https://example.com'),
+          apiKey: 'synthetic',
+        ),
+      ),
       throwsA(isA<WorkerTtsException>()),
     );
     expect(requests, 0);
@@ -80,7 +107,7 @@ void main() {
                     messages: const [],
                   )
                   .toList()
-            : client.testConnection(config),
+            : client.explain(config: config, systemPrompt: '', userPrompt: ''),
         throwsA(isA<LlmGenerationCancelled>()),
       );
       expect(requests, 0);

@@ -73,8 +73,8 @@ class CloudUsageHistoryPage extends StatelessWidget {
                 icon: Icons.bar_chart_outlined,
                 title: '暂无用量记录',
                 description:
-                    '最近 $days 天没有发送过云端请求。'
-                    '使用 AI、图片生成、语音识别或云朗读后，这里会按天记录次数。',
+                    '最近 $days 天暂无云服务用量记录。'
+                    'AI 成功结果以及图片生成、语音识别和云朗读请求会按天记录次数。',
               )
             else
               for (final kind in CloudUsageKind.values) ...[
@@ -82,7 +82,7 @@ class CloudUsageHistoryPage extends StatelessWidget {
                 const SizedBox(height: SpacingTokens.md),
               ],
             Text(
-              '共保留最近 32 天记录，更早的会自动清理。额度按本设备当天实际发送的请求计数，'
+              '共保留最近 32 天记录，更早的会自动清理。AI 按成功结果计次，旧版 AI 请求计数不沿用；其他服务按实际请求计次，'
               '不随备份恢复迁移，也不是精确费用账单。',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,

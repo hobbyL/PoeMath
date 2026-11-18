@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:poemath/core/prompts/picture_story_feedback_prompt.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
+import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/data/models/picture_story_evaluation.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
@@ -75,40 +76,42 @@ class PictureStoryFeedbackService {
         'goals': prompt.goals,
         'reference': prompt.reference,
       });
-      final completion = await client.chatComplete(
-        config: config,
-        systemPrompt: buildPictureStoryFeedbackPrompt(preference),
-        messages: [
-          ChatMessage(
-            role: ChatRole.user,
-            content: input,
-            contentParts: [
-              {'type': 'text', 'text': input},
-              {
-                'type': 'image_url',
-                'image_url': {
-                  'url': 'data:image/png;base64,${base64Encode(image)}',
+      return await client.trackSuccessfulOperation(() async {
+        final completion = await client.chatComplete(
+          config: config,
+          systemPrompt: buildPictureStoryFeedbackPrompt(preference),
+          messages: [
+            ChatMessage(
+              role: ChatRole.user,
+              content: input,
+              contentParts: [
+                {'type': 'text', 'text': input},
+                {
+                  'type': 'image_url',
+                  'image_url': {
+                    'url': 'data:image/png;base64,${base64Encode(image)}',
+                  },
                 },
-              },
-            ],
+              ],
+            ),
+          ],
+          requiresVision: true,
+          maxTokens: 4000,
+          validate: (completion) => PictureStoryEvaluation.parse(
+            completion.content ?? '',
+            answer: answer,
+            questionCount: prompt.questions.length,
           ),
-        ],
-        requiresVision: true,
-        maxTokens: 4000,
-        validate: (completion) => PictureStoryEvaluation.parse(
+        );
+        final evaluation = PictureStoryEvaluation.parse(
           completion.content ?? '',
           answer: answer,
           questionCount: prompt.questions.length,
-        ),
-      );
-      final evaluation = PictureStoryEvaluation.parse(
-        completion.content ?? '',
-        answer: answer,
-        questionCount: prompt.questions.length,
-      );
-      if (!active()) return unavailablePictureStoryFeedback('点评已暂停，可重新发起。');
-      await client.acceptCompletion(completion);
-      return evaluation.encode(answer: answer, prompts: prompt.questions);
+        );
+        if (!active()) throw const LlmGenerationCancelled();
+        await client.acceptCompletion(completion);
+        return evaluation.encode(answer: answer, prompts: prompt.questions);
+      });
     } on Object {
       // 不回显供应商正文、凭据或答案；原回答始终可回听和重试。
       return unavailablePictureStoryFeedback('点评暂时不可用，回答已保留，可稍后重试。');

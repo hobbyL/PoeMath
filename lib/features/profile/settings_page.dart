@@ -349,7 +349,7 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.lock_outline,
                 iconColor: theme.colorScheme.primary,
                 title: '家长保护与云额度',
-                subtitle: '家长密码、恢复码与每日请求次数',
+                subtitle: '家长密码、恢复码与每日云服务额度',
                 onTap: () => context.push(AppRoutes.parentProtection),
               ),
               const SizedBox(height: SpacingTokens.sm),
