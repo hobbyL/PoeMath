@@ -214,6 +214,7 @@ void main() {
 
     await tester.pumpAndSettle();
     await tap(prompt.title);
+    expect(find.text('我的表达'), findsNothing);
     expect(find.text('观察画面'), findsNothing);
     expect(find.text('试着讲'), findsNothing);
     expect(find.text('回听完善'), findsNothing);
@@ -232,6 +233,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('把事情讲顺'), findsNothing);
     await tap('说一说');
+    expect(find.text('我的表达'), findsOneWidget);
     await tap('说好了');
     await waitFor(
       () => HiveBoxes.pictureStoryPractice.values.single.segments.length == 1,

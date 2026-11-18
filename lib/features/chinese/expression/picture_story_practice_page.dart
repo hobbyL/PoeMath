@@ -99,6 +99,12 @@ class _PictureStoryPracticePageState
   bool get _busy =>
       _starting || _recording || _processing || _finishing || _deleting;
 
+  bool get _showExpression =>
+      _busy ||
+      _segments.isNotEmpty ||
+      _retellingDraft != null ||
+      _message != null;
+
   bool get _canComplete =>
       _foreground &&
       !_starting &&
@@ -980,20 +986,24 @@ class _PictureStoryPracticePageState
           final wide = constraints.maxWidth >= ResponsiveLayout.wideBreakpoint;
           final content = _buildContent(theme, prompt);
           return wide
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: content[0]),
-                    const SizedBox(width: SpacingTokens.lg),
-                    Expanded(child: content[1]),
-                  ],
-                )
+              ? content.length == 1
+                    ? content.single
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: content.first),
+                          const SizedBox(width: SpacingTokens.lg),
+                          Expanded(child: content.last),
+                        ],
+                      )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    content[0],
-                    const SizedBox(height: SpacingTokens.md),
-                    content[1],
+                    content.first,
+                    if (content.length > 1) ...[
+                      const SizedBox(height: SpacingTokens.md),
+                      content.last,
+                    ],
                   ],
                 );
         },
@@ -1124,62 +1134,63 @@ class _PictureStoryPracticePageState
           ],
         ],
       ),
-      ColoredCard(
-        key: _speakingKey,
-        color: theme.colorScheme.primary,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('我的表达', style: titleStyle),
-            if (_retellingDraft != null) ...[
-              const SizedBox(height: SpacingTokens.xs),
-              Text(
-                '第 ${(_parentRecord?.takes.length ?? 1) + 1} 遍，之前的表达已保留。',
-                style: bodyStyle,
-              ),
-            ],
-            const SizedBox(height: SpacingTokens.sm),
-            if (_segments.isEmpty && !_recording && !_processing)
-              Text('录完一段后，识别文字会自动填在这里。你可以修改文字。', style: bodyStyle),
-            for (final segment in _segments)
-              _segmentTile(theme, segment, bodyStyle),
-            if (_recording)
-              Semantics(
-                liveRegion: true,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: SpacingTokens.sm,
-                  ),
-                  child: Text(
-                    _liveText.isEmpty
-                        ? '正在听你说… $_elapsedSeconds/60 秒'
-                        : _liveText,
-                    style: bodyStyle?.copyWith(
-                      color: theme.colorScheme.primary,
+      if (_showExpression)
+        ColoredCard(
+          key: _speakingKey,
+          color: theme.colorScheme.primary,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('我的表达', style: titleStyle),
+              if (_retellingDraft != null) ...[
+                const SizedBox(height: SpacingTokens.xs),
+                Text(
+                  '第 ${(_parentRecord?.takes.length ?? 1) + 1} 遍，之前的表达已保留。',
+                  style: bodyStyle,
+                ),
+              ],
+              const SizedBox(height: SpacingTokens.sm),
+              if (_segments.isEmpty && !_recording && !_processing)
+                Text('录完一段后，识别文字会自动填在这里。你可以修改文字。', style: bodyStyle),
+              for (final segment in _segments)
+                _segmentTile(theme, segment, bodyStyle),
+              if (_recording)
+                Semantics(
+                  liveRegion: true,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: SpacingTokens.sm,
+                    ),
+                    child: Text(
+                      _liveText.isEmpty
+                          ? '正在听你说… $_elapsedSeconds/60 秒'
+                          : _liveText,
+                      style: bodyStyle?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            if (_starting || _processing || _finishing || _deleting)
-              const LinearProgressIndicator(),
-            if (_finishing) const Text('正在整理本次反馈…'),
-            if (_message != null) ...[
-              const SizedBox(height: SpacingTokens.sm),
-              Text(
-                _message!,
-                style: bodyStyle?.copyWith(color: theme.colorScheme.error),
-              ),
+              if (_starting || _processing || _finishing || _deleting)
+                const LinearProgressIndicator(),
+              if (_finishing) const Text('正在整理本次反馈…'),
+              if (_message != null) ...[
+                const SizedBox(height: SpacingTokens.sm),
+                Text(
+                  _message!,
+                  style: bodyStyle?.copyWith(color: theme.colorScheme.error),
+                ),
+              ],
+              if (_retellingDraft != null) ...[
+                const SizedBox(height: SpacingTokens.sm),
+                TextButton(
+                  onPressed: _busy ? null : _discardRetelling,
+                  child: const Text('放弃这一遍重讲'),
+                ),
+              ],
             ],
-            if (_retellingDraft != null) ...[
-              const SizedBox(height: SpacingTokens.sm),
-              TextButton(
-                onPressed: _busy ? null : _discardRetelling,
-                child: const Text('放弃这一遍重讲'),
-              ),
-            ],
-          ],
+          ),
         ),
-      ),
     ];
   }
 
