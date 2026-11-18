@@ -596,11 +596,24 @@ void main() {
 
   test('超过 32 MiB 的题图备份可导出、保存加密快照并完整恢复', () async {
     const formerLimit = 32 * 1024 * 1024;
-    final repository = PictureStoryRepository(images: images);
-    for (var index = 0; index < 15; index++) {
-      final image = await images.importBytes(
-        await pictureStoryNoisePng(width: 768 + index, height: 768),
+    const imageCount = 13;
+    final backupImages = PictureStoryImageService(
+      directoryProvider: () async => directory,
+      normalizer: (bytes) async => bytes,
+      decoder: (_) async {},
+    );
+    final repository = PictureStoryRepository(images: backupImages);
+    final expectedImages = <String, Uint8List>{};
+    var encodedImageBytes = 0;
+    for (var index = 0; index < imageCount; index++) {
+      final bytes = await pictureStoryNoisePng(width: 735 + index, height: 768);
+      expect(
+        bytes.length,
+        lessThanOrEqualTo(PictureStoryImageService.maxStoredBytes),
       );
+      encodedImageBytes += ((bytes.length + 2) ~/ 3) * 4;
+      final image = await backupImages.importBytes(bytes);
+      expectedImages[image.value] = bytes;
       await repository.savePrompt(
         prompt: pictureStoryFixture(
           id: 'local-large-backup-$index',
@@ -609,15 +622,11 @@ void main() {
         profileId: 'default',
       );
     }
+    expect(encodedImageBytes, greaterThan(formerLimit));
     final catalog = repository.catalogState().toJson();
     final enabled = repository.enabledByProfile();
-    final service = backup();
-    final json = await service.exportToJson(includeCredentials: false);
-    final file = File('${directory.path}/large-backup.json');
-    await file.writeAsString(json);
-    expect(await file.length(), greaterThan(formerLimit));
-    expect(service.inspectJson(json).counts['题目图片'], 15);
-
+    expect(repository.catalogState().imageIds.length, imageCount);
+    final service = backup(imageService: backupImages);
     final history = BackupHistoryService(
       backup: service,
       directoryProvider: () async => directory,
@@ -626,24 +635,37 @@ void main() {
     final snapshot = await history.create();
     final protected = File('${directory.path}/backup_history/${snapshot.id}');
     expect(await protected.length(), greaterThan(formerLimit));
-    expect(isEncryptedBackup(await readBackupFile(protected)), isTrue);
+    final encryptedPrefix = await protected
+        .openRead(0, 48)
+        .transform(utf8.decoder)
+        .join();
+    expect(encryptedPrefix, startsWith('{"format":"poemath-encrypted-backup"'));
     final recovered = await history.read(snapshot.id);
-    expect(service.inspectJson(recovered).counts['题目图片'], 15);
+    // UTF-16 code units never outnumber the UTF-8 bytes stored in the file.
+    expect(recovered.length, greaterThan(formerLimit));
+    final file = File('${directory.path}/large-backup.json');
     await file.writeAsString(recovered);
 
     // 恢复到全新的图片目录，避免已有图片让恢复测试假通过。
     final target = Directory('${directory.path}/restored');
     final restoredImages = PictureStoryImageService(
       directoryProvider: () async => target,
+      decoder: (_) async {},
     );
     await backup(imageService: restoredImages).restoreFromFile(file.path);
     final restored = PictureStoryRepository(images: restoredImages);
     expect(restored.catalogState().toJson(), catalog);
+    expect(restored.catalogState().imageIds.length, imageCount);
     expect(restored.enabledByProfile(), enabled);
     for (final id in restored.catalogState().imageIds) {
       final bytes = await restoredImages.readImage(id);
+      expect(bytes, expectedImages[id]);
       expect(sha256.convert(bytes).toString(), id);
     }
+    final imageId = restored.catalogState().imageIds.first;
+    final storedImage = await restoredImages.readImage(imageId);
+    await PictureStoryImageService(directoryProvider: () async => target)
+        .validateImageBytes(imageId, storedImage);
   });
 
   test('备份遇到缺失图片明确失败，不静默省略或修改题库', () async {
