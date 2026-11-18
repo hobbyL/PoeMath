@@ -72,7 +72,6 @@ class _PictureStoryPracticePageState
   Future<void> _retellingWrites = Future.value();
   bool _guided = true;
   int _questionIndex = 0;
-  int _stage = 0;
   final _speakingKey = GlobalKey();
   List<PictureStorySegment> _segments = [];
   String _liveText = '';
@@ -264,7 +263,6 @@ class _PictureStoryPracticePageState
     final generation = ++_generation;
     setState(() {
       _starting = true;
-      _stage = 1;
       _liveText = '';
       _message = null;
     });
@@ -850,7 +848,6 @@ class _PictureStoryPracticePageState
   }
 
   void _showSpeaking() {
-    setState(() => _stage = 1);
     final target = _speakingKey.currentContext;
     if (target != null) Scrollable.ensureVisible(target, alignment: .2);
   }
@@ -1102,27 +1099,6 @@ class _PictureStoryPracticePageState
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Semantics(
-            label: _stage == 0 ? '当前步骤：观察画面' : '当前步骤：试着讲',
-            child: Wrap(
-              spacing: SpacingTokens.sm,
-              runSpacing: SpacingTokens.xs,
-              children: [
-                ChoiceChip(
-                  label: const Text('观察画面'),
-                  selected: _stage == 0,
-                  onSelected: _busy ? null : (_) => setState(() => _stage = 0),
-                ),
-                ChoiceChip(
-                  label: const Text('试着讲'),
-                  selected: _stage == 1,
-                  onSelected: _busy ? null : (_) => _showSpeaking(),
-                ),
-                const Chip(label: Text('回听完善')),
-              ],
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.sm),
           PictureStoryGuidance(
             prompt: prompt,
             guided: _guided,
@@ -1131,10 +1107,7 @@ class _PictureStoryPracticePageState
             onQuestionChanged: (value) =>
                 setState(() => _questionIndex = value),
             onModeChanged: (value) {
-              setState(() {
-                _guided = value;
-                _stage = value ? 0 : 1;
-              });
+              setState(() => _guided = value);
               unawaited(_saveDraft());
             },
             onStartSpeaking: _showSpeaking,

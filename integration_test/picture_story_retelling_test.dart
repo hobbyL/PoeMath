@@ -62,7 +62,7 @@ class _Speech
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  testWidgets('分步引导、重讲续练、独立点评对比和完成次数在 Android 贯通', (tester) async {
+  testWidgets('问题引导、重讲续练、独立点评对比和完成次数在 Android 贯通', (tester) async {
     expect(
       (await PackageInfo.fromPlatform()).packageName,
       'com.poemath.app.integration',
@@ -211,6 +211,9 @@ void main() {
 
     await tester.pumpAndSettle();
     await tap(prompt.title);
+    expect(find.text('观察画面'), findsNothing);
+    expect(find.text('试着讲'), findsNothing);
+    expect(find.text('回听完善'), findsNothing);
     expect(requests, 0);
     await screenshot('observe');
     await tap('下一问');
