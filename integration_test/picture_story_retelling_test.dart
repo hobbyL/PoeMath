@@ -231,7 +231,7 @@ void main() {
     final first = repo.records().single.copy();
     expect(HiveBoxes.learningActivities.values.length, 1);
     await tap('再讲一遍');
-    await tap('自己完整讲');
+    await tap('完整模式');
     await tap('说一说');
     await tap('说好了');
     await waitFor(

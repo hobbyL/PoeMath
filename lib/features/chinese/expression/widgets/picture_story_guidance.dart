@@ -29,37 +29,51 @@ class PictureStoryGuidance extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final questions = prompt.questions;
+    final largeText = MediaQuery.textScalerOf(context).scale(14) > 20;
+    SegmentedButton<bool> modeSelector(Axis direction) => SegmentedButton<bool>(
+      direction: direction,
+      showSelectedIcon: false,
+      style: SegmentedButton.styleFrom(
+        minimumSize: const Size(0, SpacingTokens.xxl),
+        padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.sm),
+      ),
+      segments: const [
+        ButtonSegment<bool>(value: true, label: Text('问答模式')),
+        ButtonSegment<bool>(value: false, label: Text('完整模式')),
+      ],
+      selected: {guided},
+      onSelectionChanged: busy
+          ? null
+          : (selection) => onModeChanged(selection.first),
+    );
     return ColoredCard(
       color: theme.colorScheme.primary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(prompt.title, style: theme.textTheme.titleLarge),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            [
-              prompt.levelLabel,
-              if (prompt.theme.isNotEmpty) prompt.theme,
-            ].join(' · '),
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: SpacingTokens.md),
-          Wrap(
-            spacing: SpacingTokens.sm,
-            runSpacing: SpacingTokens.xs,
-            children: [
-              ChoiceChip(
-                label: const Text('跟着问题讲'),
-                selected: guided,
-                onSelected: busy ? null : (_) => onModeChanged(true),
-              ),
-              ChoiceChip(
-                label: const Text('自己完整讲'),
-                selected: !guided,
-                onSelected: busy ? null : (_) => onModeChanged(false),
-              ),
-            ],
-          ),
+          if (largeText)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(prompt.title, style: theme.textTheme.titleLarge),
+                const SizedBox(height: SpacingTokens.xs),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: modeSelector(Axis.vertical),
+                ),
+              ],
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(prompt.title, style: theme.textTheme.titleLarge),
+                ),
+                const SizedBox(width: SpacingTokens.xs),
+                modeSelector(Axis.horizontal),
+              ],
+            ),
           const SizedBox(height: SpacingTokens.md),
           if (guided && questions.isNotEmpty) ...[
             Text(

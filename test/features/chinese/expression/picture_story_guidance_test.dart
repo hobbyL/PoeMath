@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_guidance.dart';
 
 import '../../../helpers/picture_story_fixture.dart';
 
 void main() {
   testWidgets('逐问观察与自由讲述可切换，帮手仅在主动展开时显示原题提示', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final semantics = tester.ensureSemantics();
     var guided = true;
     var question = 0;
@@ -42,6 +47,22 @@ void main() {
         ),
       ),
     );
+    final titleRect = tester.getRect(find.text(prompt.title));
+    final modesRect = tester.getRect(find.byType(SegmentedButton<bool>));
+    final questionModeRect = tester.getRect(find.text('问答模式'));
+    final fullModeRect = tester.getRect(find.text('完整模式'));
+    expect(titleRect.center.dy, closeTo(modesRect.center.dy, 1));
+    expect(titleRect.right, lessThan(modesRect.left));
+    expect(
+      questionModeRect.left - modesRect.left,
+      greaterThanOrEqualTo(SpacingTokens.sm),
+    );
+    expect(
+      modesRect.right - fullModeRect.right,
+      greaterThanOrEqualTo(SpacingTokens.sm),
+    );
+    expect(find.text(prompt.levelLabel), findsNothing);
+    expect(find.text(prompt.theme), findsNothing);
     expect(find.text(prompt.questions.first), findsOneWidget);
     expect(find.text(prompt.questions.last), findsNothing);
     final questionSemantics = tester.getSemantics(
@@ -64,7 +85,7 @@ void main() {
     await tester.pump();
     expect(find.text(prompt.questions.last), findsOneWidget);
     expect(find.text(prompt.questions.first), findsNothing);
-    await tester.tap(find.text('自己完整讲'));
+    await tester.tap(find.text('完整模式'));
     await tester.pump();
     expect(find.text(prompt.questions.first), findsOneWidget);
     expect(find.text(prompt.questions.last), findsOneWidget);
