@@ -1110,32 +1110,18 @@ class _PictureStoryPracticePageState
               setState(() => _guided = value);
               unawaited(_saveDraft());
             },
-            onStartSpeaking: _showSpeaking,
           ),
-          const SizedBox(height: SpacingTokens.sm),
-          ColoredCard(
-            color: theme.colorScheme.primary,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextButton.icon(
-                  onPressed: () {
-                    setState(() => _showHints = !_showHints);
-                    if (_showHints) _useHelp();
-                  },
-                  icon: const Icon(Icons.lightbulb_outline),
-                  label: Text(_showHints ? '收起词句帮手' : '打开词句帮手'),
-                ),
-                if (_showHints)
-                  PictureStoryLanguageHelp(
-                    prompt: prompt,
-                    canViewReference:
-                        (_savedRecord?.segments.isNotEmpty ?? false),
-                    onUsed: _useHelp,
-                  ),
-              ],
+          if (_showHints) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            ColoredCard(
+              color: theme.colorScheme.primary,
+              child: PictureStoryLanguageHelp(
+                prompt: prompt,
+                canViewReference: (_savedRecord?.segments.isNotEmpty ?? false),
+                onUsed: _useHelp,
+              ),
             ),
-          ),
+          ],
         ],
       ),
       ColoredCard(

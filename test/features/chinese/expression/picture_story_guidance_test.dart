@@ -23,6 +23,7 @@ void main() {
         home: Scaffold(
           body: StatefulBuilder(
             builder: (context, setState) => SingleChildScrollView(
+              padding: const EdgeInsets.all(SpacingTokens.md),
               child: Column(
                 children: [
                   PictureStoryGuidance(
@@ -33,7 +34,6 @@ void main() {
                     onQuestionChanged: (value) =>
                         setState(() => question = value),
                     onModeChanged: (value) => setState(() => guided = value),
-                    onStartSpeaking: () {},
                   ),
                   PictureStoryLanguageHelp(
                     prompt: prompt,
@@ -70,10 +70,46 @@ void main() {
     );
     expect(questionSemantics.label, prompt.questions.first);
     expect(questionSemantics.flagsCollection.isLiveRegion, isTrue);
+    final progressRect = tester.getRect(
+      find.text('观察问题 1/${prompt.questions.length}'),
+    );
+    final previousButton = find.ancestor(
+      of: find.text('上一问'),
+      matching: find.byType(TextButton),
+    );
     final nextButton = find.ancestor(
       of: find.text('下一问'),
       matching: find.byType(TextButton),
     );
+    final previousButtonRect = tester.getRect(previousButton);
+    final nextButtonRect = tester.getRect(nextButton);
+    expect(previousButtonRect.center.dy, closeTo(progressRect.center.dy, 1));
+    expect(nextButtonRect.center.dy, closeTo(progressRect.center.dy, 1));
+    expect(progressRect.right, lessThan(previousButtonRect.left));
+    expect(nextButtonRect.left, closeTo(previousButtonRect.right, .01));
+    expect(nextButtonRect.right, closeTo(modesRect.right, .01));
+    expect(
+      previousButtonRect.height,
+      greaterThanOrEqualTo(SpacingTokens.minTapTarget),
+    );
+    expect(
+      nextButtonRect.height,
+      greaterThanOrEqualTo(SpacingTokens.minTapTarget),
+    );
+    expect(
+      tester.getRect(find.text(prompt.questions.first)).top,
+      greaterThan(nextButtonRect.bottom),
+    );
+    final nextLabelRect = tester.getRect(find.text('下一问'));
+    final nextIconRect = tester.getRect(find.byIcon(Icons.chevron_right));
+    final previousLabelRect = tester.getRect(find.text('上一问'));
+    expect(
+      nextLabelRect.left - previousLabelRect.right,
+      lessThanOrEqualTo(SpacingTokens.sm),
+    );
+    expect(nextIconRect.center.dy, closeTo(nextLabelRect.center.dy, 1));
+    expect(nextIconRect.left, greaterThan(nextLabelRect.right));
+    expect(nextIconRect.right, closeTo(modesRect.right, .01));
     expect(
       tester
           .getSemantics(nextButton)
@@ -117,6 +153,7 @@ void main() {
           ),
           home: Scaffold(
             body: SingleChildScrollView(
+              padding: const EdgeInsets.all(SpacingTokens.md),
               child: Column(
                 children: [
                   PictureStoryGuidance(
@@ -126,7 +163,6 @@ void main() {
                     busy: true,
                     onQuestionChanged: (_) => fail('忙碌时不能换问题'),
                     onModeChanged: (_) => fail('忙碌时不能换练法'),
-                    onStartSpeaking: () {},
                   ),
                   PictureStoryLanguageHelp(
                     prompt: prompt,
@@ -140,6 +176,11 @@ void main() {
         ),
       );
       expect(tester.takeException(), isNull);
+      final modesRect = tester.getRect(find.byType(SegmentedButton<bool>));
+      final nextButtonRect = tester.getRect(
+        find.ancestor(of: find.text('下一问'), matching: find.byType(TextButton)),
+      );
+      expect(nextButtonRect.right, closeTo(modesRect.right, .01));
       await tester.ensureVisible(find.text('看看另一种说法'));
       await tester.tap(find.text('看看另一种说法'));
       await tester.pumpAndSettle();

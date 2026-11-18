@@ -178,7 +178,10 @@ void main() {
 
     Future<void> tap(String text) async {
       final finder = find.text(text);
-      await tester.ensureVisible(finder.last);
+      await Scrollable.ensureVisible(
+        tester.element(finder.last),
+        alignment: .5,
+      );
       await tester.pumpAndSettle();
       await tester.tap(finder.last);
       await tester.pumpAndSettle();
@@ -218,10 +221,16 @@ void main() {
     await screenshot('observe');
     await tap('下一问');
     expect(find.text(prompt.questions[1]), findsOneWidget);
-    await tap('打开词句帮手');
+    expect(find.text('打开词句帮手'), findsNothing);
+    expect(find.text('把事情讲顺'), findsNothing);
+    await tester.tap(find.byTooltip('显示提示'));
+    await tester.pumpAndSettle();
     await tap('把事情讲顺');
     expect(find.text(prompt.reference), findsNothing);
     await screenshot('help');
+    await tester.tap(find.byTooltip('隐藏提示'));
+    await tester.pumpAndSettle();
+    expect(find.text('把事情讲顺'), findsNothing);
     await tap('说一说');
     await tap('说好了');
     await waitFor(

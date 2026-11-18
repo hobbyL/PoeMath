@@ -14,7 +14,6 @@ class PictureStoryGuidance extends StatelessWidget {
     required this.busy,
     required this.onQuestionChanged,
     required this.onModeChanged,
-    required this.onStartSpeaking,
   });
 
   final PictureStoryPrompt prompt;
@@ -23,7 +22,6 @@ class PictureStoryGuidance extends StatelessWidget {
   final bool busy;
   final ValueChanged<int> onQuestionChanged;
   final ValueChanged<bool> onModeChanged;
-  final VoidCallback onStartSpeaking;
 
   @override
   Widget build(BuildContext context) {
@@ -76,9 +74,56 @@ class PictureStoryGuidance extends StatelessWidget {
             ),
           const SizedBox(height: SpacingTokens.md),
           if (guided && questions.isNotEmpty) ...[
-            Text(
-              '观察问题 ${questionIndex + 1}/${questions.length}',
-              style: theme.textTheme.labelLarge,
+            OverflowBar(
+              alignment: MainAxisAlignment.spaceBetween,
+              overflowAlignment: OverflowBarAlignment.end,
+              spacing: SpacingTokens.sm,
+              overflowSpacing: SpacingTokens.xs,
+              children: [
+                Text(
+                  '观察问题 ${questionIndex + 1}/${questions.length}',
+                  style: theme.textTheme.labelLarge,
+                ),
+                if (questions.length > 1)
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    runSpacing: SpacingTokens.xs,
+                    children: [
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, SpacingTokens.xxl),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: SpacingTokens.xs,
+                          ),
+                        ),
+                        onPressed: busy || questionIndex == 0
+                            ? null
+                            : () => onQuestionChanged(questionIndex - 1),
+                        icon: const Icon(Icons.chevron_left),
+                        label: const Text('上一问'),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, SpacingTokens.xxl),
+                          padding: const EdgeInsetsDirectional.only(
+                            start: SpacingTokens.xs,
+                          ),
+                        ),
+                        onPressed: busy || questionIndex == questions.length - 1
+                            ? null
+                            : () => onQuestionChanged(questionIndex + 1),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('下一问'),
+                            SizedBox(width: SpacingTokens.xs),
+                            Icon(Icons.chevron_right),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
             ),
             const SizedBox(height: SpacingTokens.sm),
             Semantics(
@@ -88,48 +133,12 @@ class PictureStoryGuidance extends StatelessWidget {
                 style: theme.textTheme.titleMedium,
               ),
             ),
-            if (questions.length > 1) ...[
-              const SizedBox(height: SpacingTokens.sm),
-              Wrap(
-                spacing: SpacingTokens.sm,
-                children: [
-                  TextButton.icon(
-                    onPressed: busy || questionIndex == 0
-                        ? null
-                        : () => onQuestionChanged(questionIndex - 1),
-                    icon: const Icon(Icons.chevron_left),
-                    label: const Text('上一问'),
-                  ),
-                  TextButton.icon(
-                    onPressed: busy || questionIndex == questions.length - 1
-                        ? null
-                        : () => onQuestionChanged(questionIndex + 1),
-                    icon: const Icon(Icons.chevron_right),
-                    label: const Text('下一问'),
-                  ),
-                ],
-              ),
-            ],
-            TextButton.icon(
-              onPressed: busy ? null : onStartSpeaking,
-              icon: const Icon(Icons.record_voice_over_outlined),
-              label: const Text('把观察连起来讲'),
-            ),
           ] else ...[
             const Text('看一看画面，把你发现的事情连起来讲。'),
             for (final question in questions)
               Padding(
                 padding: const EdgeInsets.only(top: SpacingTokens.sm),
                 child: Text(question),
-              ),
-          ],
-          if (prompt.goals.isNotEmpty) ...[
-            const SizedBox(height: SpacingTokens.md),
-            Text('这次试一试', style: theme.textTheme.titleSmall),
-            for (final goal in prompt.goals)
-              Padding(
-                padding: const EdgeInsets.only(top: SpacingTokens.xs),
-                child: Text(goal),
               ),
           ],
         ],
