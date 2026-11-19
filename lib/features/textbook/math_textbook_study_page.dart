@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/math_textbook_progress.dart';
@@ -89,8 +90,6 @@ class MathTextbookBookPage extends ConsumerWidget {
                           ),
                           data: (snapshot) => _content(
                             context,
-                            ref,
-                            book,
                             snapshot.course,
                             snapshot.lessons,
                           ),
@@ -102,133 +101,126 @@ class MathTextbookBookPage extends ConsumerWidget {
 
   Widget _content(
     BuildContext context,
-    WidgetRef ref,
-    Textbook book,
     MathTextbookCourse? course,
     Map<String, MathTextbookLessonProgress> summaries,
   ) {
     final color = Theme.of(context).colorScheme.primary;
+    final unconfirmedPurposeLessonIds = {
+      for (final range
+          in course?.outline?.ranges ?? const <MathTextbookCourseRange>[])
+        if (range.needsAlignment && range.title.endsWith('（待确认用途）'))
+          range.lessonId,
+    };
     final lessons = [...?course?.currentLessons]
+      ..removeWhere((lesson) => unconfirmedPurposeLessonIds.contains(lesson.id))
       ..sort((a, b) => a.startPage.compareTo(b.startPage));
-    final read = summaries.values.where((summary) => summary.read).length;
-    final completed = summaries.values
-        .where((summary) => summary.complete)
-        .length;
-    final selected =
-        ref
-            .watch(textbookRepositoryProvider)
-            .currentBook(ProfileScope.currentId, TextbookSubject.math)
-            ?.pdfSha256 ==
-        bookId;
-    return ListView.builder(
-      padding: const EdgeInsets.all(SpacingTokens.md),
-      itemCount: lessons.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ColoredCard(
-                color: color,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      '${book.title} · ${book.volumeLabel}',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: SpacingTokens.sm),
-                    Text(book.editionNote),
-                    Text(
-                      '可学 ${lessons.length} 课 · 已读 $read 课 · 练习完成 $completed 课',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              AppTile(
-                icon: Icons.menu_book_outlined,
-                iconColor: color,
-                title: '打开原书',
-                subtitle: '${book.pageCount} 页 · 可离线阅读',
-                onTap: () => context.push(AppRoutes.textbookReadOf(bookId)),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              if (course?.outline != null &&
-                  course!.outline!.organizationVersion <
-                      mathTextbookOrganizationVersion) ...[
-                AppTile(
-                  icon: Icons.auto_stories_outlined,
-                  iconColor: color,
-                  title: '更新课时内容',
-                  subtitle: '按讲解、例题和练习重新整理',
-                  onTap: () =>
-                      context.push(AppRoutes.mathTextbookReviewOf(bookId)),
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-              ],
-              if (selected)
-                const Text('这是当前使用的数学课本')
-              else
-                OutlinedButton(
-                  onPressed: () async {
-                    await ref
-                        .read(textbookRepositoryProvider)
-                        .selectBook(ProfileScope.currentId, book);
-                    ref.invalidate(textbookLocalListProvider);
-                  },
-                  child: const Text('设为当前数学课本'),
-                ),
-              if (lessons.isEmpty) ...[
-                const SizedBox(height: SpacingTokens.lg),
-                const Text('还没有整理的课时，可以先阅读原书。'),
-              ],
-              if (lessons.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: SpacingTokens.md,
-                  ),
-                  child: OutlinedButton(
-                    onPressed: () =>
-                        context.push(AppRoutes.mathTextbookReviewOf(bookId)),
-                    child: const Text('整理课时'),
-                  ),
-                ),
-            ],
-          );
-        }
-        final lesson = lessons[index - 1], summary = summaries[lesson.id]!;
-        final unit = lesson.learning?.unitTitle ?? '';
-        final previousUnit = index == 1
-            ? null
-            : lessons[index - 2].learning?.unitTitle ?? '';
+    final needsCourseUpdate =
+        course?.outline != null &&
+        course!.outline!.organizationVersion < mathTextbookOrganizationVersion;
+    final lessonGroups = <({String unit, List<MathTextbookLesson> lessons})>[];
+    var previousUnit = '';
+    for (var index = 0; index < lessons.length; index++) {
+      final lesson = lessons[index];
+      final unit = lesson.learning?.unitTitle ?? '';
+      final unitChanged = index == 0 || unit != previousUnit;
+      final heading = unitChanged && unit.isNotEmpty && unit != lesson.title
+          ? unit
+          : '';
+      if (lessonGroups.isEmpty ||
+          heading.isNotEmpty ||
+          unitChanged && lessonGroups.last.unit.isNotEmpty) {
+        lessonGroups.add((unit: heading, lessons: <MathTextbookLesson>[]));
+      }
+      lessonGroups.last.lessons.add(lesson);
+      previousUnit = unit;
+    }
+    final showIntro = lessons.isEmpty || needsCourseUpdate;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = ResponsiveLayout.columns(constraints.maxWidth);
         return Padding(
-          padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (unit.isNotEmpty && unit != previousUnit)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: SpacingTokens.md,
+          padding: const EdgeInsets.fromLTRB(
+            SpacingTokens.md,
+            0,
+            SpacingTokens.md,
+            SpacingTokens.md,
+          ),
+          child: CustomScrollView(
+            slivers: [
+              if (showIntro)
+                SliverPadding(
+                  padding: EdgeInsets.only(
+                    bottom: lessons.isEmpty ? 0 : SpacingTokens.sm,
                   ),
-                  child: Text(
-                    unit,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (needsCourseUpdate)
+                          AppTile(
+                            icon: Icons.auto_stories_outlined,
+                            iconColor: color,
+                            title: '更新课时内容',
+                            subtitle: '按讲解、例题和练习重新整理',
+                            onTap: () => context.push(
+                              AppRoutes.mathTextbookReviewOf(bookId),
+                            ),
+                          ),
+                        if (lessons.isEmpty) ...[
+                          const SizedBox(height: SpacingTokens.md),
+                          const Text('还没有整理的课时。'),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: SpacingTokens.md,
+                            ),
+                            child: OutlinedButton(
+                              onPressed: () => context.push(
+                                AppRoutes.mathTextbookReviewOf(bookId),
+                              ),
+                              child: const Text('整理课时'),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
-              AppTile(
-                icon: summary.complete
-                    ? Icons.check_circle_outline
-                    : Icons.school_outlined,
-                iconColor: color,
-                title: lesson.title,
-                subtitle:
-                    '${summary.label}\nPDF 第 ${lesson.startPage}～${lesson.endPage} 页',
-                onTap: () => context.push(
-                  AppRoutes.mathTextbookStudyOf(bookId, lesson.id),
+              for (final group in lessonGroups) ...[
+                if (group.unit.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: SpacingTokens.md,
+                      ),
+                      child: Text(
+                        group.unit,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                  ),
+                SliverPadding(
+                  padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+                  sliver: SliverCardGrid(
+                    columnCount: columns,
+                    itemCount: group.lessons.length,
+                    itemBuilder: (context, index) {
+                      final lesson = group.lessons[index];
+                      final summary = summaries[lesson.id]!;
+                      return AppTile(
+                        icon: summary.complete
+                            ? Icons.check_circle_outline
+                            : Icons.school_outlined,
+                        iconColor: color,
+                        title: lesson.title,
+                        subtitle: summary.label,
+                        onTap: () => context.push(
+                          AppRoutes.mathTextbookStudyOf(bookId, lesson.id),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         );

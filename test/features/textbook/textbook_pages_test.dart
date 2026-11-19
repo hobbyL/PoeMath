@@ -16,6 +16,9 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_catalog.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
+import 'package:poemath/data/models/math_textbook_course.dart';
+import 'package:poemath/domain/math_textbook_course_plan.dart';
+import 'package:poemath/domain/math_textbook_progress.dart';
 import 'package:poemath/features/textbook/widgets/textbook_toc_dialog.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
@@ -37,6 +40,7 @@ import 'package:poemath/features/textbook/widgets/textbook_search_dialog.dart';
 import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
 
 import '../../helpers/textbook_fixture.dart';
+import '../../helpers/math_textbook_fixture.dart';
 import '../../helpers/textbook_page_number_fixture.dart';
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
@@ -334,6 +338,8 @@ void main() {
     Textbook mathBook, {
     bool large = false,
     List<TextbookViewerOptions>? previewOptions,
+    MathTextbookCourse? mathCourse,
+    Size? size,
   }) async {
     await tester.runAsync(
       () => SettingsRepository().setLearningBackground(
@@ -342,9 +348,8 @@ void main() {
       ),
     );
     files.paths[mathBook.pdfSha256] = '/math-navigation.pdf';
-    tester.view.physicalSize = large
-        ? const Size(320, 820)
-        : const Size(360, 800);
+    tester.view.physicalSize =
+        size ?? (large ? const Size(320, 820) : const Size(360, 800));
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -371,9 +376,25 @@ void main() {
           textbookCourseProvider(mathBook.pdfSha256)
               .overrideWith((ref) async => null),
           mathTextbookCourseProvider(mathBook.pdfSha256)
-              .overrideWith((ref) async => null),
-          mathTextbookProgressProvider(mathBook.pdfSha256)
-              .overrideWith((ref) async => null),
+              .overrideWith((ref) async => mathCourse),
+          mathTextbookBookLearningProvider(mathBook.pdfSha256).overrideWith(
+            (ref) async => (
+              course: mathCourse,
+              lessons: <String, MathTextbookLessonProgress>{
+                for (final lesson
+                    in mathCourse?.currentLessons ?? <MathTextbookLesson>[])
+                  lesson.id: const MathTextbookLessonProgress(
+                    ready: false,
+                    read: false,
+                    originalTotal: 0,
+                    originalPassed: 0,
+                    pendingParent: 0,
+                    plansTotal: 0,
+                    plansPassed: 0,
+                  ),
+              },
+            ),
+          ),
           textbookPreviewBuilderProvider.overrideWithValue((_, options) {
             previewOptions?.add(options);
             return _Viewer(options);
@@ -402,7 +423,37 @@ void main() {
     ) async {
       final mathBook = textbookFixture(
         title: '数学样本课本',
+        pageCount: 12,
         subject: TextbookSubject.math,
+      );
+      const firstLessonTitle = '真实第一课';
+      final outline = planMathTextbookCourse(
+        const TextbookTocResult(
+          source: TextbookTocSource.bookmarks,
+          entries: [TextbookTocEntry(title: firstLessonTitle, page: 7)],
+        ),
+        mathBook.pageCount,
+      );
+      final placeholderRange = outline.ranges.first;
+      final placeholder = mathLessonFixture(
+        start: placeholderRange.startPage,
+        end: placeholderRange.endPage,
+        title: placeholderRange.title,
+      );
+      final lesson =
+          mathLessonFixture(start: 7, end: 8, title: firstLessonTitle).edit(
+            learning: MathTextbookLearning(
+              unitTitle: firstLessonTitle,
+              knowledgePoints: const [],
+              exercises: const [],
+              practicePlans: const [],
+            ),
+          );
+      final mathCourse = MathTextbookCourse.forBook(mathBook)
+          .replace(lessons: [placeholder, lesson], outline: outline);
+      expect(
+        mathCourse.currentLessons.map((value) => value.id),
+        contains(placeholder.id),
       );
       repo.books[mathBook.pdfSha256] = mathBook;
       repo.readings['default:${mathBook.pdfSha256}'] = const TextbookReading(
@@ -415,6 +466,7 @@ void main() {
         mathBook,
         large: large,
         previewOptions: options,
+        mathCourse: mathCourse,
       );
       expect(find.byType(MathHomePage), findsOneWidget);
       await tester.tap(find.byKey(ValueKey('textbook-${mathBook.pdfSha256}')));
@@ -444,12 +496,18 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(MathTextbookBookPage), findsOneWidget);
       expect(find.byType(MathTextbookReviewPage), findsNothing);
+      expect(
+        find.text('${mathBook.title} · ${mathBook.volumeLabel}'),
+        findsNothing,
+      );
+      expect(find.text(mathBook.editionNote), findsNothing);
+      expect(find.text('打开原书'), findsNothing);
+      expect(find.text('这是当前使用的数学课本'), findsNothing);
+      expect(find.text('设为当前数学课本'), findsNothing);
+      expect(find.text(placeholder.title), findsNothing);
+      expect(find.text(lesson.title), findsOneWidget);
+      expect(find.textContaining('PDF 第'), findsNothing);
       expect(repo.selected, isEmpty);
-      await tester.ensureVisible(find.text('设为当前数学课本'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('设为当前数学课本'));
-      await tester.pumpAndSettle();
-      expect(repo.selected, {'default:math': mathBook.pdfSha256});
 
       router.pop();
       await tester.pumpAndSettle();
@@ -463,6 +521,74 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('数学课时列表宽屏按三列展示', (tester) async {
+    final mathBook = textbookFixture(
+      title: '宽屏数学样本课本',
+      pageCount: 12,
+      subject: TextbookSubject.math,
+    );
+    const unitTitle = '真实单元';
+    final outline = planMathTextbookCourse(
+      const TextbookTocResult(
+        source: TextbookTocSource.bookmarks,
+        entries: [TextbookTocEntry(title: unitTitle, page: 7)],
+      ),
+      mathBook.pageCount,
+    );
+    final placeholderRange = outline.ranges.first;
+    final placeholder = mathLessonFixture(
+      start: placeholderRange.startPage,
+      end: placeholderRange.endPage,
+      title: placeholderRange.title,
+    );
+    MathTextbookLesson lesson(String title, int start) =>
+        mathLessonFixture(start: start, end: start + 1, title: title).edit(
+          learning: MathTextbookLearning(
+            unitTitle: title,
+            knowledgePoints: const [],
+            exercises: const [],
+            practicePlans: const [],
+          ),
+        );
+    final course = MathTextbookCourse.forBook(mathBook).replace(
+      lessons: [
+        placeholder,
+        lesson(unitTitle, 7),
+        lesson('第二课', 9),
+        lesson('第三课', 11),
+      ],
+      outline: outline,
+    );
+    repo.books[mathBook.pdfSha256] = mathBook;
+    lockParentForTesting();
+    final router = await pumpMathShelf(
+      tester,
+      mathBook,
+      mathCourse: course,
+      size: const Size(1000, 800),
+    );
+    await tester.tap(find.byKey(ValueKey('textbook-${mathBook.pdfSha256}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一页'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('课时学习'));
+    await tester.pumpAndSettle();
+
+    final titles = [unitTitle, '第二课', '第三课'];
+    final cards = [
+      for (final title in titles)
+        find.ancestor(of: find.text(title), matching: find.byType(AppTile)),
+    ];
+    expect(find.byType(AppTile), findsNWidgets(3));
+    final rects = [for (final card in cards) tester.getRect(card.first)];
+    expect(rects[0].center.dy, closeTo(rects[1].center.dy, .1));
+    expect(rects[1].center.dy, closeTo(rects[2].center.dy, .1));
+    expect(rects[0].center.dx, lessThan(rects[1].center.dx));
+    expect(rects[1].center.dx, lessThan(rects[2].center.dx));
+    expect(tester.takeException(), isNull);
+    router.pop();
+  });
 
   testWidgets('数学书架缺失PDF时仍打开内容详情并保留续读页，不跳整理审核', (tester) async {
     final mathBook = textbookFixture(
