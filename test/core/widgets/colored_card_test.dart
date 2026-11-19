@@ -1,7 +1,7 @@
 // test/core/widgets/colored_card_test.dart
 //
 // ColoredCard 渐变扩展测试（任务 10-12-feature-batch-8 ⑦）：
-// - 纯色路径回归：背景 = color × backgroundOpacity、radiusMedium、无阴影；
+// - 默认纸面不透出祖先背景，实色/透明区域不附加装饰；
 // - 渐变路径：gradient 优先，忽略 color 着色；
 // - 阴影参数：boxShadow 透传到 Decoration；
 // - color 与 gradient 至少其一（断言报错）。
@@ -26,24 +26,58 @@ void main() {
     return container.decoration! as BoxDecoration;
   }
 
-  Widget wrap(Widget child) => MaterialApp(
-        home: Scaffold(body: child),
-      );
+  Widget wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
-  testWidgets('纯色路径回归：color × backgroundOpacity + radiusMedium 无阴影', (tester) async {
-    await tester.pumpWidget(wrap(
-      const ColoredCard(color: kRed, child: Text('卡片')),
-    ),);
+  testWidgets('默认纸面是独立的不透明表面，带细边线和纸页底边', (tester) async {
+    await tester.pumpWidget(
+      wrap(const ColoredCard(color: kRed, child: Text('卡片'))),
+    );
 
     final decoration = decorationOf(tester);
-    expect(decoration.color, kRed.withValues(alpha: 0.08));
+    expect(decoration.color!.a, 1);
     expect(decoration.gradient, isNull);
-    expect(decoration.boxShadow, isNull);
+    expect(decoration.border, isNotNull);
+    expect(decoration.boxShadow, isNotEmpty);
     expect(
       decoration.borderRadius,
       BorderRadius.circular(SpacingTokens.radiusMedium),
     );
   });
+
+  testWidgets('准备遮罩保留半透明，遮罩内的进度可以独立显示', (tester) async {
+    await tester.pumpWidget(
+      wrap(
+        const ColoredCard(
+          color: kRed,
+          backgroundOpacity: .6,
+          paperSurface: false,
+          child: CircularProgressIndicator(),
+        ),
+      ),
+    );
+    final decoration = decorationOf(tester);
+    expect(decoration.color, kRed.withValues(alpha: .6));
+    expect(decoration.border, isNull);
+    expect(decoration.boxShadow, isNull);
+  });
+
+  for (final opacity in [0.0, 1.0]) {
+    testWidgets('透明度 $opacity 保留全幅背景和无背景容器的语义', (tester) async {
+      await tester.pumpWidget(
+        wrap(
+          ColoredCard(
+            color: kRed,
+            backgroundOpacity: opacity,
+            child: const Text('背景'),
+          ),
+        ),
+      );
+      final decoration = decorationOf(tester);
+      expect(decoration.color, kRed.withValues(alpha: opacity));
+      expect(decoration.border, isNull);
+      expect(decoration.boxShadow, isNull);
+    });
+  }
 
   testWidgets('渐变路径：gradient 优先于 color 着色', (tester) async {
     const gradient = LinearGradient(
@@ -51,9 +85,9 @@ void main() {
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     );
-    await tester.pumpWidget(wrap(
-      const ColoredCard(gradient: gradient, child: Text('渐变卡')),
-    ),);
+    await tester.pumpWidget(
+      wrap(const ColoredCard(gradient: gradient, child: Text('渐变卡'))),
+    );
 
     final decoration = decorationOf(tester);
     expect(decoration.gradient, same(gradient));
@@ -66,13 +100,15 @@ void main() {
   });
 
   testWidgets('boxShadow 透传（渐变 + softShadow 组合）', (tester) async {
-    await tester.pumpWidget(wrap(
-      const ColoredCard(
-        gradient: LinearGradient(colors: [kBlue, kRed]),
-        boxShadow: SpacingTokens.softShadow,
-        child: Text('带阴影渐变卡'),
+    await tester.pumpWidget(
+      wrap(
+        const ColoredCard(
+          gradient: LinearGradient(colors: [kBlue, kRed]),
+          boxShadow: SpacingTokens.softShadow,
+          child: Text('带阴影渐变卡'),
+        ),
       ),
-    ),);
+    );
 
     final decoration = decorationOf(tester);
     expect(decoration.boxShadow, same(SpacingTokens.softShadow));

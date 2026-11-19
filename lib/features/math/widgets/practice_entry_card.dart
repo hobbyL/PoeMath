@@ -1,8 +1,6 @@
 // lib/features/math/widgets/practice_entry_card.dart
 //
-// 练习入口卡片：图标 + 标题 + 描述，居中的网格单元。
-// 与 `GradeSemesterCard` 同款视觉（无边框、浅色底、圆角），
-// 适合按响应式列数铺成一行多个。
+// 练习入口卡片：纸面上的图标、楷体标题与说明，按自然高度排成网格。
 
 import 'package:flutter/material.dart';
 
@@ -30,34 +28,32 @@ class PracticeEntryCard extends StatelessWidget {
 
     return ColoredCard(
       color: primary,
-      backgroundOpacity: 0.06,
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(
-        horizontal: SpacingTokens.md,
-        vertical: SpacingTokens.sm,
-      ),
+      padding: const EdgeInsets.all(SpacingTokens.md),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 28, color: primary),
-          const SizedBox(height: SpacingTokens.xs),
+          Row(
+            children: [
+              Icon(icon, size: SpacingTokens.xl, color: primary),
+              const Spacer(),
+              Icon(Icons.arrow_forward, size: SpacingTokens.md, color: primary),
+            ],
+          ),
+          const SizedBox(height: SpacingTokens.lg),
           Text(
             title,
-            style: theme.textTheme.titleSmall?.copyWith(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w600,
               color: theme.colorScheme.onSurface,
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: SpacingTokens.xs),
+          const SizedBox(height: SpacingTokens.sm),
           Text(
             description,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
           ),
         ],
       ),

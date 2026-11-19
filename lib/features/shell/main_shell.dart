@@ -293,7 +293,7 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 }
 
-/// 原生 NavigationBar 管理选中语义，胶囊按钮统一包裹横排图标与文字。
+/// 原生 NavigationBar 管理选中语义，圆角按钮统一包裹横排图标与文字。
 class _NavigationTab extends StatelessWidget {
   const _NavigationTab({
     super.key,
@@ -348,7 +348,11 @@ class _NavigationTab extends StatelessWidget {
                       horizontal: SpacingTokens.xs,
                       vertical: SpacingTokens.sm,
                     ),
-                    shape: const StadiumBorder(),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        SpacingTokens.radiusSmall,
+                      ),
+                    ),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     animationDuration: MediaQuery.disableAnimationsOf(context)
                         ? Duration.zero

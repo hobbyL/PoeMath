@@ -89,11 +89,15 @@ void main() {
               ),
             ),
           );
-          final card = tester.widget<ColoredCard>(find.byType(ColoredCard));
-          final cardBackground = Color.alphaBlend(
-            card.color!.withValues(alpha: card.backgroundOpacity),
-            theme.scaffoldBackgroundColor,
+          final surface = tester.widget<Container>(
+            find
+                .descendant(
+                  of: find.byType(ColoredCard),
+                  matching: find.byType(Container),
+                )
+                .first,
           );
+          final cardBackground = (surface.decoration! as BoxDecoration).color!;
           final tag = find.text('必背');
           final tagBox = tester.widget<Container>(
             find.ancestor(of: tag, matching: find.byType(Container)).first,

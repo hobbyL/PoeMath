@@ -155,9 +155,8 @@ void main() {
         final overviewContainer = tester.widget<Container>(
           find.descendant(of: overview, matching: find.byType(Container)).first,
         );
-        final overviewGradient =
-            (overviewContainer.decoration! as BoxDecoration).gradient!
-                as LinearGradient;
+        final overviewBackground =
+            (overviewContainer.decoration! as BoxDecoration).color!;
         for (final label in ['已学诗词', '数学做题', '总星星']) {
           final labelFinder = find.text(label);
           final statColumn = find
@@ -169,18 +168,12 @@ void main() {
               )
               .toList();
           expect(texts, hasLength(2));
-          for (final tint in overviewGradient.colors) {
-            final background = Color.alphaBlend(
-              tint,
-              theme.scaffoldBackgroundColor,
+          for (final text in texts) {
+            expect(
+              contrastRatio(text.style!.color!, overviewBackground),
+              greaterThanOrEqualTo(4.5),
+              reason: label,
             );
-            for (final text in texts) {
-              expect(
-                contrastRatio(text.style!.color!, background),
-                greaterThanOrEqualTo(4.5),
-                reason: label,
-              );
-            }
           }
         }
         final button = tester.widget<FilledButton>(find.byType(FilledButton));

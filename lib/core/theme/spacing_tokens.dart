@@ -19,8 +19,8 @@ class SpacingTokens {
 
   // ============ 圆角 ============
   static const double radiusSmall = 8.0;
-  static const double radiusMedium = 16.0;
-  static const double radiusLarge = 24.0;
+  static const double radiusMedium = 8.0;
+  static const double radiusLarge = 16.0;
   static const double radiusPill = 999.0;
 
   // ============ 无障碍：命中区域下限 ============

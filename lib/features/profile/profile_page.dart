@@ -369,7 +369,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       children: [
         Text(
           value,
-          style: theme.textTheme.titleMedium?.copyWith(
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontSize: TypographyTokens.fsHeadline,
             fontWeight: FontWeight.bold,
             color: color,
           ),

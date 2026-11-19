@@ -21,7 +21,7 @@ import 'package:poemath/core/widgets/colored_card.dart';
 
 /// 通用列表行组件。
 ///
-/// 视觉规则继承 [ColoredCard]（半透明彩色背景 + 圆角），额外提供：
+/// 视觉规则继承 [ColoredCard]（纸面 + 细墨线），额外提供：
 /// - 裸图标（无背景容器，颜色跟随 iconColor）
 /// - 自定义前导内容（如题目缩略图）
 /// - 标题 + 副标题文本列
@@ -152,6 +152,7 @@ class AppTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final titleStyle = theme.textTheme.titleSmall?.copyWith(
+      fontFamily: flat ? null : TypographyTokens.inkFontFamily,
       fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
       color: selected ? theme.colorScheme.onPrimaryContainer : null,
     );
@@ -374,7 +375,7 @@ class AppTile extends StatelessWidget {
     }
     const contentPadding = EdgeInsets.symmetric(
       horizontal: SpacingTokens.md,
-      vertical: SpacingTokens.sm + 2,
+      vertical: SpacingTokens.sm + SpacingTokens.xs / 2,
     );
     final edgeWidth = leadingEdgeWidth;
     final cardContent = edgeWidth == null

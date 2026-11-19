@@ -1,16 +1,16 @@
 // lib/core/widgets/stat_overview_card.dart
 //
 // 层级：core/widgets
-// 职责：统计概览卡 —— 主色→次色渐变底 + 竖分隔线 + 大号数字 + 入场动画。
+// 职责：统计概览卡 —— 纸面 + 竖分隔线 + 大号数字 + 入场动画。
 //       口算练习页与应用题题库页共用，保证两处「统计卡」视觉完全一致。
 //
-// 说明：渐变卡片 ColoredCard 无法表达（仅支持单色半透明背景），故由本
-//       共享组件集中承载这唯一一处 BoxDecoration（页面侧仍禁止手写）。
+// 通过 ColoredCard 共用纸面圆角与容器规范。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
 
 /// 单项统计数据：大号数值 + 说明文字。
@@ -24,9 +24,7 @@ class StatOverviewItem {
   final String label;
 }
 
-/// 统计概览卡：渐变底 + 等宽统计项，项间以竖分隔线分隔。
-///
-/// 视觉与口算练习页统计卡一致（主色→次色渐变、圆角、淡入上滑动画）。
+/// 统计概览卡：纸面与等宽统计项，项间以竖分隔线分隔。
 class StatOverviewCard extends StatelessWidget {
   const StatOverviewCard({super.key, required this.items});
 
@@ -37,21 +35,13 @@ class StatOverviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
+    return ColoredCard(
           // 不自带外边距：嵌入方（页面/列表）的 padding 已统一为 md，
           // 自带 margin 会与页面 padding **叠加**，让本卡比同页其他卡
           // 左右各多缩进 16（口算练习页顶部统计卡与下方练习卡的错位即此）。
           // 需要留白的调用方自行包 Padding。
           padding: const EdgeInsets.all(SpacingTokens.md),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                theme.colorScheme.primary.withValues(alpha: 0.15),
-                theme.colorScheme.secondary.withValues(alpha: 0.1),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-          ),
+          color: theme.colorScheme.primary,
           child: Row(
             children: [
               for (var i = 0; i < items.length; i++) ...[
@@ -86,7 +76,8 @@ class StatOverviewCard extends StatelessWidget {
           fit: BoxFit.scaleDown,
           child: Text(
             item.value,
-            style: theme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: TypographyTokens.fsHeadline,
               fontWeight: FontWeight.bold,
               color: theme.colorScheme.primary,
             ),

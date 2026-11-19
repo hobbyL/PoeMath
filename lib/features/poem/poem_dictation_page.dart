@@ -798,6 +798,7 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
                     child: ColoredCard(
                       color: theme.colorScheme.surface,
                       backgroundOpacity: 0.6,
+                      paperSurface: false,
                       padding: EdgeInsets.zero,
                       child: const Center(child: CircularProgressIndicator()),
                     ),

@@ -194,6 +194,8 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium?.copyWith(
+                      // 紧凑工具栏为两侧状态操作保留空间，窄屏放大后仍居中。
+                      fontSize: TypographyTokens.fsBody,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

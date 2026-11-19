@@ -52,10 +52,11 @@ class PoemCard extends StatelessWidget {
     return ColoredCard(
       width: double.infinity,
       color: theme.colorScheme.primary,
-      backgroundOpacity: 0.06,
       onTap: onTap,
+      padding: const EdgeInsets.all(SpacingTokens.lg),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text.rich(
             TextSpan(
@@ -76,24 +77,33 @@ class PoemCard extends StatelessWidget {
                 TextSpan(text: poem.title),
               ],
             ),
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: SpacingTokens.xs),
           Text(
             '${poem.dynasty} · ${poem.author}',
-            textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: SpacingTokens.sm),
+          Divider(color: theme.colorScheme.outlineVariant),
+          const SizedBox(height: SpacingTokens.sm),
+          Text(
+            poem.content.split('\n').take(2).join('\n'),
+            style: TypographyTokens.poemContentStyle(
+              color: theme.colorScheme.onSurface,
+            ).copyWith(fontSize: TypographyTokens.fsTitle, letterSpacing: 0),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: SpacingTokens.md),
           Wrap(
             spacing: SpacingTokens.xs,
             runSpacing: SpacingTokens.xs,
-            alignment: WrapAlignment.center,
+            alignment: WrapAlignment.start,
             children: [
               _tag(
                 context,
@@ -114,14 +124,6 @@ class PoemCard extends StatelessWidget {
                   filled: true,
                 ),
             ],
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-          Text(
-            poem.content.split('\n').take(2).join('\n'),
-            style: theme.textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -146,10 +148,12 @@ class PoemCard extends StatelessWidget {
       padding: EdgeInsets.zero,
       labelPadding: const EdgeInsets.symmetric(horizontal: SpacingTokens.xs),
       visualDensity: VisualDensity.compact,
-      side: BorderSide.none,
-      backgroundColor: filled ? color : color.withValues(alpha: 0.1),
+      side: filled
+          ? BorderSide.none
+          : BorderSide(color: color.withValues(alpha: .3)),
+      backgroundColor: filled ? color : theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+        borderRadius: BorderRadius.circular(SpacingTokens.xs),
       ),
     );
   }

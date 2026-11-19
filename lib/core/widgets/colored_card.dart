@@ -1,7 +1,7 @@
 // lib/core/widgets/colored_card.dart
 //
 // 层级：core/widgets
-// 职责：基于主色调的半透明卡片容器 — 全局统一的卡片视觉基底。
+// 职责：统一纸面卡片、语义着色与点击反馈。
 //
 // 用法：
 //   ColoredCard(
@@ -16,18 +16,19 @@ import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
 
-/// 全局统一的半透明彩色卡片。
+/// 全局统一的纸面卡片。
 ///
 /// 视觉规则：
-/// - 纯色路径：背景色 = [color] × [backgroundOpacity] 透明度（默认 8%）
+/// - 普通卡片：在主题纸色上叠加 [color]，配细墨线和纸页底边。
+/// - [backgroundOpacity] 为 0 / 1 时保留透明 / 实色表面，不附加纸页装饰。
 /// - 渐变路径：背景 = [gradient]（提供时优先生效，忽略 [color] 着色）
-/// - 圆角 = [SpacingTokens.radiusMedium] (16)
-/// - 无边框；阴影可选（[boxShadow]，如 [SpacingTokens.softShadow]）
+/// - 圆角 = [SpacingTokens.radiusMedium]
+/// - [border] / [boxShadow] 可覆盖纸面默认装饰。
 ///
 /// 可选参数：
 /// - [onTap] 添加点击水波纹
 /// - [padding] 覆盖默认内边距 ([SpacingTokens.md])
-/// - [backgroundOpacity] 覆盖默认背景透明度 (0.08，仅纯色路径生效)
+/// - [backgroundOpacity] 覆盖默认纸面着色强度 (0.02，仅纯色路径生效)
 class ColoredCard extends StatelessWidget {
   const ColoredCard({
     super.key,
@@ -38,7 +39,8 @@ class ColoredCard extends StatelessWidget {
     required this.child,
     this.onTap,
     this.padding,
-    this.backgroundOpacity = 0.08,
+    this.backgroundOpacity = 0.02,
+    this.paperSurface = true,
     this.width,
     this.constraints,
     this.borderRadius = const BorderRadius.all(
@@ -52,7 +54,7 @@ class ColoredCard extends StatelessWidget {
   /// 渐变背景（LinearGradient）；非空时优先于 [color] 渲染。
   final LinearGradient? gradient;
 
-  /// 可选阴影；null = 无阴影（默认，维持原视觉）。
+  /// 可选阴影；普通卡片默认一条轻薄纸页底边，空列表可取消。
   final List<BoxShadow>? boxShadow;
 
   final BoxBorder? border;
@@ -66,8 +68,11 @@ class ColoredCard extends StatelessWidget {
   /// 内边距，默认 [SpacingTokens.md]。
   final EdgeInsetsGeometry? padding;
 
-  /// 背景色透明度，默认 0.08（仅纯色路径生效）。
+  /// 纸面着色强度，默认 0.02；0 / 1 分别表示透明 / 实色背景。
   final double backgroundOpacity;
+
+  /// 普通卡片使用不透明纸面；叠在内容上方的半透明遮罩应设为 false。
+  final bool paperSurface;
 
   /// 卡片宽度，默认不限制。
   final double? width;
@@ -80,26 +85,56 @@ class ColoredCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final paper =
+        paperSurface &&
+        gradient == null &&
+        backgroundOpacity > 0 &&
+        backgroundOpacity < 1;
+    final tint = color?.withValues(alpha: backgroundOpacity);
     final decoration = BoxDecoration(
       color: gradient == null
-          ? color!.withValues(alpha: backgroundOpacity)
+          ? (paper ? Color.alphaBlend(tint!, scheme.surface) : tint)
           : null,
       gradient: gradient,
-      boxShadow: boxShadow,
-      border: border,
+      boxShadow:
+          boxShadow ??
+          (paper
+              ? [
+                  BoxShadow(
+                    color: scheme.outlineVariant.withValues(alpha: .45),
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null),
+      border:
+          border ??
+          (paper
+              ? Border.all(
+                  color: scheme.outlineVariant,
+                  strokeAlign: BorderSide.strokeAlignOutside,
+                )
+              : null),
       borderRadius: borderRadius,
     );
-
-    final container = Container(
-      width: width,
-      constraints: constraints,
+    final content = Padding(
       padding: padding ?? const EdgeInsets.all(SpacingTokens.md),
-      decoration: decoration,
       child: child,
     );
-
-    if (onTap == null) return container;
-
-    return InkWell(onTap: onTap, borderRadius: borderRadius, child: container);
+    return Container(
+      width: width,
+      constraints: constraints,
+      decoration: decoration,
+      child: onTap == null
+          ? content
+          : Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: borderRadius,
+                child: content,
+              ),
+            ),
+    );
   }
 }
