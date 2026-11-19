@@ -622,26 +622,19 @@ class _MathTextbookPracticePageState
       parentPlan: paperPlan,
     );
     return [
-      if (widget.planId != null) ...[
+      if (widget.planId != null && !paperPlan) ...[
         Text(
           '${draft.index + 1} / ${draft.items.length}',
           style: Theme.of(context).textTheme.labelLarge,
         ),
         const SizedBox(height: SpacingTokens.sm),
         Text(
-          paperPlan ? '实践任务' : item.exercise.title,
+          item.exercise.title,
           style: Theme.of(context).textTheme.titleLarge,
         ),
         if (_firstSource != null)
           Text(mathTextbookSourcePageLabel(_firstSource!)),
-        if (_paperOnly) const Text('按原书要求完成作答或操作，再在下方记录结果，提交给家长核对。'),
-        Text(
-          item.exercise.fields.every(
-                (field) => field.rule.kind == MathTextbookAnswerKind.parent,
-              )
-              ? '可在纸上或用实物完成'
-              : '按本课已审核范围生成的巩固题',
-        ),
+        const Text('按本课已审核范围生成的巩固题'),
         const SizedBox(height: SpacingTokens.md),
       ],
       for (final block in displayBlocks)

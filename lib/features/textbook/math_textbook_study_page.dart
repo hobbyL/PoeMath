@@ -12,11 +12,15 @@ import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/domain/math_textbook_progress.dart';
 import 'package:poemath/domain/math_textbook_practice.dart';
 import 'package:poemath/domain/math_textbook_course_plan.dart';
+import 'package:poemath/domain/math_textbook_content_organizer.dart';
+import 'package:poemath/domain/math_textbook_study.dart';
+import 'package:poemath/domain/math_textbook_knowledge_illustrations.dart';
 import 'package:poemath/features/textbook/math_textbook_labels.dart';
 import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_reader_page.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_study_content.dart';
+import 'package:poemath/features/textbook/widgets/math_textbook_knowledge_images.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
 
 class MathTextbookBookPage extends ConsumerWidget {
@@ -160,10 +164,13 @@ class MathTextbookBookPage extends ConsumerWidget {
     }
     final knowledgeEntries = [
       for (final lesson in pageLessons)
-        for (final point
-            in lesson.learning?.knowledgePoints ??
-                const <MathTextbookKnowledgePoint>[])
+        for (final point in mathTextbookStudyNotes(lesson))
           (lesson: lesson, point: point),
+    ];
+    final exampleEntries = [
+      for (final lesson in pageLessons)
+        for (final example in mathTextbookWorkedExamples(lesson))
+          (lesson: lesson, example: example),
     ];
     final practiceEntries =
         <
@@ -217,7 +224,8 @@ class MathTextbookBookPage extends ConsumerWidget {
       }
     }
     final hasModeContent = switch (selectedMode) {
-      AppRoutes.mathTextbookLearnMode => knowledgeEntries.isNotEmpty,
+      AppRoutes.mathTextbookLearnMode =>
+        knowledgeEntries.isNotEmpty || exampleEntries.isNotEmpty,
       AppRoutes.mathTextbookPracticeMode => practiceEntries.isNotEmpty,
       _ => lessons.isNotEmpty,
     };
@@ -226,11 +234,13 @@ class MathTextbookBookPage extends ConsumerWidget {
       builder: (context, constraints) {
         final columns = ResponsiveLayout.columns(constraints.maxWidth);
         final modeSlivers = <Widget>[];
-        if (selectedMode == AppRoutes.mathTextbookLearnMode &&
-            knowledgeEntries.isNotEmpty) {
+        if (selectedMode == AppRoutes.mathTextbookLearnMode && hasModeContent) {
           modeSlivers.add(
             SliverPadding(
-              padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+              padding: const EdgeInsets.only(
+                top: SpacingTokens.md,
+                bottom: SpacingTokens.sm,
+              ),
               sliver: SliverToBoxAdapter(
                 child: MasonryLayout(
                   key: const ValueKey('math-textbook-knowledge-masonry'),
@@ -255,6 +265,22 @@ class MathTextbookBookPage extends ConsumerWidget {
                           ),
                         ),
                       ),
+                    for (final entry in exampleEntries)
+                      AppTile(
+                        icon: Icons.menu_book_outlined,
+                        iconColor: color,
+                        title: entry.example.title,
+                        titleMaxLines: 2,
+                        subtitle: '例题与解题过程',
+                        onTap: () => context.push(
+                          AppRoutes.mathTextbookStudyOf(
+                            bookId,
+                            entry.lesson.id,
+                            mode: AppRoutes.mathTextbookLearnMode,
+                            exampleId: entry.example.id,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -264,7 +290,10 @@ class MathTextbookBookPage extends ConsumerWidget {
             practiceEntries.isNotEmpty) {
           modeSlivers.add(
             SliverPadding(
-              padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+              padding: const EdgeInsets.only(
+                top: SpacingTokens.md,
+                bottom: SpacingTokens.sm,
+              ),
               sliver: SliverToBoxAdapter(
                 child: MasonryLayout(
                   key: const ValueKey('math-textbook-practice-masonry'),
@@ -362,70 +391,74 @@ class MathTextbookBookPage extends ConsumerWidget {
             );
           }
         }
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(
-            SpacingTokens.md,
-            0,
-            SpacingTokens.md,
-            SpacingTokens.md,
-          ),
-          child: CustomScrollView(
-            slivers: [
-              if (showIntro)
-                SliverPadding(
-                  padding: EdgeInsets.only(
-                    bottom: lessons.isEmpty ? 0 : SpacingTokens.sm,
-                  ),
-                  sliver: SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (needsCourseUpdate)
-                          AppTile(
-                            icon: Icons.auto_stories_outlined,
-                            iconColor: color,
-                            title: '更新课时内容',
-                            subtitle: '按讲解、例题和练习重新整理',
-                            onTap: () => context.push(
-                              AppRoutes.mathTextbookReviewOf(bookId),
-                            ),
-                          ),
-                        if (!hasModeContent) ...[
-                          const SizedBox(height: SpacingTokens.md),
-                          Text(
-                            currentPages != null && pageLessons.isEmpty
-                                ? '当前页尚未关联课时。'
-                                : switch (selectedMode) {
-                                    AppRoutes.mathTextbookLearnMode =>
-                                      currentPages == null
-                                          ? '本书尚未整理知识点。'
-                                          : '本课时尚未整理知识点。',
-                                    AppRoutes.mathTextbookPracticeMode =>
-                                      currentPages == null
-                                          ? '本书尚未整理练习。'
-                                          : '本课时尚未整理练习。',
-                                    _ => '还没有整理的课时。',
-                                  },
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: SpacingTokens.md,
-                            ),
-                            child: OutlinedButton(
-                              onPressed: () => context.push(
-                                AppRoutes.mathTextbookReviewOf(bookId),
+        return CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                SpacingTokens.md,
+                0,
+                SpacingTokens.md,
+                SpacingTokens.md,
+              ),
+              sliver: SliverMainAxisGroup(
+                slivers: [
+                  if (showIntro)
+                    SliverPadding(
+                      padding: EdgeInsets.only(
+                        bottom: lessons.isEmpty ? 0 : SpacingTokens.sm,
+                      ),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (needsCourseUpdate)
+                              AppTile(
+                                icon: Icons.auto_stories_outlined,
+                                iconColor: color,
+                                title: '更新课时内容',
+                                subtitle: '按讲解、例题和练习重新整理',
+                                onTap: () => context.push(
+                                  AppRoutes.mathTextbookReviewOf(bookId),
+                                ),
                               ),
-                              child: const Text('整理教材内容'),
-                            ),
-                          ),
-                        ],
-                      ],
+                            if (!hasModeContent) ...[
+                              const SizedBox(height: SpacingTokens.md),
+                              Text(
+                                currentPages != null && pageLessons.isEmpty
+                                    ? '当前页尚未关联课时。'
+                                    : switch (selectedMode) {
+                                        AppRoutes.mathTextbookLearnMode =>
+                                          currentPages == null
+                                              ? '本书尚未整理知识点与例题。'
+                                              : '本课时尚未整理知识点与例题。',
+                                        AppRoutes.mathTextbookPracticeMode =>
+                                          currentPages == null
+                                              ? '本书尚未整理练习。'
+                                              : '本课时尚未整理练习。',
+                                        _ => '还没有整理的课时。',
+                                      },
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: SpacingTokens.md,
+                                ),
+                                child: OutlinedButton(
+                                  onPressed: () => context.push(
+                                    AppRoutes.mathTextbookReviewOf(bookId),
+                                  ),
+                                  child: const Text('整理教材内容'),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ...modeSlivers,
-            ],
-          ),
+                  ...modeSlivers,
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
@@ -448,25 +481,28 @@ class MathTextbookBookPage extends ConsumerWidget {
 
 class _MathTextbookKnowledgePage extends StatelessWidget {
   const _MathTextbookKnowledgePage({
+    required this.book,
     required this.lesson,
     required this.onRead,
     required this.onKnowledge,
   });
 
+  final Textbook book;
   final MathTextbookLesson lesson;
   final VoidCallback onRead;
   final ValueChanged<MathTextbookKnowledgePoint> onKnowledge;
 
   @override
   Widget build(BuildContext context) {
-    final points = lesson.learning?.knowledgePoints ?? const [];
+    final points = mathTextbookStudyNotes(lesson);
+    final examples = mathTextbookWorkedExamples(lesson);
     return Scaffold(
       appBar: AppBar(title: Text(lesson.title)),
       body: SafeArea(
-        child: points.isEmpty
+        child: points.isEmpty && examples.isEmpty
             ? AppEmptyState(
                 icon: Icons.lightbulb_outline,
-                title: '本课暂无知识点',
+                title: '本课暂无知识点与例题',
                 description: '可以先看一看本课完整内容。',
                 actions: [
                   TextButton.icon(
@@ -478,10 +514,28 @@ class _MathTextbookKnowledgePage extends StatelessWidget {
               )
             : ListView.separated(
                 padding: const EdgeInsets.all(SpacingTokens.md),
-                itemCount: points.length,
+                itemCount: points.length + examples.length,
                 separatorBuilder: (_, __) =>
                     const SizedBox(height: SpacingTokens.sm),
                 itemBuilder: (context, index) {
+                  if (index >= points.length) {
+                    final example = examples[index - points.length];
+                    return AppTile(
+                      icon: Icons.menu_book_outlined,
+                      iconColor: Theme.of(context).colorScheme.primary,
+                      title: example.title,
+                      titleMaxLines: 2,
+                      subtitle: '例题与解题过程',
+                      onTap: () => context.push(
+                        AppRoutes.mathTextbookStudyOf(
+                          book.pdfSha256,
+                          lesson.id,
+                          mode: AppRoutes.mathTextbookLearnMode,
+                          exampleId: example.id,
+                        ),
+                      ),
+                    );
+                  }
                   final point = points[index];
                   return AppTile(
                     icon: Icons.lightbulb_outline,
@@ -494,6 +548,49 @@ class _MathTextbookKnowledgePage extends StatelessWidget {
                   );
                 },
               ),
+      ),
+    );
+  }
+}
+
+class MathTextbookKnowledgeNotesPage extends StatelessWidget {
+  const MathTextbookKnowledgeNotesPage({
+    super.key,
+    required this.point,
+    required this.book,
+    required this.lesson,
+  });
+  final MathTextbookKnowledgePoint point;
+  final Textbook book;
+  final MathTextbookLesson lesson;
+
+  @override
+  Widget build(BuildContext context) {
+    final blocks = mathTextbookKnowledgeImageBlocks(lesson, point);
+    return Scaffold(
+      appBar: AppBar(title: Text(point.title)),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(SpacingTokens.md),
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  point.summary,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                if (blocks.isNotEmpty)
+                  MathTextbookKnowledgeImages(
+                    book: book,
+                    point: point,
+                    blocks: blocks,
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -622,11 +719,13 @@ class MathTextbookStudyPage extends ConsumerStatefulWidget {
     required this.lessonId,
     this.mode,
     this.knowledgePointId,
+    this.exampleId,
     this.viewerBuilder,
   });
   final String bookId, lessonId;
   final String? mode;
   final String? knowledgePointId;
+  final String? exampleId;
   final TextbookViewerBuilder? viewerBuilder;
   @override
   ConsumerState<MathTextbookStudyPage> createState() =>
@@ -727,6 +826,27 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
     MathTextbookLesson lesson,
     MathTextbookProgress progress,
   ) {
+    if (widget.exampleId != null) {
+      final example = mathTextbookWorkedExamples(lesson)
+          .where((value) => value.id == widget.exampleId)
+          .firstOrNull;
+      if (example == null) {
+        return _statusPage(
+          lesson.title,
+          const AppEmptyState(
+            icon: Icons.menu_book_outlined,
+            title: '例题已更新',
+            description: '请返回本课重新选择。',
+          ),
+        );
+      }
+      return MathTextbookSourceContentPage(
+        book: book,
+        title: example.title,
+        blocks: example.blocks,
+        workedExample: true,
+      );
+    }
     final availability = mathTextbookPracticeAvailability(
       lesson,
       book.pdfSha256,
@@ -812,11 +932,12 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
     final pointId = widget.knowledgePointId;
     final point = pointId == null
         ? null
-        : lesson.learning?.knowledgePoints
+        : mathTextbookStudyNotes(lesson)
               .where((value) => value.id == pointId)
               .firstOrNull;
     if (pointId == null) {
       return _MathTextbookKnowledgePage(
+        book: book,
         lesson: lesson,
         onRead: () => _openOriginalLesson(book, lesson),
         onKnowledge: (knowledge) =>
@@ -833,13 +954,10 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
         ),
       );
     }
-    return MathTextbookSourceContentPage(
+    return MathTextbookKnowledgeNotesPage(
+      point: point,
       book: book,
-      title: point.title,
-      knowledgePoint: true,
-      blocks: lesson.blocks
-          .where((block) => point.blockIds.contains(block.id))
-          .toList(),
+      lesson: lesson,
     );
   }
 
@@ -860,16 +978,17 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
   }) {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => MathTextbookSourceContentPage(
-          book: book,
-          title: knowledge?.title ?? lesson.title,
-          knowledgePoint: knowledge != null,
-          blocks: knowledge == null
-              ? lesson.blocks
-              : lesson.blocks
-                    .where((b) => knowledge.blockIds.contains(b.id))
-                    .toList(),
-        ),
+        builder: (_) => knowledge != null
+            ? MathTextbookKnowledgeNotesPage(
+                point: knowledge,
+                book: book,
+                lesson: lesson,
+              )
+            : MathTextbookSourceContentPage(
+                book: book,
+                title: lesson.title,
+                blocks: lesson.blocks,
+              ),
       ),
     );
   }
@@ -878,6 +997,7 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => _MathTextbookKnowledgePage(
+          book: book,
           lesson: lesson,
           onRead: () => _openOriginalLesson(book, lesson),
           onKnowledge: (knowledge) =>
@@ -969,8 +1089,8 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
       availability: availability,
     );
     final learning = lesson.learning;
-    final knowledgePoints =
-        learning?.knowledgePoints ?? <MathTextbookKnowledgePoint>[];
+    final knowledgePoints = mathTextbookStudyNotes(lesson);
+    final examples = mathTextbookWorkedExamples(lesson);
     final hasPractice =
         (learning?.exercises.isNotEmpty ?? false) ||
         (learning?.practicePlans.isNotEmpty ?? false);
@@ -998,9 +1118,13 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
           icon: Icons.lightbulb_outline,
           iconColor: color,
           title: '学一学',
-          subtitle: knowledgePoints.isEmpty
-              ? '本课暂无知识点'
-              : '${knowledgePoints.length} 个知识点与例题',
+          subtitle: knowledgePoints.isEmpty && examples.isEmpty
+              ? '本课暂无知识点与例题'
+              : [
+                  if (knowledgePoints.isNotEmpty)
+                    '${knowledgePoints.length} 个知识要点',
+                  if (examples.isNotEmpty) '${examples.length} 个讲解例题',
+                ].join(' · '),
           onTap: () => _showKnowledge(book, lesson),
         ),
         const SizedBox(height: SpacingTokens.md),

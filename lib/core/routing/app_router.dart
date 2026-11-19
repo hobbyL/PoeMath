@@ -220,6 +220,7 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.home}) {
             lessonId: state.pathParameters['lesson']!,
             mode: state.uri.queryParameters['mode'],
             knowledgePointId: state.uri.queryParameters['point'],
+            exampleId: state.uri.queryParameters['example'],
           ),
         ),
       ),

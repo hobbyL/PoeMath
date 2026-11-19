@@ -23,6 +23,7 @@ import 'package:poemath/data/repositories/math_textbook_learning_repository.dart
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/domain/math_textbook_practice.dart';
+import 'package:poemath/domain/math_textbook_content_organizer.dart';
 import 'package:poemath/features/textbook/math_textbook_learning_editor_page.dart';
 import 'package:poemath/features/textbook/math_textbook_lesson_page.dart';
 import 'package:poemath/features/textbook/math_textbook_practice_page.dart';
@@ -32,6 +33,7 @@ import 'package:poemath/features/textbook/providers/math_textbook_providers.dart
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_study_content.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_source_preview.dart';
+import 'package:poemath/features/textbook/widgets/math_textbook_knowledge_images.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
 
 import '../../helpers/hive_test_helper.dart';
@@ -226,6 +228,7 @@ void defineMathTextbookLearningTests({
     double scale = 1,
     Brightness brightness = Brightness.light,
     List<MathTextbookRegion>? renderedSources,
+    MathTextbookKnowledgeImageLoader? knowledgeImageLoader,
     TextbookViewerBuilder? viewerBuilder,
   }) async {
     tester.view.physicalSize = size;
@@ -266,6 +269,7 @@ void defineMathTextbookLearningTests({
                   lessonId: state.pathParameters['lesson']!,
                   mode: state.uri.queryParameters['mode'],
                   knowledgePointId: state.uri.queryParameters['point'],
+                  exampleId: state.uri.queryParameters['example'],
                   viewerBuilder: viewerBuilder,
                 ),
               ),
@@ -298,6 +302,12 @@ void defineMathTextbookLearningTests({
             textbookCatalogProvider.overrideWith((ref) async => []),
             textbookFileServiceProvider.overrideWithValue(
               _TaskClarityFiles(directory),
+            ),
+            mathTextbookKnowledgeImageLoaderProvider.overrideWithValue(
+              knowledgeImageLoader ?? (path, point, blocks, token) async => [],
+            ),
+            mathTextbookExampleRendererProvider.overrideWith(
+              (ref) => ref.read(mathTextbookRegionRendererProvider),
             ),
             mathTextbookRegionRendererProvider.overrideWithValue((
               path,
@@ -650,7 +660,11 @@ void defineMathTextbookLearningTests({
         lesson.learning!.practicePlans.single.task,
       );
       expect(find.text('本课实践'), findsOneWidget);
-      expect(find.text('实践任务'), findsOneWidget);
+      expect(find.text('1 / 1'), findsNothing);
+      expect(find.text('实践任务'), findsNothing);
+      expect(find.textContaining(RegExp(r'^(书本|PDF) 第 .+ 页$')), findsNothing);
+      expect(find.text('按原书要求完成作答或操作，再在下方记录结果，提交给家长核对。'), findsNothing);
+      expect(find.text('可在纸上或用实物完成'), findsNothing);
       expect(find.text('本课巩固'), findsNothing);
       expect(find.text(instruction, findRichText: true), findsOneWidget);
       expect(find.text('查看文字'), findsNothing);
@@ -955,6 +969,21 @@ void defineMathTextbookLearningTests({
         for (final title in titles)
           tester.getRect(find.widgetWithText(AppTile, title)),
       ];
+      final viewport = tester.getRect(find.byType(CustomScrollView));
+      for (final card in cards) {
+        expect(
+          card.left,
+          greaterThanOrEqualTo(viewport.left + SpacingTokens.md),
+        );
+        expect(
+          card.right,
+          lessThanOrEqualTo(viewport.right - SpacingTokens.md),
+        );
+      }
+      expect(
+        cards.first.top,
+        greaterThanOrEqualTo(viewport.top + SpacingTokens.md),
+      );
       expect(cards[0].top, closeTo(cards[1].top, .1));
       expect(cards[1].top, closeTo(cards[2].top, .1));
       expect(cards[0].left, lessThan(cards[1].left));
@@ -998,6 +1027,287 @@ void defineMathTextbookLearningTests({
       '根据本节课的知识点逐步加强数量关系练习',
       '快速巩固',
     ]);
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.pumpAndSettle();
+    final viewport = tester.getRect(find.byType(CustomScrollView));
+    final card = tester.getRect(find.widgetWithText(AppTile, '教材原题'));
+    expect(card.left, viewport.left + SpacingTokens.md);
+    expect(card.right, viewport.right - SpacingTokens.md);
+    expect(
+      tester
+          .widget<MasonryLayout>(
+            find.byKey(const ValueKey('math-textbook-practice-masonry')),
+          )
+          .columnCount,
+      1,
+    );
+  });
+
+  testWidgets('学一学包含知识配图和完整例题，做一做只保留原题与练习', (tester) async {
+    final fixture = mathMisclassifiedPracticeFixture(illustratedHeading: true);
+    final illustrated = fixture.edit(
+      blocks: [
+        for (final block in fixture.blocks)
+          if (block.id == 'example')
+            MathTextbookBlock.fromJson({
+              ...block.toJson(),
+              'sourceLayout': true,
+            })
+          else
+            block,
+      ],
+    );
+    final renderedSources = <MathTextbookRegion>[];
+    const teachingImage = MathTextbookRegion(
+      page: 1,
+      left: .2,
+      top: .22,
+      right: .8,
+      bottom: .35,
+    );
+    var knowledgeLoads = 0;
+    await tester.runAsync(() => install(illustrated, approve: false));
+    await mount(
+      tester,
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookLearnMode,
+        pages: [2],
+      ),
+      renderedSources: renderedSources,
+      knowledgeImageLoader: (path, point, blocks, token) async {
+        knowledgeLoads++;
+        expect(point.title, '自有长度课');
+        expect(blocks.map((block) => block.id), ['example']);
+        return [teachingImage];
+      },
+    );
+    await waitFor(tester, () => find.text('自有长度课').evaluate().isNotEmpty);
+    expect(find.text('认识角'), findsOneWidget);
+    expect(find.widgetWithText(AppTile, '自有长度课 · 例 1'), findsOneWidget);
+    expect(find.widgetWithText(AppTile, '认识角 · 例 2'), findsOneWidget);
+    expect(find.textContaining('量一量图中的纸条'), findsNothing);
+    expect(find.textContaining('再比较两条线段'), findsNothing);
+    await tap(tester, find.widgetWithText(AppTile, '自有长度课'));
+    await waitFor(
+      tester,
+      () => find.byType(MathTextbookKnowledgeNotesPage).evaluate().isNotEmpty,
+    );
+    expect(find.text('用尺子连接两个点，可以得到一条线段。'), findsOneWidget);
+    await waitFor(tester, () => renderedSources.isNotEmpty);
+    await waitForImages(tester);
+    expect(find.byType(MathTextbookSourcePreview), findsOneWidget);
+    expect(renderedSources.single, teachingImage);
+    expect(
+      find.descendant(
+        of: find.byType(MathTextbookKnowledgeNotesPage),
+        matching: find.byType(ColoredCard),
+      ),
+      findsNothing,
+    );
+    expect(
+      tester
+          .widget<MathTextbookSourcePreview>(
+            find.byType(MathTextbookSourcePreview),
+          )
+          .workedExample,
+      isFalse,
+    );
+    router!.pop();
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '自有长度课').evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+    await tap(tester, find.widgetWithText(AppTile, '自有长度课'));
+    await waitForImages(tester);
+    expect(knowledgeLoads, 1, reason: '再次进入直接复用已定位的知识配图');
+    expect(renderedSources, [teachingImage], reason: '再次进入直接读取 PNG，不重渲染 PDF');
+    renderedSources.clear();
+
+    router!.pop();
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '自有长度课 · 例 1').evaluate().isNotEmpty,
+    );
+    await tap(tester, find.widgetWithText(AppTile, '自有长度课 · 例 1'));
+    await waitFor(
+      tester,
+      () => find.byType(MathTextbookSourceContentPage).evaluate().isNotEmpty,
+    );
+    final examplePage = tester.widget<MathTextbookSourceContentPage>(
+      find.byType(MathTextbookSourceContentPage),
+    );
+    expect(examplePage.workedExample, isTrue);
+    expect(examplePage.blocks.map((b) => b.id), ['example']);
+    await waitFor(tester, () => renderedSources.isNotEmpty);
+    expect(
+      tester
+          .widget<MathTextbookSourcePreview>(
+            find.byType(MathTextbookSourcePreview),
+          )
+          .workedExample,
+      isTrue,
+    );
+    expect(
+      renderedSources.single.toJson(),
+      illustrated.blocks.first.sources.single.toJson(),
+    );
+    expect(find.textContaining('量一量图中的纸条'), findsNothing);
+    router!.go(
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookPracticeMode,
+        pages: [1],
+      ),
+    );
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '教材原题').evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('例 1'), findsNothing);
+    expect(find.textContaining('例 2'), findsNothing);
+    await tap(tester, find.widgetWithText(AppTile, '教材原题'));
+    await waitFor(tester, () => find.byType(TextField).evaluate().isNotEmpty);
+    expect(find.textContaining('量一量图中的纸条'), findsOneWidget);
+    final draft = MathTextbookPracticeDraft.fromJson(
+      PracticeDraftRepository().get(
+        MathTextbookLearningRepository.draftKind,
+        scope: jsonEncode([book.pdfSha256, lesson.id, null]),
+      ),
+    );
+    expect(draft.items.map((item) => item.blocks.map((b) => b.id).toList()), [
+      ['practice-heading', 'practice-body'],
+      ['numbered'],
+      ['continued-practice'],
+    ]);
+    expect(find.byType(MathTextbookSourcePreview), findsWidgets);
+  });
+
+  testWidgets('只有完整例题时仍可从学一学打开，教材原题跳过章节导入图', (tester) async {
+    final fixture = mathChapterIntroductionFixture(legacy: false);
+    expect(mathTextbookStudyNotes(fixture), isEmpty);
+    final title = fixture.learning!.knowledgePoints.single.title;
+    await tester.runAsync(() => install(fixture, approve: false));
+    await mount(
+      tester,
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookLearnMode,
+        pages: [1],
+      ),
+    );
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, title).evaluate().isNotEmpty,
+    );
+    expect(find.textContaining('尚未整理'), findsNothing);
+    await tap(tester, find.widgetWithText(AppTile, title));
+    await waitFor(
+      tester,
+      () => find.byType(MathTextbookSourceContentPage).evaluate().isNotEmpty,
+    );
+    expect(
+      tester
+          .widget<MathTextbookSourceContentPage>(
+            find.byType(MathTextbookSourceContentPage),
+          )
+          .workedExample,
+      isTrue,
+    );
+    router!.go(
+      AppRoutes.mathTextbookStudyOf(
+        book.pdfSha256,
+        fixture.id,
+        mode: AppRoutes.mathTextbookLearnMode,
+      ),
+    );
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, title).evaluate().isNotEmpty,
+    );
+    router!.go(
+      AppRoutes.mathTextbookStudyOf(
+        book.pdfSha256,
+        fixture.id,
+        mode: AppRoutes.mathTextbookPracticeMode,
+      ),
+    );
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '教材原题').evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppTile, title), findsNothing);
+    await tap(tester, find.widgetWithText(AppTile, '教材原题'));
+    await waitFor(tester, () => find.byType(TextField).evaluate().isNotEmpty);
+    expect(find.textContaining('在纸上画出5个圆'), findsOneWidget);
+    expect(find.textContaining('（3）班'), findsNothing);
+  });
+
+  testWidgets('切换知识点取消旧配图，配图失败仍保留讲解并可重试', (tester) async {
+    final source = mathTaskClarityFixture();
+    final first = source.learning!.knowledgePoints.single;
+    final second = MathTextbookKnowledgePoint(
+      id: 'another-point',
+      title: '角的边',
+      summary: '两条边从同一个顶点出发。',
+      blockIds: first.blockIds,
+    );
+    final fixture = MathTextbookLesson.fromJson({
+      ...source.toJson(),
+      'learning': {
+        ...source.learning!.toJson(),
+        'knowledgePoints': [first.toJson(), second.toJson()],
+      },
+    });
+    await tester.runAsync(() => install(fixture, approve: false));
+    final oldImage = Completer<List<MathTextbookRegion>>();
+    bool Function()? oldCancelled;
+    var attempts = 0;
+    final rendered = <MathTextbookRegion>[];
+    const newRegion = MathTextbookRegion(
+      page: 1,
+      left: .3,
+      top: .15,
+      right: .8,
+      bottom: .25,
+    );
+    String location(String id) => AppRoutes.mathTextbookStudyOf(
+      book.pdfSha256,
+      lesson.id,
+      mode: AppRoutes.mathTextbookLearnMode,
+      knowledgePointId: id,
+    );
+    await mount(
+      tester,
+      location(first.id),
+      size: const Size(320, 860),
+      scale: 2,
+      renderedSources: rendered,
+      knowledgeImageLoader: (path, point, blocks, token) async {
+        if (point.id == first.id) {
+          oldCancelled = () => token.cancelled;
+          return oldImage.future;
+        }
+        if (++attempts == 1) throw const FormatException('配图读取失败，请重试');
+        return [newRegion];
+      },
+    );
+    await waitFor(tester, () => oldCancelled != null);
+    router!.go(location(second.id));
+    await waitFor(tester, () => find.text('重新加载配图').evaluate().isNotEmpty);
+    expect(oldCancelled!(), isTrue);
+    expect(find.text(second.summary), findsOneWidget);
+    oldImage.complete([fixture.blocks.first.sources.single]);
+    await tester.pump();
+    expect(rendered, isEmpty);
+    await tap(tester, find.text('重新加载配图'));
+    await waitFor(tester, () => rendered.isNotEmpty);
+    expect(rendered, [newRegion]);
+    expect(find.text('配图读取失败，请重试'), findsNothing);
+    expect(find.text(second.summary), findsOneWidget);
   });
 
   testWidgets('同一课时任意页都能打开完整知识点、原题与巩固，并恢复同一草稿', (tester) async {
@@ -1063,14 +1373,14 @@ void defineMathTextbookLearningTests({
     await tap(tester, find.widgetWithText(AppTile, '合并数量'));
     await waitFor(
       tester,
-      () => find.byType(MathTextbookSourceContentPage).evaluate().isNotEmpty,
+      () => find.byType(MathTextbookKnowledgeNotesPage).evaluate().isNotEmpty,
     );
-    final knowledgePage = tester.widget<MathTextbookSourceContentPage>(
-      find.byType(MathTextbookSourceContentPage),
+    final knowledgePage = tester.widget<MathTextbookKnowledgeNotesPage>(
+      find.byType(MathTextbookKnowledgeNotesPage),
     );
-    expect(knowledgePage.knowledgePoint, isTrue);
-    expect(knowledgePage.title, '合并数量');
-    expect(knowledgePage.blocks.map((block) => block.id), ['example']);
+    expect(knowledgePage.point.title, '合并数量');
+    expect(find.text('用加法求合并后的数量。'), findsOneWidget);
+    expect(find.byType(MathTextbookSourcePreview), findsNothing);
 
     router!.go(
       AppRoutes.mathTextbookBookOf(
@@ -1087,16 +1397,16 @@ void defineMathTextbookLearningTests({
     await tap(tester, find.widgetWithText(AppTile, '合并数量'));
     await waitFor(
       tester,
-      () => find.byType(MathTextbookSourceContentPage).evaluate().isNotEmpty,
+      () => find.byType(MathTextbookKnowledgeNotesPage).evaluate().isNotEmpty,
     );
     expect(
       tester
-          .widget<MathTextbookSourceContentPage>(
-            find.byType(MathTextbookSourceContentPage),
+          .widget<MathTextbookKnowledgeNotesPage>(
+            find.byType(MathTextbookKnowledgeNotesPage),
           )
-          .blocks
-          .map((block) => block.id),
-      ['example'],
+          .point
+          .id,
+      knowledgePage.point.id,
     );
 
     router!.go(
@@ -1231,7 +1541,7 @@ void defineMathTextbookLearningTests({
     expect(find.widgetWithText(AppTile, '本课巩固'), findsOneWidget);
   });
 
-  testWidgets('长摘要以简短入口呈现，双倍字号可直接打开对应完整内容', (tester) async {
+  testWidgets('长摘要以简短入口呈现，双倍字号打开完整知识要点，不展示例题截图', (tester) async {
     final source = mathLearningFixture();
     final knowledge = source.learning!.knowledgePoints.single;
     final long = MathTextbookLesson.fromJson({
@@ -1263,22 +1573,19 @@ void defineMathTextbookLearningTests({
     await tap(tester, find.text(knowledge.title));
     await waitFor(
       tester,
-      () => find.byType(MathTextbookSourceContentPage).evaluate().isNotEmpty,
+      () => find.byType(MathTextbookKnowledgeNotesPage).evaluate().isNotEmpty,
     );
     expect(
       tester
-          .widget<MathTextbookSourceContentPage>(
-            find.byType(MathTextbookSourceContentPage),
+          .widget<MathTextbookKnowledgeNotesPage>(
+            find.byType(MathTextbookKnowledgeNotesPage),
           )
-          .blocks
-          .map((b) => b.id),
-      ['example'],
+          .point
+          .summary,
+      '用加法求合并后的数量。\n' * 80,
     );
-    expect(
-      find.text('把2个圆和3个圆合在一起，共有5个圆。', findRichText: true),
-      findsOneWidget,
-    );
-    final contentPage = find.byType(MathTextbookSourceContentPage);
+    expect(find.text('把2个圆和3个圆合在一起，共有5个圆。', findRichText: true), findsNothing);
+    final contentPage = find.byType(MathTextbookKnowledgeNotesPage);
     expect(
       find.descendant(of: contentPage, matching: find.byType(ColoredCard)),
       findsNothing,
@@ -1293,8 +1600,9 @@ void defineMathTextbookLearningTests({
     );
     expect(
       find.descendant(of: appBar, matching: find.byTooltip('打开原书')),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(find.byType(MathTextbookSourcePreview), findsNothing);
     expect(
       find.descendant(of: contentPage, matching: find.text('查看文字')),
       findsNothing,

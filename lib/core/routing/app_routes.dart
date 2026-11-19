@@ -149,10 +149,12 @@ class AppRoutes {
     String lesson, {
     String? mode,
     String? knowledgePointId,
+    String? exampleId,
   }) {
     final queryParameters = {
       if (mode != null) 'mode': mode,
       if (knowledgePointId != null) 'point': knowledgePointId,
+      if (exampleId != null) 'example': exampleId,
     };
     return Uri(
       path: '/math/textbook/$id/lesson/${Uri.encodeComponent(lesson)}',
