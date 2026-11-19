@@ -1,7 +1,7 @@
 // lib/core/theme/color_tokens.dart
 //
 // 层级：core/theme（设计令牌 - 颜色板）
-// 职责：集中定义诗词国风水墨 + 口算童趣马卡龙 + 语义色 + 深色映射的全部颜色常量。
+// 职责：集中定义宣纸水墨主题、练习插画及语义色的全部颜色常量。
 // 规则：所有 widget 与主题构建器 **只能** 从此文件读取颜色，禁止在业务代码中硬编码 Color(0xFF...)。
 
 import 'package:flutter/painting.dart';
@@ -14,36 +14,82 @@ class ColorTokens {
 
   // ============ 诗词国风水墨 ============
   /// 宣纸底：Scaffold 背景
-  static const Color poemPaper = Color(0xFFF9F7F2);
+  static const Color poemPaper = Color(0xFFF7F0E2);
+
+  /// 素纸表面：弹窗、输入区域及底部导航。
+  static const Color paperSurface = Color(0xFFFFFBF3);
+  static const Color paperRaised = Color(0xFFF0E7D6);
 
   /// 启动水墨画的宣纸底，与图片外沿及 Android ic_launcher_background 同色。
   static const Color startupPaper = Color(0xFFF9E7C8);
 
   /// 宣纸深：卡片/次级背景
-  static const Color poemPaperDeep = Color(0xFFEFEAE0);
+  static const Color poemPaperDeep = Color(0xFFE9DFCD);
 
   /// 墨色：主要文字
-  static const Color poemInk = Color(0xFF2B2B2B);
+  static const Color poemInk = Color(0xFF2D352F);
 
   /// 淡墨：次级文字
-  static const Color poemInkLight = Color(0xFF6B6B6B);
+  static const Color poemInkLight = Color(0xFF565D53);
 
   /// 墨绿：主色调
-  static const Color poemGreen = Color(0xFF436444);
+  static const Color poemGreen = Color(0xFF245B4E);
 
   /// 墨绿深：按下 / 强调
-  static const Color poemGreenDeep = Color(0xFF2F4A31);
+  static const Color poemGreenDeep = Color(0xFF243E32);
 
   /// 深色主题的墨绿前景，保持在深底及着色卡片上的可读性。
-  static const Color poemGreenLight = Color(0xFFAAC9A5);
+  static const Color poemGreenLight = Color(0xFFA8D4BC);
 
   /// 朱砂：点缀强调色
-  static const Color poemCinnabar = Color(0xFFB35C5C);
+  static const Color poemCinnabar = Color(0xFF934B3D);
 
-  static const Color poemCinnabarLight = Color(0xFFE5AAA8);
+  static const Color poemCinnabarLight = Color(0xFFE8B4A3);
 
   /// 描金：装饰线 / 徽章
   static const Color poemGold = Color(0xFFC9A56A);
+
+  /// 赭石主色；完整纸色与夜色均独立于松墨。
+  static const Color inkOchre = Color(0xFF7C4028);
+  static const Color inkOchreLight = Color(0xFFF0BE82);
+
+  // 松墨：青白素宣、松绿与冷墨；夜色保持青绿基调。
+  static const Color pinePaper = Color(0xFFEAF2EE);
+  static const Color pineSurface = Color(0xFFF4FBF7);
+  static const Color pineRaised = Color(0xFFDDE9E2);
+  static const Color pinePaperDeep = Color(0xFFD0DFD6);
+  static const Color pineInk = Color(0xFF1E3A33);
+  static const Color pineMutedInk = Color(0xFF4A5C56);
+  static const Color pineRule = Color(0xFFBBCDC2);
+  static const Color pineAccent = Color(0xFF4E6273);
+  static const Color pineAccentLight = Color(0xFFB5CDD9);
+  static const Color pineNight = Color(0xFF112B29);
+  static const Color pineNightSurface = Color(0xFF1D3934);
+  static const Color pineNightRaised = Color(0xFF2C493F);
+  static const Color pineNightInk = Color(0xFFE4F2E9);
+  static const Color pineNightMuted = Color(0xFFAFCCC1);
+  static const Color pineNightRule = Color(0xFF47675C);
+
+  // 赭石：暖黄旧纸、棕墨与朱砂；夜色保持赤褐基调。
+  static const Color ochrePaper = Color(0xFFEDD4AC);
+  static const Color ochreSurface = Color(0xFFFFF2D9);
+  static const Color ochreRaised = Color(0xFFE8CCA2);
+  static const Color ochrePaperDeep = Color(0xFFDFC095);
+  static const Color ochreInk = Color(0xFF422B20);
+  static const Color ochreMutedInk = Color(0xFF694A37);
+  static const Color ochreRule = Color(0xFFC0A077);
+  static const Color ochreAccent = Color(0xFF705126);
+  static const Color ochreAccentLight = Color(0xFFE2C58D);
+  static const Color ochreNight = Color(0xFF322118);
+  static const Color ochreNightSurface = Color(0xFF493124);
+  static const Color ochreNightRaised = Color(0xFF604332);
+  static const Color ochreNightInk = Color(0xFFFFF0D5);
+  static const Color ochreNightMuted = Color(0xFFD7BFA0);
+  static const Color ochreNightRule = Color(0xFF88674C);
+  static const Color ochreSeal = Color(0xFF8C372A);
+  static const Color ochreSealLight = Color(0xFFF0AF91);
+  static const Color ochreCaution = Color(0xFF69451E);
+  static const Color ochreSuccess = Color(0xFF24542D);
 
   /// 印章红：勋章 / 收藏标记
   static const Color poemSeal = Color(0xFFA83E3E);
@@ -51,12 +97,12 @@ class ColorTokens {
   /// 淡宣纸分割线
   static const Color poemDivider = Color(0xFFDCD5C6);
 
-  // ============ 口算童趣马卡龙 ============
+  // ============ 练习插画色（不再作为独立主题） ============
   /// 温白底：Scaffold 背景
-  static const Color mathBackground = Color(0xFFFFFDF7);
+  static const Color mathBackground = poemPaper;
 
-  /// 纯白 Surface：卡片
-  static const Color mathSurface = Color(0xFFFFFFFF);
+  /// 素纸 Surface：卡片
+  static const Color mathSurface = paperSurface;
 
   /// 薰衣草紫：主色
   static const Color mathPurple = Color(0xFFB5A0E8);
@@ -83,10 +129,10 @@ class ColorTokens {
   static const Color mathCoral = Color(0xFFFF9A8B);
 
   /// 口算主文字色
-  static const Color mathTextDark = Color(0xFF33333A);
+  static const Color mathTextDark = poemInk;
 
   /// 口算次级文字色
-  static const Color mathTextLight = Color(0xFF7A7A85);
+  static const Color mathTextLight = poemInkLight;
 
   // ============ 语义色（跨主题共享） ============
   static const Color success = Color(0xFF52C41A);
@@ -106,13 +152,14 @@ class ColorTokens {
   /// 提示灯亮起时的琥珀色，在浅色图片上保留清晰轮廓。
   static const Color hintAmber = Color(0xFF9A6700);
 
-  // ============ 深色模式（占位映射） ============
+  // ============ 深色模式：夜墨底与暖纸文字 ============
   /// 深色背景
-  static const Color darkBackground = Color(0xFF1A1A1F);
+  static const Color darkBackground = Color(0xFF1D2521);
 
   /// 深色卡片 Surface
-  static const Color darkSurface = Color(0xFF25252C);
+  static const Color darkSurface = Color(0xFF27312B);
 
   /// 深色主文字
-  static const Color darkTextPrimary = Color(0xFFECECEC);
+  static const Color darkTextPrimary = Color(0xFFF0E8DA);
+  static const Color darkTextSecondary = Color(0xFFC4C9BC);
 }

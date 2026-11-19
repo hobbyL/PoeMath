@@ -8,14 +8,14 @@ class ProfileBadgeStyles {
 
   // 童生、秀才、举人、进士、探花、榜眼、状元、诗仙。
   static const _levelColors = [
-    (ColorTokens.mathPurple, ColorTokens.mathBlue),
-    (ColorTokens.mathBlue, ColorTokens.mathMint),
+    (ColorTokens.poemGreenLight, ColorTokens.inkOchreLight),
+    (ColorTokens.mathMint, ColorTokens.poemGreenLight),
     (ColorTokens.mathMint, ColorTokens.poemGold),
-    (ColorTokens.mathPurple, ColorTokens.mathPink),
-    (ColorTokens.mathPink, ColorTokens.mathYellow),
-    (ColorTokens.poemGold, ColorTokens.mathCoral),
-    (ColorTokens.mathCoral, ColorTokens.mathYellow),
-    (ColorTokens.mathYellow, ColorTokens.mathPurple),
+    (ColorTokens.inkOchreLight, ColorTokens.poemCinnabarLight),
+    (ColorTokens.poemCinnabarLight, ColorTokens.poemGold),
+    (ColorTokens.poemGold, ColorTokens.inkOchreLight),
+    (ColorTokens.poemCinnabarLight, ColorTokens.inkOchreLight),
+    (ColorTokens.inkOchreLight, ColorTokens.poemGreenLight),
   ];
 
   static HeroTagStyle level(int level) {
@@ -44,7 +44,7 @@ class ProfileBadgeStyles {
       _ => 0,
     };
     return HeroTagStyle(
-      accent: ColorTokens.mathYellow,
+      accent: ColorTokens.inkOchreLight,
       secondaryAccent: ColorTokens.poemGold,
       emphasis: milestone / 4,
       trailCount: milestone >= 3 ? 2 : 1,

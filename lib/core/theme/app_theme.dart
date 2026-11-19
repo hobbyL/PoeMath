@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/math_theme.dart';
 import 'package:poemath/core/theme/poem_theme.dart';
 
-/// 当前活跃学科：决定加载哪一套主题。
+/// 已持久化的配色标识：poem 为松墨，math 为赭石。
 enum AppSubject { poem, math }
 
 /// 主题门面：外部只需调用 [AppTheme.resolve] 即可获得 ThemeData。
@@ -22,27 +22,11 @@ class AppTheme {
     required AppSubject subject,
     required Brightness brightness,
   }) {
-    final theme = switch (subject) {
+    return switch (subject) {
       AppSubject.poem =>
         brightness == Brightness.light ? PoemTheme.light() : PoemTheme.dark(),
       AppSubject.math =>
         brightness == Brightness.light ? MathTheme.light() : MathTheme.dark(),
     };
-    return theme.copyWith(
-      bottomSheetTheme: const BottomSheetThemeData(
-        constraints: BoxConstraints(maxWidth: double.infinity),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          final selected = states.contains(WidgetState.selected);
-          return theme.textTheme.labelMedium?.copyWith(
-            color: selected
-                ? theme.colorScheme.onPrimary
-                : theme.colorScheme.onSurfaceVariant,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-          );
-        }),
-      ),
-    );
   }
 }

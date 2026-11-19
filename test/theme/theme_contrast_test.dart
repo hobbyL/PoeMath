@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/theme/ink_theme.dart';
+import 'package:poemath/core/theme/math_theme.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/core/widgets/stat_overview_card.dart';
@@ -87,6 +89,8 @@ void main() {
           ),
           '正文': (scheme.onSurface, scheme.surface),
           '次要正文': (scheme.onSurfaceVariant, scheme.surface),
+          if (theme.extension<MathThemeExt>() case final math?)
+            '口算大数字': (math.problemNumber.color!, scheme.surface),
         };
         final page = theme.scaffoldBackgroundColor;
         final card = Color.alphaBlend(
@@ -131,9 +135,16 @@ void main() {
         );
         await tester.pump(const Duration(seconds: 1));
         await drainHiveWritesForTesting(tester);
+        await tester.runAsync(
+          () => precacheImage(
+            AssetImage(theme.extension<InkThemeExt>()!.heroImage),
+            tester.element(find.byType(HomePage)),
+          ),
+        );
         await tester.pump(const Duration(milliseconds: 400));
-        final cardFinder = find.byWidgetPredicate(
-          (widget) => widget is ColoredCard && widget.gradient != null,
+        final cardFinder = find.descendant(
+          of: find.byKey(const ValueKey('home-check-in-background')),
+          matching: find.byType(ColoredCard),
         );
         expect(cardFinder, findsOneWidget);
         final card = tester.widget<ColoredCard>(cardFinder);

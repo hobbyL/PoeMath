@@ -21,8 +21,10 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 class ActiveSubjectNotifier extends Notifier<AppSubject> {
   @override
   AppSubject build() {
-    final stored = HiveBoxes.settings
-        .get('active_subject', defaultValue: 'poem') as String;
+    final stored = HiveBoxes.settings.get(
+      'active_subject',
+      defaultValue: 'poem',
+    ) as String;
 
     // 监听后续变更，自动持久化到 Hive
     listenSelf((prev, next) {
@@ -46,11 +48,11 @@ class ActiveSubjectNotifier extends Notifier<AppSubject> {
   }
 }
 
-/// 当前活跃学科（决定加载哪套主题）。
+/// 当前配色偏好（松墨 / 赭石；存储标识保持兼容）。
 final activeSubjectProvider =
     NotifierProvider<ActiveSubjectNotifier, AppSubject>(
-  ActiveSubjectNotifier.new,
-);
+      ActiveSubjectNotifier.new,
+    );
 
 /// 外观模式 Notifier — 初始值从 Hive 读取，变更时自动写回。
 class ThemeModeNotifier extends Notifier<ThemeMode> {
@@ -58,10 +60,8 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 
   @override
   ThemeMode build() {
-    final stored = HiveBoxes.settings.get(
-      _storageKey,
-      defaultValue: 'system',
-    ) as String;
+    final stored =
+        HiveBoxes.settings.get(_storageKey, defaultValue: 'system') as String;
 
     listenSelf((prev, next) {
       if (prev != null && prev != next) {
@@ -83,10 +83,10 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   }
 
   static String _serialize(ThemeMode mode) => switch (mode) {
-        ThemeMode.system => 'system',
-        ThemeMode.light => 'light',
-        ThemeMode.dark => 'dark',
-      };
+    ThemeMode.system => 'system',
+    ThemeMode.light => 'light',
+    ThemeMode.dark => 'dark',
+  };
 }
 
 /// 亮色 / 暗色 / 跟随系统。

@@ -26,7 +26,7 @@ class HeroStarlightPainter extends CustomPainter {
   // 先限制光晕自身亮度，再做透明叠加，保证相遇时也不会冲淡文字。
   late final _light = _readableGlow(Color.lerp(glow, foreground, .18)!);
   late final _coolLight = _readableGlow(
-    Color.lerp(ColorTokens.mathPurple, foreground, .12)!,
+    Color.lerp(ColorTokens.poemGreenLight, foreground, .12)!,
   );
   late final _starLight = _readableGlow(foreground);
 
@@ -374,7 +374,7 @@ Color _readableHeroLight(Color depth, Color foreground, Color candidate) {
   for (var step = 0; step < 12; step++) {
     final mix = (low + high) / 2;
     final luminance = Color.lerp(depth, candidate, mix)!.computeLuminance();
-    if ((front + .05) / (luminance + .05) >= 5.2) {
+    if ((front + .05) / (luminance + .05) >= 6.5) {
       low = mix;
     } else {
       high = mix;

@@ -237,11 +237,18 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500)); // 完成底部弹窗动画
 
     expect(find.text('主题风格'), findsOneWidget);
-    expect(find.text('国风水墨主题'), findsOneWidget);
-    expect(find.text('童趣马卡龙主题'), findsOneWidget);
+    final choices = find.byType(RadioListTile<AppSubject>);
+    expect(
+      find.descendant(of: choices, matching: find.text('宣纸 · 松墨')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: choices, matching: find.text('宣纸 · 赭石')),
+      findsOneWidget,
+    );
 
-    // 选择童趣马卡龙 — 触发 activeSubjectProvider 变更 + Hive 持久化
-    await tester.tap(find.text('童趣马卡龙主题'));
+    // 选择宣纸 · 赭石 — 触发 activeSubjectProvider 变更 + Hive 持久化
+    await tester.tap(find.text('宣纸 · 赭石'));
     await tester.pump(); // 触发回调
     await tester.pump(const Duration(seconds: 1)); // 完成动画
 

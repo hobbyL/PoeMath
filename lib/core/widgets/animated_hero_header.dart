@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/theme/ink_theme.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/hero_starlight_painter.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
@@ -24,7 +25,7 @@ class AnimatedHeroColors {
     final starlight = style == AnimatedHeroStyle.starlight;
     final scheme = theme.colorScheme;
     final accent = starlight
-        ? Color.lerp(scheme.tertiary, ColorTokens.mathPurpleDeep, .66)!
+        ? Color.lerp(scheme.primary, scheme.tertiary, .18)!
         : scheme.primary;
     final shade = dark && !starlight ? scheme.surface : scheme.shadow;
     return AnimatedHeroColors._(
@@ -40,7 +41,7 @@ class AnimatedHeroColors {
         starlight ? (dark ? .92 : .86) : (dark ? .96 : .38),
       )!,
       glow: starlight
-          ? Color.lerp(scheme.tertiaryContainer, ColorTokens.mathBlue, .6)!
+          ? Color.lerp(scheme.tertiaryContainer, scheme.tertiary, .35)!
           : scheme.tertiary,
     );
   }
@@ -169,7 +170,8 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final colors = AnimatedHeroColors(Theme.of(context), style: widget.style);
+    final theme = Theme.of(context);
+    final colors = AnimatedHeroColors(theme, style: widget.style);
     // 背景已绘制到屏幕顶边，系统栏只保留图标，不能叠加底色或对比度遮罩。
     final overlayStyle =
         (colors.foreground.computeLuminance() > .5
@@ -230,7 +232,9 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                       ),
                                       borderRadius: BorderRadius.zero,
                                       padding: EdgeInsets.zero,
-                                      child:
+                                      child: Stack(
+                                        fit: StackFit.expand,
+                                        children: [
                                           CustomPaint(
                                                 painter:
                                                     widget.style ==
@@ -265,6 +269,25 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                   milliseconds: 300,
                                                 ),
                                               ),
+                                          RepaintBoundary(
+                                            child: Image.asset(
+                                              theme
+                                                      .extension<InkThemeExt>()
+                                                      ?.heroImage ??
+                                                  'assets/images/ink_landscape_overlay.png',
+                                              fit: BoxFit.cover,
+                                              alignment: Alignment.centerRight,
+                                              cacheWidth: 640,
+                                              color: colors.foreground,
+                                              opacity:
+                                                  const AlwaysStoppedAnimation(
+                                                    .14,
+                                                  ),
+                                              excludeFromSemantics: true,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -710,12 +733,12 @@ class _HeroAuroraPainter extends CustomPainter {
       return (math.max(front, back) + .05) / (math.min(front, back) + .05);
     }
 
-    if (contrast(candidate) >= 5.2) return candidate;
+    if (contrast(candidate) >= 6.5) return candidate;
     var low = 0.0;
     var high = 1.0;
     for (var step = 0; step < 12; step++) {
       final mix = (low + high) / 2;
-      if (contrast(Color.lerp(depth, candidate, mix)!) >= 5.2) {
+      if (contrast(Color.lerp(depth, candidate, mix)!) >= 6.5) {
         low = mix;
       } else {
         high = mix;

@@ -76,8 +76,8 @@ class SettingsPage extends ConsumerWidget {
     };
 
     final subjectLabel = switch (subject) {
-      AppSubject.poem => '国风水墨',
-      AppSubject.math => '童趣马卡龙',
+      AppSubject.poem => '宣纸 · 松墨',
+      AppSubject.math => '宣纸 · 赭石',
     };
 
     final modeLabel = switch (mode) {
@@ -520,11 +520,13 @@ class SettingsPage extends ConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           RadioListTile<AppSubject>(
-                            title: Text('国风水墨主题'),
+                            title: Text('宣纸 · 松墨'),
+                            subtitle: Text('青白素宣 · 松绿冷墨 · 松枝山水'),
                             value: AppSubject.poem,
                           ),
                           RadioListTile<AppSubject>(
-                            title: Text('童趣马卡龙主题'),
+                            title: Text('宣纸 · 赭石'),
+                            subtitle: Text('暖黄旧纸 · 棕墨朱砂 · 梅枝书案'),
                             value: AppSubject.math,
                           ),
                         ],

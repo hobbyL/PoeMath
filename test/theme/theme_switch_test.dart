@@ -1,7 +1,7 @@
 // test/theme/theme_switch_test.dart
 //
 // 主题切换 widget 测试：当 activeSubjectProvider 从 poem 切到 math 时，
-// lightThemeProvider 派生的 ThemeData 的主色应从墨绿变为薰衣草紫。
+// 页面、卡片、文字及页头意象都要跟随选择变化，避免只有强调色不同。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/app.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/color_tokens.dart';
+import 'package:poemath/core/theme/ink_theme.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
@@ -29,7 +30,7 @@ void main() {
       subject: AppSubject.math,
       brightness: Brightness.light,
     );
-    expect(mathLight.colorScheme.primary, ColorTokens.mathPurpleDeep);
+    expect(mathLight.colorScheme.primary, ColorTokens.inkOchre);
   });
 
   test('所有学科和明暗主题的 bottom sheet 都不限制最大宽度', () {
@@ -41,6 +42,46 @@ void main() {
         );
         expect(theme.bottomSheetTheme.constraints?.maxWidth, double.infinity);
       }
+    }
+  });
+
+  test('松墨与赭石在明暗模式下都有明显不同的纸色和页头意象', () {
+    for (final brightness in Brightness.values) {
+      final pine = AppTheme.resolve(
+        subject: AppSubject.poem,
+        brightness: brightness,
+      );
+      final ochre = AppTheme.resolve(
+        subject: AppSubject.math,
+        brightness: brightness,
+      );
+      for (final (cool, warm) in [
+        (pine.scaffoldBackgroundColor, ochre.scaffoldBackgroundColor),
+        (pine.colorScheme.surface, ochre.colorScheme.surface),
+      ]) {
+        final coolHue = HSLColor.fromColor(cool).hue;
+        final warmHue = HSLColor.fromColor(warm).hue;
+        expect(coolHue, inInclusiveRange(130, 185));
+        expect(warmHue, inInclusiveRange(15, 50));
+        // 至少一个通道相差 10%，拦住近白底只改一点色温的回归。
+        expect(
+          [
+            (cool.r - warm.r).abs(),
+            (cool.g - warm.g).abs(),
+            (cool.b - warm.b).abs(),
+          ].any((difference) => difference >= .1),
+          isTrue,
+        );
+      }
+      expect(pine.colorScheme.onSurface, isNot(ochre.colorScheme.onSurface));
+      expect(
+        pine.colorScheme.outlineVariant,
+        isNot(ochre.colorScheme.outlineVariant),
+      );
+      expect(
+        pine.extension<InkThemeExt>()!.heroImage,
+        isNot(ochre.extension<InkThemeExt>()!.heroImage),
+      );
     }
   });
 
@@ -119,7 +160,23 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
 
       final ThemeData light2 = container.read(lightThemeProvider);
-      expect(light2.colorScheme.primary, ColorTokens.mathPurpleDeep);
+      expect(light2.colorScheme.primary, ColorTokens.inkOchre);
+      expect(
+        light2.scaffoldBackgroundColor,
+        isNot(light1.scaffoldBackgroundColor),
+      );
+      expect(light2.colorScheme.surface, isNot(light1.colorScheme.surface));
+      final renderedTheme = Theme.of(
+        tester.element(find.byType(Scaffold).first),
+      );
+      expect(
+        renderedTheme.scaffoldBackgroundColor,
+        light2.scaffoldBackgroundColor,
+      );
+      expect(
+        renderedTheme.extension<InkThemeExt>()!.heroImage,
+        light2.extension<InkThemeExt>()!.heroImage,
+      );
 
       // 排空 Hive 写链，否则 tearDown 的 Hive.close() 在 fake 时钟下永不返回。
       await drainHiveWritesForTesting(tester);
