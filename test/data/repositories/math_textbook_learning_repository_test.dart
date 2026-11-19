@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/backup_service.dart';
@@ -16,6 +17,8 @@ import 'package:poemath/data/repositories/textbook_progress_cleanup.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/domain/math_textbook_progress.dart';
+import 'package:poemath/domain/math_textbook_practice.dart';
+import 'package:poemath/domain/math_textbook_grading.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/math_textbook_fixture.dart';
@@ -119,6 +122,190 @@ void main() {
     await repo.finish(finished);
     return finished;
   }
+
+  Future<MathTextbookPracticeDraft> storeBeforeIntroductionFix(
+    MathTextbookLearningRepository repo,
+    MathTextbookLesson old, {
+    bool plan = false,
+    String introductionAnswer = '',
+    bool submitted = false,
+  }) async {
+    final practice = plan ? old.learning!.practicePlans.single : null;
+    final items = practice == null
+        ? originalMathTextbookItems(old)
+        : generateMathTextbookPractice(
+            lesson: old,
+            plan: practice,
+            grade: book.grade,
+            semester: book.semester,
+            random: Random(42),
+          );
+    final draft = MathTextbookPracticeDraft(
+      sessionId: 'retained-session',
+      profileId: repo.profileId,
+      bookId: book.pdfSha256,
+      editionId: book.learningEditionId,
+      lessonId: old.id,
+      lessonDigest: old.contentDigest(book.pdfSha256),
+      planId: practice?.id,
+      planDigest: practice?.digest,
+      seed: plan ? 42 : null,
+      items: items,
+      operationIds: [
+        for (var i = 0; i < items.length; i++) 'retained-operation-$i',
+      ],
+      startedAt: now,
+      elapsedSeconds: 27,
+      index: submitted ? 1 : 0,
+      answers: [
+        if (!plan) {'answer': introductionAnswer},
+        {'answer': '已画好三个圆，还要再画两个'},
+      ],
+      results: [
+        if (!plan) submitted ? MathTextbookResult.pendingParent : null,
+        null,
+      ],
+    );
+    repo.drafts.claim(
+      MathTextbookLearningRepository.draftKind,
+      scope: draft.scope,
+    );
+    await repo.drafts.save(
+      MathTextbookLearningRepository.draftKind,
+      draft.toJson(),
+      scope: draft.scope,
+    );
+    if (submitted) {
+      final evaluation = gradeMathTextbookExercise(
+        items.first.exercise,
+        draft.answers.first,
+      );
+      final progress = (await repo.load()).copyWith(
+        history: [
+          MathTextbookAttempt(
+            id: draft.operationIds.first,
+            sessionId: draft.sessionId,
+            lessonId: old.id,
+            lessonTitle: old.title,
+            lessonDigest: draft.lessonDigest,
+            scopeDigest: mathTextbookTargetDigest(
+              old,
+              null,
+              items.first.exercise.id,
+            ),
+            item: items.first,
+            answers: draft.answers.first,
+            result: evaluation.result,
+            fieldResults: evaluation.fields,
+            createdAt: now,
+          ),
+        ],
+      );
+      await HiveBoxes.settings.put(repo.key, jsonEncode(progress.toJson()));
+    }
+    return draft;
+  }
+
+  for (final plan in [false, true]) {
+    test('章节导入修正后恢复${plan ? '本课实践' : '教材原题'}，保留真实题目作答和同一次练习', () async {
+      final old = mathChapterIntroductionFixture();
+      await saveLesson(old, reviewed: false);
+      final repo = repository();
+      final draft = await storeBeforeIntroductionFix(repo, old, plan: plan);
+      final course = (await courses.load(book))!.toJson();
+      final restored = (await repo.loadDraft(old.id, planId: draft.planId))!;
+      expect(restored.items, hasLength(1));
+      expect(restored.sessionId, draft.sessionId);
+      expect(restored.startedAt, draft.startedAt);
+      expect(restored.elapsedSeconds, 27);
+      expect(restored.operationIds, [draft.operationIds.last]);
+      expect(restored.items.single.toJson(), draft.items.last.toJson());
+      expect(restored.answers, [draft.answers.last]);
+      expect(restored.results, [null]);
+      expect(restored.lessonDigest, isNot(draft.lessonDigest));
+      expect((await repo.load()).history, isEmpty);
+      expect((await courses.load(book))!.toJson(), course);
+      expect(
+        (await repo.loadDraft(old.id, planId: draft.planId))!.toJson(),
+        restored.toJson(),
+      );
+      final attempt = await repo.submit(restored, 0);
+      expect(attempt.id, draft.operationIds.last);
+      expect(attempt.answers, draft.answers.last);
+    });
+  }
+
+  test('导入图已有未提交的文字时拒绝自动移除，完整保留草稿', () async {
+    final old = mathChapterIntroductionFixture();
+    await saveLesson(old, reviewed: false);
+    final repo = repository();
+    final draft = await storeBeforeIntroductionFix(
+      repo,
+      old,
+      introductionAnswer: '还未提交的观察记录',
+    );
+    final stored = repo.drafts.get(
+      MathTextbookLearningRepository.draftKind,
+      scope: draft.scope,
+    );
+    await expectLater(repo.loadDraft(old.id), throwsStateError);
+    expect(
+      repo.drafts.get(
+        MathTextbookLearningRepository.draftKind,
+        scope: draft.scope,
+      ),
+      stored,
+    );
+  });
+
+  test('导入图已提交时保留历史，当前草稿继续真实题目且不重复提交', () async {
+    final old = mathChapterIntroductionFixture();
+    await saveLesson(old, reviewed: false);
+    final repo = repository();
+    final draft = await storeBeforeIntroductionFix(
+      repo,
+      old,
+      introductionAnswer: '观察记录已提交',
+      submitted: true,
+    );
+    final progress = (await repo.load()).toJson();
+    final restored = (await repo.loadDraft(old.id))!;
+    expect(restored.index, 0);
+    expect(restored.items.single.toJson(), draft.items.last.toJson());
+    expect(restored.answers.single, draft.answers.last);
+    expect((await repo.load()).toJson(), progress);
+  });
+
+  test('导入修正不能掩盖真实题干编辑，旧草稿仍然保留并报过期', () async {
+    final old = mathChapterIntroductionFixture();
+    await saveLesson(old, reviewed: false);
+    final repo = repository();
+    final draft = await storeBeforeIntroductionFix(repo, old);
+    final stored = repo.drafts.get(
+      MathTextbookLearningRepository.draftKind,
+      scope: draft.scope,
+    );
+    await saveLesson(
+      old.edit(
+        blocks: [
+          ...old.blocks.take(old.blocks.length - 1),
+          MathTextbookBlock.fromJson({
+            ...old.blocks.last.toJson(),
+            'spans': [const MathTextbookSpan.text('换一组图形进行计数。').toJson()],
+          }),
+        ],
+      ),
+      reviewed: false,
+    );
+    await expectLater(repo.loadDraft(old.id), throwsStateError);
+    expect(
+      repo.drafts.get(
+        MathTextbookLearningRepository.draftKind,
+        scope: draft.scope,
+      ),
+      stored,
+    );
+  });
 
   test('读取原书参考接受较早的页面进度，不重写草稿或课程且旧页面仍不能回退保存', () async {
     final lesson = await saveLesson(mathTaskClarityFixture(), reviewed: false);

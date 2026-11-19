@@ -23,6 +23,7 @@ import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/domain/math_textbook_grading.dart';
+import 'package:poemath/domain/math_textbook_content_organizer.dart';
 import 'package:poemath/domain/math_textbook_practice.dart';
 
 /// 课程锁、档案代次和恢复屏障覆盖一次学习写入及其跨 box 结算。
@@ -233,10 +234,118 @@ class MathTextbookLearningRepository {
     drafts.claim(draftKind, scope: scope);
     final raw = drafts.get(draftKind, scope: scope);
     if (raw == null) return null;
-    final draft = MathTextbookPracticeDraft.fromJson(raw);
+    final draft = await _repairIntroductionDraft(
+      course,
+      MathTextbookPracticeDraft.fromJson(raw),
+    );
     _validateDraft(course, draft);
     return draft;
   });
+
+  Future<MathTextbookPracticeDraft> _repairIntroductionDraft(
+    MathTextbookCourse? course,
+    MathTextbookPracticeDraft draft,
+  ) async {
+    final lesson = course?.currentLessons
+        .where((l) => l.id == draft.lessonId)
+        .firstOrNull;
+    if (lesson == null ||
+        lesson.contentDigest(book.pdfSha256) == draft.lessonDigest) {
+      return draft;
+    }
+    final previous = mathTextbookLessonBeforeIntroductionFix(
+      lesson,
+      bookId: book.pdfSha256,
+      digest: draft.lessonDigest,
+    );
+    if (previous == null) return draft;
+    final introductionIds = {
+      for (final item in originalMathTextbookItems(previous))
+        if (item.blocks.isNotEmpty &&
+            item.blocks.every(
+              (block) => mathTextbookNumberedTopicTitle(block) != null,
+            ))
+          item.exercise.id,
+    };
+    if (introductionIds.isEmpty) return draft;
+    final remainingItems = originalMathTextbookItems(previous)
+        .where((item) => !introductionIds.contains(item.exercise.id))
+        .map((item) => item.toJson())
+        .toList();
+    // Admit only this exact classification repair, never a real course edit or
+    // changed question/rule. Validate the old frozen items before transforming.
+    if (textbookContentDigest({'items': remainingItems}) !=
+        textbookContentDigest({
+          'items': originalMathTextbookItems(lesson)
+              .map((item) => item.toJson())
+              .toList(),
+        })) {
+      return draft;
+    }
+    _validateDraft(
+      MathTextbookCourse(
+        pdfSha256: course!.pdfSha256,
+        pageCount: course.pageCount,
+        fileSize: course.fileSize,
+        grade: course.grade,
+        semester: course.semester,
+        revision: course.revision,
+        lessons: [
+          for (final value in course.lessons)
+            value.id == previous.id ? previous : value,
+        ],
+        pendingLessons: course.pendingLessons,
+        outline: course.outline,
+      ),
+      draft,
+    );
+    final kept = <int>[];
+    for (var i = 0; i < draft.items.length; i++) {
+      if (draft.planId == null &&
+          introductionIds.contains(draft.items[i].exercise.id)) {
+        // Preserve unsubmitted writing. Submitted scene answers already have a
+        // durable history record; do not fabricate a submission for an empty one.
+        if (draft.answers[i].values.any((value) => value.trim().isNotEmpty) &&
+            !_read().history.any(
+              (attempt) =>
+                  attempt.id == draft.operationIds[i] &&
+                  textbookContentDigest(attempt.answers) ==
+                      textbookContentDigest(draft.answers[i]),
+            )) {
+          return draft;
+        }
+      } else {
+        kept.add(i);
+      }
+    }
+    if (kept.isEmpty ||
+        draft.exerciseIds != null && kept.length != draft.items.length) {
+      return draft;
+    }
+    final next = MathTextbookPracticeDraft(
+      sessionId: draft.sessionId,
+      profileId: draft.profileId,
+      bookId: draft.bookId,
+      editionId: draft.editionId,
+      lessonId: draft.lessonId,
+      lessonDigest: lesson.contentDigest(book.pdfSha256),
+      planId: draft.planId,
+      planDigest: draft.planDigest,
+      seed: draft.seed,
+      exerciseIds: draft.exerciseIds,
+      items: [for (final i in kept) draft.items[i]],
+      operationIds: [for (final i in kept) draft.operationIds[i]],
+      startedAt: draft.startedAt,
+      finishedAt: draft.finishedAt,
+      index: kept.where((i) => i < draft.index).length,
+      elapsedSeconds: draft.elapsedSeconds,
+      answers: [for (final i in kept) draft.answers[i]],
+      results: [for (final i in kept) draft.results[i]],
+    );
+    _validateDraft(course, next, newSession: true);
+    await drafts.save(draftKind, next.toJson(), scope: next.scope);
+    return next;
+  }
 
   Future<MathTextbookPracticeDraft> start(
     String lessonId, {

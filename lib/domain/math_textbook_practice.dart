@@ -123,7 +123,8 @@ List<MathTextbookBlock> mathTextbookPracticeDisplayBlocks(
     final fullPage =
         !parentPlan &&
         block.kind == MathTextbookBlockKind.exercise &&
-        (headingOnly || (item.blocks.length == 1 && !block.needsSource));
+        item.blocks.length == 1 &&
+        (headingOnly || !block.needsSource);
     if (fullPage) {
       display.add(
         MathTextbookBlock(

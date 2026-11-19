@@ -9,9 +9,36 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
+import 'package:poemath/domain/math_textbook_content_organizer.dart';
 
-MathTextbookCourse _decodeCourse(Uint8List bytes) =>
-    MathTextbookCourse.fromJson(jsonDecode(utf8.decode(bytes)));
+MathTextbookCourse _decodeCourse(Uint8List bytes) {
+  final course = MathTextbookCourse.fromJson(jsonDecode(utf8.decode(bytes)));
+  final retained = course.outline?.retainedLessonIds.toSet() ?? <String>{};
+  final lessons = [
+    for (final lesson in course.lessons)
+      retained.contains(lesson.id)
+          ? lesson
+          : resolveMathTextbookLearningSections(lesson),
+  ];
+  if (lessons.indexed.every(
+    (entry) => identical(entry.$2, course.lessons[entry.$1]),
+  )) {
+    return course;
+  }
+  // Read-time compatibility does not write files or advance the edit revision.
+  // withCurrentCourse uses this same decoder when starting/submitting practice.
+  return MathTextbookCourse(
+    pdfSha256: course.pdfSha256,
+    pageCount: course.pageCount,
+    fileSize: course.fileSize,
+    grade: course.grade,
+    semester: course.semester,
+    revision: course.revision,
+    lessons: lessons,
+    pendingLessons: course.pendingLessons,
+    outline: course.outline,
+  );
+}
 
 // Keep this closure outside the repository so it cannot capture the IO queue.
 Future<MathTextbookCourse> _decodeLargeCourse(Uint8List bytes) => Isolate.run(

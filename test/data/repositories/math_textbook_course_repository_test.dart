@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
+import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/math_textbook_course_repository.dart';
 
@@ -24,6 +25,75 @@ void main() {
     );
   });
   tearDown(() async => root.delete(recursive: true));
+
+  for (final large in [false, true]) {
+    test('旧自动分类读取时修正，练习写入读取同一配置，原文件不变（后台：$large）', () async {
+      final original = mathMisclassifiedPracticeFixture(
+        illustratedHeading: true,
+      );
+      final saved = await repository.saveGenerated(
+        book,
+        original,
+        generation: 0,
+        authorize: authorize,
+      );
+      final file = File(
+        '${root.path}/textbooks/math-courses/${book.pdfSha256}.json',
+      );
+      final raw =
+          '${large ? ' ' * (64 * 1024) : ''}${jsonEncode(saved.toJson())}';
+      await file.writeAsString(raw);
+
+      final loaded = (await repository.load(book))!;
+      expect(loaded.revision, saved.revision);
+      expect(loaded.lessons.single.learning!.knowledgePoints.map((k) => k.id), [
+        'example-knowledge',
+        'next-example-knowledge',
+      ]);
+      expect(loaded.lessons.single.learning!.exercises.map((e) => e.blockIds), [
+        ['practice-heading', 'practice-body'],
+        ['numbered'],
+        ['continued-practice'],
+      ]);
+      expect(
+        loaded.lessons.single.blocks.map((b) => b.toJson()),
+        original.blocks.map((b) => b.toJson()),
+      );
+      expect(loaded.lessons.single.review, isNull);
+      await repository.withCurrentCourse(book, (current) async {
+        expect(current!.toJson(), loaded.toJson());
+      });
+      expect(await file.readAsString(), raw);
+    });
+  }
+
+  for (final reviewed in [false, true]) {
+    test('分类兼容不重写${reviewed ? '已审核' : '人工修改'}的学习配置', () async {
+      final original = mathMisclassifiedPracticeFixture();
+      final preserved = reviewed
+          ? original.approve(
+              pdfSha256: book.pdfSha256,
+              reviewer: '测试家长',
+              editingMilliseconds: 1000,
+            )
+          : original.edit(
+              learning: MathTextbookLearning.fromJson({
+                ...original.learning!.toJson(),
+                'knowledgePoints': [
+                  for (final point in original.learning!.knowledgePoints)
+                    {...point.toJson(), 'summary': '${point.summary}家长补充说明。'},
+                ],
+              }),
+            );
+      final saved = await repository.saveGenerated(
+        book,
+        preserved,
+        generation: 0,
+        authorize: authorize,
+      );
+      expect((await repository.load(book))!.toJson(), saved.toJson());
+    });
+  }
 
   test('整书量级草稿在后台解码后保留正文、审核和教材身份校验', () async {
     final dense = denseMathLearningFixture().approve(
@@ -48,6 +118,23 @@ void main() {
       repository.load(book.withSubject(TextbookSubject.chinese)),
       throwsFormatException,
     );
+  });
+
+  test('人工把大量内容合为少量知识点时，读取不受自动摘录数量上限影响', () async {
+    final source = denseMathLearningFixture(additionalBlocks: 150);
+    final manual = source.edit(
+      learning: MathTextbookLearning.fromJson({
+        ...source.learning!.toJson(),
+        'coverageConfirmed': false,
+      }),
+    );
+    final saved = await repository.saveGenerated(
+      book,
+      manual,
+      generation: 0,
+      authorize: authorize,
+    );
+    expect((await repository.load(book))!.toJson(), saved.toJson());
   });
 
   test('后台解码拒绝损坏大文件，失败后课程队列仍可读取', () async {

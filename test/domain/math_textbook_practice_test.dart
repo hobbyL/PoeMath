@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
+import 'package:poemath/domain/math_textbook_content_organizer.dart';
 import 'package:poemath/domain/math_textbook_course_plan.dart';
 import 'package:poemath/domain/math_textbook_grading.dart';
 import 'package:poemath/domain/math_textbook_practice.dart';
@@ -103,6 +104,19 @@ void main() {
     });
     expect(item.toJson(), retained);
     expect(item.blocks.single.sources.single.top, .2);
+  });
+
+  test('做一做配图标题已经和题干成组时，展示题组而不重复整页', () {
+    final lesson = resolveMathTextbookLearningSections(
+      mathMisclassifiedPracticeFixture(illustratedHeading: true),
+    );
+    final item = originalMathTextbookItems(lesson).first;
+    final display = mathTextbookPracticeDisplayBlocks(item);
+    expect(display.map((b) => b.id), ['practice-heading', 'practice-body']);
+    expect(display.map((b) => b.sources.single.top), [.5, .48]);
+    expect(display.first.sourceLayout, isTrue);
+    expect(display.last.text, '量一量图中的纸条，在纸上记录它的长度。');
+    expect(display, item.blocks);
   });
 
   for (final manual in [false, true]) {

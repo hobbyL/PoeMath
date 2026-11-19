@@ -4,6 +4,7 @@ import 'package:poemath/domain/math_textbook_content_organizer.dart';
 import 'package:poemath/domain/math_textbook_draft_parser.dart';
 
 import '../helpers/math_textbook_fixture.dart';
+import '../helpers/math_textbook_learning_fixture.dart';
 
 MathTextbookBlock _block(
   String id,
@@ -37,6 +38,112 @@ MathTextbookLesson _lesson(
 );
 
 void main() {
+  test('编号章节导入图不再生成原题，已有自动配置只修正分类', () {
+    final old = mathChapterIntroductionFixture();
+    final before = old.toJson();
+    expect(old.learning!.exercises.first.blockIds, ['chapter-scene']);
+    final corrected = resolveMathTextbookLearningSections(old);
+    expect(corrected.learning!.exercises.map((e) => e.blockIds), [
+      ['exercise'],
+    ]);
+    expect(
+      corrected.blocks.map((b) => b.toJson()),
+      old.blocks.map((b) => b.toJson()),
+    );
+    expect(old.toJson(), before);
+    expect(
+      mathChapterIntroductionFixture(legacy: false).learning!.toJson(),
+      corrected.learning!.toJson(),
+    );
+    expect(resolveMathTextbookLearningSections(corrected), same(corrected));
+  });
+
+  test('章节标题只识别明确的主题名，真正含题干的加法题保留', () {
+    final intro = mathChapterIntroductionFixture().blocks.first;
+    for (final title in ['1. 加法', '2. 减法', '1. 乘法的初步认识', '2. 2~6的乘法口诀']) {
+      final block = MathTextbookBlock.fromJson({
+        ...intro.toJson(),
+        'spans': [MathTextbookSpan.text(title).toJson()],
+      });
+      expect(mathTextbookNumberedTopicTitle(block), isNotNull);
+    }
+    for (final title in [
+      '1. 加法要注意什么？',
+      '2. 减法算一算。',
+      '1. 32+6=',
+      '1. 用加法求和',
+      '1 加法',
+    ]) {
+      final block = MathTextbookBlock.fromJson({
+        ...intro.toJson(),
+        'spans': [MathTextbookSpan.text(title).toJson()],
+      });
+      expect(mathTextbookNumberedTopicTitle(block), isNull);
+    }
+    final reviewed = mathChapterIntroductionFixture().approve(
+      pdfSha256: 'a' * 64,
+      reviewer: '家长',
+      editingMilliseconds: 1000,
+    );
+    expect(resolveMathTextbookLearningSections(reviewed), same(reviewed));
+  });
+
+  test('新整理的子章节标题与背景图归为教学内容，不产生可提交的题目', () {
+    final lesson = organizeMathTextbookLesson(
+      _lesson([
+        _block(
+          'chapter',
+          MathTextbookBlockKind.exercise,
+          '1. 加法',
+          .08,
+          .12,
+          number: '1',
+        ),
+        _block('scene', MathTextbookBlockKind.illustration, '', .18, .9),
+      ], title: '两位数加减法'),
+    );
+    expect(
+      lesson.blocks.where((b) => b.kind == MathTextbookBlockKind.exercise),
+      isEmpty,
+    );
+    expect(seedMathTextbookLearning(lesson).exercises, isEmpty);
+  });
+  for (final illustrated in [false, true]) {
+    test('无编号练习和次页续题不生成知识点，题干与配图一起保留（配图标题：$illustrated）', () {
+      final lesson = mathMisclassifiedPracticeFixture(
+        illustratedHeading: illustrated,
+      );
+      expect(lesson.learning!.knowledgePoints.map((p) => p.blockIds.single), [
+        'example',
+        'practice-body',
+        'continued-practice',
+        'next-example',
+      ]);
+      final learning = seedMathTextbookLearning(lesson);
+      expect(learning.knowledgePoints.map((p) => p.blockIds.single), [
+        'example',
+        'next-example',
+      ]);
+      expect(learning.exercises.map((e) => e.blockIds), [
+        ['practice-heading', 'practice-body'],
+        ['numbered'],
+        ['continued-practice'],
+      ]);
+      expect(learning.exercises.map((e) => e.knowledgePointIds), [
+        ['example-knowledge'],
+        ['example-knowledge'],
+        ['example-knowledge'],
+      ]);
+      expect(learning.exercises.every((e) => e.needsParent), isTrue);
+      expect(learning.coverageConfirmed, isFalse);
+      learning.matchBlocks(lesson.blocks);
+      final resolved = resolveMathTextbookLearningSections(lesson);
+      expect(resolved.learning!.toJson(), learning.toJson());
+      expect(resolved.blocks, lesson.blocks);
+      expect(resolveMathTextbookLearningSections(resolved), same(resolved));
+    });
+  }
+
   for (final parallel in [false, true]) {
     test(parallel ? '无配图的并列待填算式仍按原书保留列位' : '连续上下算式保持结构化展示', () {
       MathTextbookBlock formula(

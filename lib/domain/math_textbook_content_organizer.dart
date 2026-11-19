@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:lpinyin/lpinyin.dart';
 import 'package:poemath/data/models/math_textbook_course.dart';
+import 'package:poemath/data/models/textbook_course.dart'
+    show textbookContentDigest;
 import 'package:poemath/domain/textbook_pinyin_font.dart';
 
 final _practiceHeading = RegExp(r'^(?:练习[一二三四五六七八九十百0-9]+|做一做|想一想|说一说|试一试)$');
@@ -11,6 +13,31 @@ final _instructionNumber = RegExp(r'^([0-9]{1,2})[.、]\s*');
 
 bool isMathTextbookPracticeHeading(String text) =>
     _practiceHeading.hasMatch(text.replaceAll(RegExp(r'\s'), ''));
+
+bool isMathTextbookExampleStepHeading(String text) =>
+    _exampleStepHeadings.contains(text.replaceAll(RegExp(r'\s'), ''));
+
+/// Numbered topic banners can be merged with an introductory scene. A section
+/// name such as "1. 加法" does not turn that scene into an answerable question.
+String? mathTextbookNumberedTopicTitle(MathTextbookBlock block) {
+  if (block.kind != MathTextbookBlockKind.exercise ||
+      block.parentNote.isNotEmpty ||
+      block.sources.first.top > .18) {
+    return null;
+  }
+  final firstLine = block.text
+      .split('\n')
+      .first
+      .trim()
+      .replaceAll(RegExp(r'\s'), '');
+  final match = RegExp(r'^[0-9]{1,2}[.、](.+)$').firstMatch(firstLine);
+  if (match == null) return null;
+  final title = match[1]!;
+  return RegExp(r'^(?:(?:加|减|乘|除)法(?:的初步认识)?|[0-9]+[~～—-][0-9]+的乘法口诀)$')
+          .hasMatch(title)
+      ? title
+      : null;
+}
 
 /// Keep each example/question with its explanation and drawing. The original
 /// page remains an independent anchor; an uncertain diagram is never flattened.
@@ -283,12 +310,14 @@ MathTextbookBlock _namedUnitHeading(
       block.sources.first.top > .18) {
     return block;
   }
+  final topic = mathTextbookNumberedTopicTitle(block);
   final text = block.text.replaceAll(RegExp(r'\s'), '');
   final match = RegExp(r'^[0-9]{1,2}[.、](.+)$').firstMatch(text);
   if (match == null) return block;
   final title = lessonTitle.replaceAll(RegExp(r'\s'), '');
   final name = match[1]!;
-  if (name != title &&
+  if (topic == null &&
+      name != title &&
       !(title.endsWith(name) &&
           RegExp(r'^[0-9]{1,2}[.、]?$')
               .hasMatch(title.substring(0, title.length - name.length)))) {
@@ -526,31 +555,256 @@ String _knowledgeSummary(MathTextbookBlock block) {
   return (statements.isEmpty ? sentences : statements).take(3).join('\n');
 }
 
+/// Student notes contain explanations, while worked examples have their own
+/// learning entries. Authored summaries remain intact; automatic excerpts keep
+/// only complete method statements from the source, never generated answers.
+List<MathTextbookKnowledgePoint> mathTextbookStudyNotes(
+  MathTextbookLesson lesson,
+) {
+  final learning = lesson.learning;
+  if (learning == null) return const [];
+  final automatic =
+      lesson.review == null &&
+      !learning.coverageConfirmed &&
+      textbookContentDigest(learning.toJson()) ==
+          textbookContentDigest(
+            _seedMathTextbookLearning(
+              lesson,
+              unitTitle: learning.unitTitle,
+              classifyPracticeSections: true,
+              excludeIntroductions: true,
+            ).toJson(),
+          );
+  if (!automatic) {
+    return learning.knowledgePoints
+        .where((point) => point.summary.trim().isNotEmpty)
+        .toList();
+  }
+  final notes = <MathTextbookKnowledgePoint>[];
+  for (final point in learning.knowledgePoints) {
+    final statements = <String>{};
+    for (final block in lesson.blocks.where(
+      (b) => point.blockIds.contains(b.id),
+    )) {
+      // A formula or diagram separates prose fragments. Do not attach a
+      // question's labels to the explanation which follows its calculation.
+      final text = block.spans
+          .map((span) => span.text ?? '\u0000')
+          .join()
+          .replaceAll(
+            RegExp(
+              r'(?<=[\u3400-\u9fff，、；：])[^\S\n]*\n[^\S\n]*(?=[\u3400-\u9fff])',
+            ),
+            '',
+          );
+      for (final match in RegExp(r'[^。！？!?\n\u0000]+[。！]').allMatches(text)) {
+        final sentence = match[0]!.trim().replaceFirst(RegExp(r'^\d+\s+'), '');
+        if (sentence.length > 400 ||
+            RegExp(
+              r'[（(]\s*[）)]|_{2,}|……|后记|本册教材|编写|出版社|敬意|谢意|上面|下面|下表|你自己|说一说|填一填|量一量',
+            ).hasMatch(sentence)) {
+          continue;
+        }
+        if (RegExp(
+          r'对齐|相加满十|不够减|从十位退|进[一1]|可以用|可以看作|可以得到|可以形成|可以比较|可以测量|就是|叫作|称为|作为|作单位|需要使用|先画|再画|借助尺子|用相同|相同的单位|要注意|应注意',
+        ).hasMatch(sentence)) {
+          statements.add(sentence);
+        }
+      }
+    }
+    if (statements.isEmpty) continue;
+    final title = point.title
+        .replaceFirst(RegExp(r'\s*·\s*例\s*[^·]+$'), '')
+        .trim();
+    final index = notes.indexWhere((note) => note.title == title);
+    if (index < 0) {
+      notes.add(
+        MathTextbookKnowledgePoint(
+          id: point.id,
+          title: title,
+          summary: statements.join('\n'),
+          blockIds: point.blockIds,
+        ),
+      );
+    } else {
+      final previous = notes[index];
+      notes[index] = MathTextbookKnowledgePoint(
+        id: previous.id,
+        title: title,
+        summary: {...previous.summary.split('\n'), ...statements}.join('\n'),
+        blockIds: {...previous.blockIds, ...point.blockIds}.toList(),
+      );
+    }
+  }
+  return notes;
+}
+
 MathTextbookLearning seedMathTextbookLearning(
   MathTextbookLesson lesson, {
   String unitTitle = '',
   bool legacyLayout = false,
+}) => MathTextbookLearning.fromJson(
+  _seedMathTextbookLearning(
+    lesson,
+    unitTitle: unitTitle,
+    legacyLayout: legacyLayout,
+    classifyPracticeSections: !legacyLayout,
+    excludeIntroductions: !legacyLayout,
+  ).toJson(),
+);
+
+/// Repair only a reproducible, unreviewed automatic learning configuration.
+/// Keep authored blocks and the stored course untouched; both student reads and
+/// authoritative practice writes must resolve the same configuration.
+MathTextbookLesson resolveMathTextbookLearningSections(
+  MathTextbookLesson lesson,
+) {
+  final learning = lesson.learning;
+  if (learning == null || lesson.review != null || learning.coverageConfirmed) {
+    return lesson;
+  }
+  final digest = textbookContentDigest(learning.toJson());
+  final reproducible = [false, true].any(
+    (classify) =>
+        textbookContentDigest(
+          _seedMathTextbookLearning(
+            lesson,
+            unitTitle: learning.unitTitle,
+            classifyPracticeSections: classify,
+          ).toJson(),
+        ) ==
+        digest,
+  );
+  if (!reproducible) return lesson;
+  final corrected = _seedMathTextbookLearning(
+    lesson,
+    unitTitle: learning.unitTitle,
+    classifyPracticeSections: true,
+    excludeIntroductions: true,
+  );
+  // Do not make a valid saved course unreadable if the extra question groups
+  // exceed the learning schema's limit. Generation still validates this limit.
+  if (corrected.exercises.length > 1000) return lesson;
+  if (textbookContentDigest(corrected.toJson()) == digest) return lesson;
+  return lesson.edit(learning: corrected);
+}
+
+/// Reconstruct an exact older automatic configuration solely to validate and
+/// retain existing practice drafts when introductory scenes stop being tasks.
+MathTextbookLesson? mathTextbookLessonBeforeIntroductionFix(
+  MathTextbookLesson lesson, {
+  required String bookId,
+  required String digest,
+}) {
+  final learning = lesson.learning;
+  if (learning == null || lesson.review != null || learning.coverageConfirmed) {
+    return null;
+  }
+  final current = _seedMathTextbookLearning(
+    lesson,
+    unitTitle: learning.unitTitle,
+    classifyPracticeSections: true,
+    excludeIntroductions: true,
+  );
+  if (textbookContentDigest(current.toJson()) !=
+      textbookContentDigest(learning.toJson())) {
+    return null;
+  }
+  for (final classify in [true, false]) {
+    final previous = lesson.edit(
+      learning: _seedMathTextbookLearning(
+        lesson,
+        unitTitle: learning.unitTitle,
+        classifyPracticeSections: classify,
+      ),
+    );
+    if (previous.contentDigest(bookId) == digest) return previous;
+  }
+  return null;
+}
+
+MathTextbookLearning _seedMathTextbookLearning(
+  MathTextbookLesson lesson, {
+  String unitTitle = '',
+  bool legacyLayout = false,
+  required bool classifyPracticeSections,
+  bool excludeIntroductions = false,
 }) {
   final knowledge = <MathTextbookKnowledgePoint>[];
   final exercises = <MathTextbookExercise>[];
   var section = lesson.title;
+  var practice = false;
+  MathTextbookBlock? practiceHeading;
+  MathTextbookRegion? previousPracticeSource;
   for (final block in lesson.blocks) {
     if (block.kind == MathTextbookBlockKind.sourcePage) continue;
+    if (classifyPracticeSections && isMathTextbookFooter(block)) continue;
+    final introduction = excludeIntroductions
+        ? mathTextbookNumberedTopicTitle(block)
+        : null;
+    if (introduction != null) {
+      section = introduction;
+      practice = false;
+      practiceHeading = null;
+      previousPracticeSource = null;
+      continue;
+    }
     if (block.kind == MathTextbookBlockKind.heading) {
-      if (!_practiceHeading.hasMatch(
-        block.text.replaceAll(RegExp(r'\s'), ''),
-      )) {
+      final isPractice = isMathTextbookPracticeHeading(block.text);
+      if (classifyPracticeSections &&
+          !_exampleStepHeadings.contains(
+            block.text.replaceAll(RegExp(r'\s'), ''),
+          )) {
+        practice = isPractice;
+        practiceHeading = isPractice ? block : null;
+        previousPracticeSource = null;
+      }
+      if (!isPractice) {
         section = block.text.trim();
       }
       continue;
     }
-    if (block.kind == MathTextbookBlockKind.exercise) {
+    if (classifyPracticeSections) {
+      if (block.kind == MathTextbookBlockKind.example) {
+        practice = false;
+        practiceHeading = null;
+        previousPracticeSource = null;
+      } else if (block.kind == MathTextbookBlockKind.exercise) {
+        practice = true;
+      }
+    }
+    if (block.kind == MathTextbookBlockKind.exercise || practice) {
+      // Unnumbered prompts and their drawings can be separate organized blocks.
+      // Keep them in the same page's question; the next page retains its own
+      // source instead of guessing a cross-page question boundary.
+      if (classifyPracticeSections &&
+          block.kind != MathTextbookBlockKind.exercise &&
+          previousPracticeSource?.page == block.sources.first.page &&
+          exercises.last.blockIds.length < 100) {
+        final previous = exercises.removeLast();
+        exercises.add(
+          MathTextbookExercise.fromJson({
+            ...previous.toJson(),
+            'blockIds': [...previous.blockIds, block.id],
+          }),
+        );
+        previousPracticeSource = block.sources.last;
+        continue;
+      }
       exercises.add(
         MathTextbookExercise(
           id: '${block.id}-exercise',
-          title: mathTextbookSectionTitle(block),
+          title: block.kind == MathTextbookBlockKind.exercise
+              ? mathTextbookSectionTitle(block)
+              : '原书练习',
           number: block.exerciseNumber ?? '',
-          blockIds: [block.id],
+          blockIds: [
+            if (classifyPracticeSections &&
+                block.kind != MathTextbookBlockKind.exercise &&
+                practiceHeading?.sources.first.page == block.sources.first.page)
+              practiceHeading!.id,
+            block.id,
+          ],
           knowledgePointIds: knowledge.isEmpty ? [] : [knowledge.last.id],
           fields: [
             MathTextbookAnswerField(
@@ -564,6 +818,8 @@ MathTextbookLearning seedMathTextbookLearning(
           ],
         ),
       );
+      previousPracticeSource = block.sources.last;
+      practiceHeading = null;
       continue;
     }
     final summary = _knowledgeSummary(block);
@@ -586,23 +842,21 @@ MathTextbookLearning seedMathTextbookLearning(
       ),
     );
   }
-  return MathTextbookLearning.fromJson(
-    MathTextbookLearning(
-      unitTitle: unitTitle,
-      knowledgePoints: knowledge,
-      exercises: exercises,
-      practicePlans: [
-        if (knowledge.isNotEmpty)
-          MathTextbookPracticePlan(
-            id: '${lesson.id}-practice',
-            knowledgePointId: knowledge.first.id,
-            title: '本课实践',
-            kind: MathTextbookPracticeKind.parentTask,
-            count: 1,
-            task: '选择本课一个例题或活动，在纸上完成并说明方法，请家长对照原书核对。',
-          ),
-      ],
-      coverageConfirmed: false,
-    ).toJson(),
+  return MathTextbookLearning(
+    unitTitle: unitTitle,
+    knowledgePoints: knowledge,
+    exercises: exercises,
+    practicePlans: [
+      if (knowledge.isNotEmpty)
+        MathTextbookPracticePlan(
+          id: '${lesson.id}-practice',
+          knowledgePointId: knowledge.first.id,
+          title: '本课实践',
+          kind: MathTextbookPracticeKind.parentTask,
+          count: 1,
+          task: '选择本课一个例题或活动，在纸上完成并说明方法，请家长对照原书核对。',
+        ),
+    ],
+    coverageConfirmed: false,
   );
 }

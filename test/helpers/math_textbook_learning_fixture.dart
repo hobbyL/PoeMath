@@ -1,5 +1,142 @@
 import 'package:poemath/data/models/math_textbook_course.dart';
+import 'package:poemath/domain/math_textbook_content_organizer.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
+
+/// A chapter-opening scene was previously mistaken for question 1. The real
+/// worked example and exercise occupy subsequent pages.
+MathTextbookLesson mathChapterIntroductionFixture({bool legacy = true}) {
+  final source = mathLearningFixture(manual: true);
+  final lesson = MathTextbookLesson(
+    id: source.id,
+    title: '两位数加减法',
+    startPage: 1,
+    endPage: 3,
+    blocks: [
+      MathTextbookBlock(
+        id: 'chapter-scene',
+        kind: MathTextbookBlockKind.exercise,
+        exerciseNumber: '1',
+        spans: const [MathTextbookSpan.text('1. 加法\n（3）班')],
+        sources: const [
+          MathTextbookRegion(page: 1, left: 0, top: 0, right: 1, bottom: .9),
+        ],
+        sourceLayout: true,
+      ),
+      for (final block in source.blocks)
+        MathTextbookBlock.fromJson({
+          ...block.toJson(),
+          if (block.id == 'example') 'kind': 'example',
+          'sources': [
+            for (final region in block.sources)
+              {...region.toJson(), 'page': region.page + 1},
+          ],
+        }),
+    ],
+  );
+  return lesson.edit(
+    learning: seedMathTextbookLearning(lesson, legacyLayout: legacy),
+  );
+}
+
+/// Saved automatic output before unnumbered practice sections were recognized.
+MathTextbookLesson mathMisclassifiedPracticeFixture({
+  bool illustratedHeading = false,
+}) {
+  MathTextbookBlock block(
+    String id,
+    MathTextbookBlockKind kind,
+    String text,
+    int page,
+    double top,
+    double bottom, {
+    String? number,
+  }) => MathTextbookBlock(
+    id: id,
+    kind: kind,
+    spans: text.isEmpty ? const [] : [MathTextbookSpan.text(text)],
+    sources: [
+      MathTextbookRegion(
+        page: page,
+        left: .1,
+        top: top,
+        right: .9,
+        bottom: bottom,
+      ),
+    ],
+    exerciseNumber: number,
+    sourceLayout: illustratedHeading && id == 'practice-heading',
+  );
+  final lesson = MathTextbookLesson(
+    id: 'math-1-2',
+    title: '自有长度课',
+    startPage: 1,
+    endPage: 2,
+    blocks: [
+      block(
+        'example',
+        MathTextbookBlockKind.example,
+        '用尺子连接两个点，可以得到一条线段。',
+        1,
+        .1,
+        .4,
+        number: '1',
+      ),
+      block(
+        'practice-heading',
+        illustratedHeading
+            ? MathTextbookBlockKind.exercise
+            : MathTextbookBlockKind.heading,
+        '做一做',
+        1,
+        .5,
+        .65,
+      ),
+      // Its crop overlaps the heading because the retained diagram extends up.
+      block(
+        'practice-body',
+        MathTextbookBlockKind.text,
+        '量一量图中的纸条，在纸上记录它的长度。',
+        1,
+        .48,
+        .72,
+      ),
+      block(
+        'numbered',
+        MathTextbookBlockKind.exercise,
+        '2 画出两条指定长度的线段。',
+        1,
+        .75,
+        .9,
+        number: '2',
+      ),
+      block('source-1', MathTextbookBlockKind.sourcePage, '', 1, 0, 1),
+      block(
+        'continued-practice',
+        MathTextbookBlockKind.text,
+        '再比较两条线段，说一说哪一条更长。',
+        2,
+        .05,
+        .2,
+      ),
+      block('next-topic', MathTextbookBlockKind.heading, '认识角', 2, .3, .35),
+      block(
+        'next-example',
+        MathTextbookBlockKind.example,
+        '两条边从同一个顶点出发，可以形成一个角。',
+        2,
+        .4,
+        .6,
+        number: '2',
+      ),
+      block('source-2', MathTextbookBlockKind.sourcePage, '', 2, 0, 1),
+    ],
+  );
+  // The frozen seeder reproduces the former saved configuration, including its
+  // mistaken knowledge points; do not build the fixture with the fixed rules.
+  return lesson.edit(
+    learning: seedMathTextbookLearning(lesson, legacyLayout: true),
+  );
+}
 
 /// Self-authored paper tasks with a referenced example and retained PDF crops.
 MathTextbookLesson mathTaskClarityFixture({bool genericPractice = true}) {
