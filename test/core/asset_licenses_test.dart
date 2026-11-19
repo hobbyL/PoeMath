@@ -13,7 +13,8 @@ void main() {
             (name) =>
                 name.contains('提示音') ||
                 name.contains('童趣答题语音') ||
-                name.contains('PDFium'),
+                name.contains('PDFium') ||
+                name.contains('霞鹜文楷'),
           ),
         )
         .toList();
@@ -42,5 +43,12 @@ void main() {
     expect(pdfiumText, contains('licenses/pdfium.txt'));
     expect(pdfiumText, contains('licenses/freetype.txt'));
     expect(pdfiumText, contains('licenses/libjpeg_turbo.md'));
+    final font = licenses.singleWhere(
+      (entry) => entry.packages.contains('霞鹜文楷轻便版 — LXGW'),
+    );
+    expect(
+      font.paragraphs.map((p) => p.text).join('\n'),
+      contains('SIL OPEN FONT LICENSE'),
+    );
   });
 }

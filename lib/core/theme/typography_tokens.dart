@@ -3,7 +3,7 @@
 // 层级：core/theme（设计令牌 - 字体）
 // 职责：字号阶梯、字重与两套主题的专用样式常量。
 // 规则：新增字号必须落到这里，不允许 widget 内散写 fontSize: 18 之类的数值。
-// 字体：使用系统默认字体，不捆绑自定义字族。
+// 字体：标题与诗句使用随包文楷，说明、操作和算式使用系统字体。
 
 import 'package:flutter/material.dart';
 
@@ -12,6 +12,9 @@ import 'package:poemath/core/theme/color_tokens.dart';
 /// 字体令牌汇总。
 class TypographyTokens {
   const TypographyTokens._();
+
+  /// 随包离线字体，不依赖设备是否预装中文衬线字族。
+  static const String inkFontFamily = 'LXGWWenKaiLite';
 
   // ============ 字号阶梯（16 基线） ============
   static const double fsDisplay = 34.0;
@@ -25,6 +28,9 @@ class TypographyTokens {
   static const double fsCaption = 13.0;
   static const double fsLabel = 12.0;
 
+  /// 行内状态标签，不用于正文或操作按钮标题。
+  static const double fsCompactLabel = 11.0;
+
   // ============ 诗词专用（更大，儿童阅读舒适度） ============
   static const double fsPoemTitle = 28.0;
 
@@ -36,10 +42,10 @@ class TypographyTokens {
   /// 口算大数字（低龄用户高识别）
   static const double fsMathProblem = 42.0;
 
-  /// Serif 字体回退列表（优先使用系统已有的衬线字体，不捆绑字体文件）。
+  /// 缺字回退，主字族由随包文楷提供。
   static const List<String> serifFallback = [
-    'Noto Serif SC', // Android 通常预装
-    'Source Han Serif', // Android 备选
+    'Noto Serif SC',
+    'Source Han Serif',
     'Songti SC', // macOS/iOS 预装的宋体
     'STSong', // iOS 备选
     'serif', // 通用 serif fallback
@@ -52,6 +58,7 @@ class TypographyTokens {
         height: 1.8,
         letterSpacing: 2.0,
         color: color,
+        fontFamily: inkFontFamily,
         fontFamilyFallback: serifFallback,
       );
 

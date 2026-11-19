@@ -466,3 +466,5 @@ cat keystore.b64 | pbcopy
 ## 许可证
 
 Apache License 2.0
+
+标题与诗句内置 [霞鹜文楷轻便版 v1.530](https://github.com/lxgw/LxgwWenKai-Lite/releases/tag/v1.530)，遵循 SIL Open Font License 1.1；完整声明随包提供，可在「关于 → 开源许可」中查看。

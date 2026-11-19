@@ -80,6 +80,11 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  fonts:
+    - family: LXGWWenKaiLite
+      fonts:
+        - asset: assets/fonts/LXGWWenKaiLite-Regular.ttf
+
   assets:
     - assets/data/
     - assets/icons/
