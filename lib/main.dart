@@ -4,7 +4,7 @@
 //   1. 确保 Flutter binding 初始化。
 //   2. 挂载全局错误处理（崩溃进诊断缓冲 + 日志）。
 //   3. 立即启动 Flutter UI。
-//   4. 由 AppBootstrap 初始化 Hive，并在失败时提供重试。
+//   4. 由 AppBootstrap 统一准备 Hive、学习资料与索引，失败时提供重试。
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';

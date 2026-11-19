@@ -54,6 +54,9 @@ class AppRoutes {
       '/profile/settings/books/:id/math/:lesson';
   static const String mathTextbookBook = '/math/textbook/:id';
   static const String mathTextbookStudy = '/math/textbook/:id/lesson/:lesson';
+  static const String mathTextbookReadMode = 'read';
+  static const String mathTextbookLearnMode = 'learn';
+  static const String mathTextbookPracticeMode = 'practice';
   static const String mathTextbookPractice =
       '/math/textbook/:id/lesson/:lesson/practice';
   static const String mathTextbookHistory = '/math/textbook/:id/history';
@@ -95,8 +98,7 @@ class AppRoutes {
   // ============ AI 助手 ============
   static const String assistant = '/assistant';
 
-  // ============ 启动 & 设置 ============
-  static const String splash = '/splash';
+  // ============ 设置 ============
   static const String onboarding = '/onboarding';
   static const String settings = '/profile/settings';
   static const String parentProtection = '/profile/settings/parent-protection';
@@ -127,17 +129,56 @@ class AppRoutes {
       '/profile/settings/books/$id/math';
   static String mathTextbookLessonOf(String id, String lesson) =>
       '/profile/settings/books/$id/math/${Uri.encodeComponent(lesson)}';
-  static String mathTextbookBookOf(String id) => '/math/textbook/$id';
-  static String mathTextbookStudyOf(String id, String lesson) =>
-      '/math/textbook/$id/lesson/${Uri.encodeComponent(lesson)}';
+  static String mathTextbookBookOf(
+    String id, {
+    String? mode,
+    List<int>? pages,
+  }) {
+    final queryParameters = {
+      if (mode != null) 'mode': mode,
+      if (pages != null && pages.isNotEmpty) 'pages': pages.join(','),
+    };
+    return Uri(
+      path: '/math/textbook/$id',
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+    ).toString();
+  }
+
+  static String mathTextbookStudyOf(
+    String id,
+    String lesson, {
+    String? mode,
+    String? knowledgePointId,
+  }) {
+    final queryParameters = {
+      if (mode != null) 'mode': mode,
+      if (knowledgePointId != null) 'point': knowledgePointId,
+    };
+    return Uri(
+      path: '/math/textbook/$id/lesson/${Uri.encodeComponent(lesson)}',
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+    ).toString();
+  }
+
   static String mathTextbookPracticeOf(
     String id,
     String lesson, {
     String? planId,
-  }) => Uri(
-    path: '/math/textbook/$id/lesson/$lesson/practice',
-    queryParameters: planId == null ? null : {'plan': planId},
-  ).toString();
+    Set<String>? exerciseIds,
+  }) {
+    final selectedExerciseIds = exerciseIds?.toList();
+    selectedExerciseIds?.sort();
+    final queryParameters = {
+      if (planId != null) 'plan': planId,
+      if (selectedExerciseIds != null && selectedExerciseIds.isNotEmpty)
+        'exercises': selectedExerciseIds.join(','),
+    };
+    return Uri(
+      path: '/math/textbook/$id/lesson/$lesson/practice',
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+    ).toString();
+  }
+
   static String mathTextbookHistoryOf(String id, {bool parent = false}) =>
       parent
       ? '/profile/settings/books/$id/math-history'

@@ -24,7 +24,4 @@ class AppConstants {
 
   /// slogan
   static const String slogan = '读诗、算数，慢慢来';
-
-  /// Splash 最短停留时长（毫秒）— 仅在跳过导入时生效
-  static const int splashMinDurationMs = 300;
 }

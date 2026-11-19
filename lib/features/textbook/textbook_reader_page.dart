@@ -26,11 +26,15 @@ class TextbookReaderPage extends ConsumerStatefulWidget {
     this.firstPage = false,
     this.initialPage,
     this.viewerBuilder,
+    this.title,
+    this.bottomAction,
   });
   final String bookId;
   final bool firstPage;
   final int? initialPage;
   final TextbookViewerBuilder? viewerBuilder;
+  final String? title;
+  final Widget? bottomAction;
   @override
   ConsumerState<TextbookReaderPage> createState() => _TextbookReaderPageState();
 }
@@ -207,7 +211,11 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
     final revision = _viewerRevision;
     return Scaffold(
       appBar: AppBar(
-        title: Text(book.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(
+          widget.title ?? book.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         leadingWidth: SpacingTokens.minTapTarget * 2,
         leading: Row(
           children: [
@@ -347,6 +355,10 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
                   ),
                 ],
               ),
+              if (widget.bottomAction != null) ...[
+                const SizedBox(height: SpacingTokens.xs),
+                widget.bottomAction!,
+              ],
             ],
           ),
         ),

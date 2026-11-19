@@ -27,10 +27,12 @@ import 'package:poemath/features/textbook/math_textbook_learning_editor_page.dar
 import 'package:poemath/features/textbook/math_textbook_lesson_page.dart';
 import 'package:poemath/features/textbook/math_textbook_practice_page.dart';
 import 'package:poemath/features/textbook/math_textbook_study_page.dart';
+import 'package:poemath/features/textbook/textbook_reader_page.dart';
 import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_study_content.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_source_preview.dart';
+import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/math_textbook_fixture.dart';
@@ -40,6 +42,96 @@ import '../../helpers/parent_access_test_helper.dart';
 class _TaskClarityFiles extends TextbookFileService {
   @override
   Future<String?> installedPath(Textbook book) async => '/self-owned-task.pdf';
+}
+
+MathTextbookLesson _mathLearningFixtureWithPageScopedExercises() {
+  final lesson = mathLearningFixture();
+  final learning = lesson.learning!;
+  final firstPageBlock = MathTextbookBlock(
+    id: 'exercise-page-1',
+    kind: MathTextbookBlockKind.exercise,
+    exerciseNumber: '2',
+    spans: const [MathTextbookSpan.text('3 + 2 = ?')],
+    sources: const [
+      MathTextbookRegion(page: 1, left: .1, top: .45, right: .9, bottom: .7),
+    ],
+  );
+  final firstPageExercise = MathTextbookExercise.fromJson({
+    ...learning.exercises.single.toJson(),
+    'id': 'ex-page-1',
+    'title': '原书第2题',
+    'number': '2',
+    'blockIds': [firstPageBlock.id],
+  });
+  return MathTextbookLesson.fromJson({
+    ...lesson.toJson(),
+    'blocks': [
+      ...lesson.blocks.map((block) => block.toJson()),
+      firstPageBlock.toJson(),
+    ],
+    'learning': {
+      ...learning.toJson(),
+      'exercises': [
+        ...learning.exercises.map((exercise) => exercise.toJson()),
+        firstPageExercise.toJson(),
+      ],
+    },
+  });
+}
+
+MathTextbookLesson _mathLearningFixtureWithVariableCardHeights() {
+  final source = _mathLearningFixtureWithPageScopedExercises();
+  final learning = source.learning!;
+  final point = learning.knowledgePoints.single.toJson();
+  final plan = learning.practicePlans.single.toJson();
+  return MathTextbookLesson.fromJson({
+    ...source.toJson(),
+    'learning': {
+      ...learning.toJson(),
+      'knowledgePoints': [
+        point,
+        {
+          ...point,
+          'id': 'kp-long',
+          'title': '根据数量关系选择计算方法',
+          'summary': '观察题目中的数量变化，再选择合适的运算方法并检查结果。' * 30,
+        },
+        {
+          ...point,
+          'id': 'kp-short-2',
+          'title': '快速检查',
+          'summary': '重新计算后核对结果。',
+        },
+        {
+          ...point,
+          'id': 'kp-short-3',
+          'title': '整理数量',
+          'summary': '用算式表达图示数量。',
+        },
+      ],
+      'practicePlans': [
+        plan,
+        {
+          ...plan,
+          'id': 'plan-long',
+          'knowledgePointId': 'kp-long',
+          'title': '根据本节课的知识点逐步加强数量关系练习',
+        },
+        {
+          ...plan,
+          'id': 'plan-short-2',
+          'knowledgePointId': 'kp-short-2',
+          'title': '快速巩固',
+        },
+        {
+          ...plan,
+          'id': 'plan-short-3',
+          'knowledgePointId': 'kp-short-3',
+          'title': '独立练习',
+        },
+      ],
+    },
+  });
 }
 
 void main() {
@@ -132,6 +224,7 @@ void defineMathTextbookLearningTests({
     double scale = 1,
     Brightness brightness = Brightness.light,
     List<MathTextbookRegion>? renderedSources,
+    TextbookViewerBuilder? viewerBuilder,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -148,20 +241,41 @@ void defineMathTextbookLearningTests({
       await waitFor(tester, () => drained);
       await drainHiveWritesForTesting(tester);
     });
-    router = renderedSources == null
+    router = renderedSources == null && viewerBuilder == null
         ? createAppRouter(initialLocation: location)
         : GoRouter(
             initialLocation: location,
             routes: [
               GoRoute(
-                path: AppRoutes.mathTextbookPracticeOf(
-                  book.pdfSha256,
-                  lesson.id,
+                path: AppRoutes.mathTextbookBook,
+                builder: (_, state) => MathTextbookBookPage(
+                  bookId: state.pathParameters['id']!,
+                  mode: state.uri.queryParameters['mode'],
+                  currentPages: state.uri.queryParameters['pages']
+                      ?.split(',')
+                      .map(int.parse)
+                      .toList(),
                 ),
+              ),
+              GoRoute(
+                path: AppRoutes.mathTextbookStudy,
+                builder: (_, state) => MathTextbookStudyPage(
+                  bookId: state.pathParameters['id']!,
+                  lessonId: state.pathParameters['lesson']!,
+                  mode: state.uri.queryParameters['mode'],
+                  knowledgePointId: state.uri.queryParameters['point'],
+                  viewerBuilder: viewerBuilder,
+                ),
+              ),
+              GoRoute(
+                path: AppRoutes.mathTextbookPractice,
                 builder: (_, state) => MathTextbookPracticePage(
-                  bookId: book.pdfSha256,
-                  lessonId: lesson.id,
+                  bookId: state.pathParameters['id']!,
+                  lessonId: state.pathParameters['lesson']!,
                   planId: state.uri.queryParameters['plan'],
+                  exerciseIds: state.uri.queryParameters['exercises']
+                      ?.split(',')
+                      .toSet(),
                 ),
               ),
               GoRoute(
@@ -708,9 +822,9 @@ void defineMathTextbookLearningTests({
       tester,
       AppRoutes.mathTextbookStudyOf(book.pdfSha256, lesson.id),
     );
-    await waitFor(tester, () => find.text('阅读本课内容').evaluate().isNotEmpty);
+    await waitFor(tester, () => find.text('看一看').evaluate().isNotEmpty);
     expect(find.text('本课待家长核对'), findsNothing);
-    await tap(tester, find.text('阅读本课内容'));
+    await tap(tester, find.text('看一看'));
     await waitFor(
       tester,
       () => find
@@ -723,6 +837,382 @@ void defineMathTextbookLearningTests({
     await waitFor(tester, () => find.text('本课练习暂不可用').evaluate().isNotEmpty);
     expect(find.byType(TextField), findsNothing);
     expect(HiveBoxes.mathSessions.values, isEmpty);
+  });
+
+  testWidgets('显式选择原题的草稿不覆盖整课草稿', (tester) async {
+    await tester.runAsync(
+      () => install(_mathLearningFixtureWithPageScopedExercises()),
+    );
+    final drafts = await io(tester, () async {
+      final repo = repository();
+      final whole = await repo.start(lesson.id);
+      final firstPage = await repo.start(lesson.id, exerciseIds: {'ex-page-1'});
+      final secondPage = await repo.start(lesson.id, exerciseIds: {'ex'});
+      return (
+        whole: whole,
+        firstPage: firstPage,
+        secondPage: secondPage,
+        wholeReload: await repo.loadDraft(lesson.id),
+        firstPageReload: await repo.loadDraft(
+          lesson.id,
+          exerciseIds: {'ex-page-1'},
+        ),
+        secondPageReload: await repo.loadDraft(lesson.id, exerciseIds: {'ex'}),
+      );
+    });
+
+    expect(drafts.whole.exerciseIds, isNull);
+    expect(drafts.firstPage.exerciseIds, ['ex-page-1']);
+    expect(drafts.firstPage.items.map((item) => item.exercise.id), [
+      'ex-page-1',
+    ]);
+    expect(drafts.secondPage.exerciseIds, ['ex']);
+    expect(drafts.secondPage.items.map((item) => item.exercise.id), ['ex']);
+    expect(drafts.whole.scope, isNot(drafts.firstPage.scope));
+    expect(drafts.whole.scope, isNot(drafts.secondPage.scope));
+    expect(drafts.firstPage.scope, isNot(drafts.secondPage.scope));
+    expect(drafts.wholeReload?.sessionId, drafts.whole.sessionId);
+    expect(drafts.firstPageReload?.sessionId, drafts.firstPage.sessionId);
+    expect(drafts.secondPageReload?.sessionId, drafts.secondPage.sessionId);
+  });
+
+  testWidgets('练习深链恢复限定原题列表', (tester) async {
+    await tester.runAsync(
+      () => install(_mathLearningFixtureWithPageScopedExercises()),
+    );
+    await mount(
+      tester,
+      AppRoutes.mathTextbookPracticeOf(
+        book.pdfSha256,
+        lesson.id,
+        exerciseIds: {'ex-page-1'},
+      ),
+    );
+    await waitFor(tester, () => find.byType(TextField).evaluate().isNotEmpty);
+
+    expect(
+      tester
+          .widget<MathTextbookPracticePage>(
+            find.byType(MathTextbookPracticePage),
+          )
+          .exerciseIds,
+      {'ex-page-1'},
+    );
+    final raw = PracticeDraftRepository().get(
+      MathTextbookLearningRepository.draftKind,
+      scope: jsonEncode([
+        book.pdfSha256,
+        lesson.id,
+        null,
+        ['ex-page-1'],
+      ]),
+    );
+    expect(
+      MathTextbookPracticeDraft.fromJson(raw).items
+          .map((item) => item.exercise.id),
+      ['ex-page-1'],
+    );
+  });
+
+  testWidgets('学一学和做一做按卡片自然高度瀑布流排布', (tester) async {
+    await tester.runAsync(
+      () => install(_mathLearningFixtureWithVariableCardHeights()),
+    );
+    await mount(
+      tester,
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookLearnMode,
+        pages: [lesson.startPage],
+      ),
+      size: const Size(1200, 1100),
+    );
+
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '整理数量').evaluate().isNotEmpty,
+    );
+    void expectWaterfall(String key, List<String> titles) {
+      final masonry = find.byKey(ValueKey(key));
+      expect(tester.widget<MasonryLayout>(masonry).columnCount, 3);
+      final cards = [
+        for (final title in titles)
+          tester.getRect(find.widgetWithText(AppTile, title)),
+      ];
+      expect(cards[0].top, closeTo(cards[1].top, .1));
+      expect(cards[1].top, closeTo(cards[2].top, .1));
+      expect(cards[0].left, lessThan(cards[1].left));
+      expect(cards[1].left, lessThan(cards[2].left));
+      expect(cards[0].height, lessThan(cards[1].height));
+      final shortestBottom = [
+        cards[0].bottom,
+        cards[1].bottom,
+        cards[2].bottom,
+      ].reduce((first, second) => first < second ? first : second);
+      final tallestBottom = [
+        cards[0].bottom,
+        cards[1].bottom,
+        cards[2].bottom,
+      ].reduce((first, second) => first > second ? first : second);
+      expect(cards[3].top, closeTo(shortestBottom + SpacingTokens.sm, .1));
+      expect(cards[3].top, lessThan(tallestBottom));
+    }
+
+    expectWaterfall('math-textbook-knowledge-masonry', [
+      '合并数量',
+      '根据数量关系选择计算方法',
+      '快速检查',
+      '整理数量',
+    ]);
+
+    router!.go(
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookPracticeMode,
+        pages: [lesson.startPage],
+      ),
+    );
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '独立练习').evaluate().isNotEmpty,
+    );
+    expectWaterfall('math-textbook-practice-masonry', [
+      '教材原题',
+      '本课巩固',
+      '根据本节课的知识点逐步加强数量关系练习',
+      '快速巩固',
+    ]);
+  });
+
+  testWidgets('同一课时任意页都能打开完整知识点、原题与巩固，并恢复同一草稿', (tester) async {
+    await tester.runAsync(
+      () => install(_mathLearningFixtureWithPageScopedExercises()),
+    );
+    await mount(
+      tester,
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookReadMode,
+      ),
+      viewerBuilder: (_, options) => Text('原书第 ${options.initialPage} 页'),
+    );
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, lesson.title).evaluate().isNotEmpty,
+    );
+    expect(
+      tester
+          .widget<MathTextbookBookPage>(find.byType(MathTextbookBookPage))
+          .mode,
+      AppRoutes.mathTextbookReadMode,
+    );
+    await tap(tester, find.widgetWithText(AppTile, lesson.title));
+    await waitFor(
+      tester,
+      () => find.byType(TextbookReaderPage).evaluate().isNotEmpty,
+    );
+    final reader = tester.widget<TextbookReaderPage>(
+      find.byType(TextbookReaderPage),
+    );
+    expect(reader.initialPage, lesson.startPage);
+    expect(reader.title, lesson.title);
+    expect(reader.bottomAction, isNotNull);
+    expect(find.text('原书第 ${lesson.startPage} 页'), findsOneWidget);
+    expect(find.text('看完本课，标记已读'), findsOneWidget);
+
+    router!.go(
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookLearnMode,
+        pages: [lesson.startPage],
+      ),
+    );
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '合并数量').evaluate().isNotEmpty,
+    );
+    expect(
+      tester
+          .widget<MathTextbookBookPage>(find.byType(MathTextbookBookPage))
+          .mode,
+      AppRoutes.mathTextbookLearnMode,
+    );
+    expect(
+      tester
+          .widget<MathTextbookBookPage>(find.byType(MathTextbookBookPage))
+          .currentPages,
+      [lesson.startPage],
+    );
+    expect(find.text('学一学'), findsOneWidget);
+    await tap(tester, find.widgetWithText(AppTile, '合并数量'));
+    await waitFor(
+      tester,
+      () => find.byType(MathTextbookSourceContentPage).evaluate().isNotEmpty,
+    );
+    final knowledgePage = tester.widget<MathTextbookSourceContentPage>(
+      find.byType(MathTextbookSourceContentPage),
+    );
+    expect(knowledgePage.knowledgePoint, isTrue);
+    expect(knowledgePage.title, '合并数量');
+    expect(knowledgePage.blocks.map((block) => block.id), ['example']);
+
+    router!.go(
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookLearnMode,
+        pages: [lesson.endPage],
+      ),
+    );
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '合并数量').evaluate().isNotEmpty,
+    );
+    expect(find.text('当前页尚未整理知识点。'), findsNothing);
+    await tap(tester, find.widgetWithText(AppTile, '合并数量'));
+    await waitFor(
+      tester,
+      () => find.byType(MathTextbookSourceContentPage).evaluate().isNotEmpty,
+    );
+    expect(
+      tester
+          .widget<MathTextbookSourceContentPage>(
+            find.byType(MathTextbookSourceContentPage),
+          )
+          .blocks
+          .map((block) => block.id),
+      ['example'],
+    );
+
+    router!.go(
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookPracticeMode,
+        pages: [lesson.startPage],
+      ),
+    );
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '教材原题').evaluate().isNotEmpty,
+    );
+    expect(
+      tester
+          .widget<MathTextbookBookPage>(find.byType(MathTextbookBookPage))
+          .mode,
+      AppRoutes.mathTextbookPracticeMode,
+    );
+    expect(find.text('做一做'), findsOneWidget);
+    expect(find.widgetWithText(AppTile, lesson.title), findsNothing);
+    expect(find.widgetWithText(AppTile, '本课巩固'), findsOneWidget);
+    await tap(tester, find.widgetWithText(AppTile, '教材原题'));
+    await waitFor(tester, () => find.byType(TextField).evaluate().isNotEmpty);
+    expect(find.byType(MathTextbookPracticePage), findsOneWidget);
+    expect(
+      tester
+          .widget<MathTextbookPracticePage>(
+            find.byType(MathTextbookPracticePage),
+          )
+          .exerciseIds,
+      isNull,
+    );
+    MathTextbookPracticeDraft savedLessonDraft() =>
+        MathTextbookPracticeDraft.fromJson(
+          PracticeDraftRepository().get(
+            MathTextbookLearningRepository.draftKind,
+            scope: jsonEncode([book.pdfSha256, lesson.id, null]),
+          ),
+        );
+    final firstPageDraft = savedLessonDraft();
+    expect(firstPageDraft.items.map((item) => item.exercise.id), [
+      'ex',
+      'ex-page-1',
+    ]);
+
+    router!.go(
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookPracticeMode,
+        pages: [lesson.endPage],
+      ),
+    );
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '教材原题').evaluate().isNotEmpty,
+    );
+    expect(find.widgetWithText(AppTile, '本课巩固'), findsOneWidget);
+    await tap(tester, find.widgetWithText(AppTile, '教材原题'));
+    await waitFor(tester, () => find.byType(TextField).evaluate().isNotEmpty);
+    expect(
+      tester
+          .widget<MathTextbookPracticePage>(
+            find.byType(MathTextbookPracticePage),
+          )
+          .exerciseIds,
+      isNull,
+    );
+    final lastPageDraft = savedLessonDraft();
+    expect(lastPageDraft.sessionId, firstPageDraft.sessionId);
+    expect(lastPageDraft.items.map((item) => item.exercise.id), [
+      'ex',
+      'ex-page-1',
+    ]);
+  });
+
+  testWidgets('当前页没有对应课时内容时不展示全书知识点或练习', (tester) async {
+    await tester.runAsync(() => install(mathLearningFixture()));
+    await mount(
+      tester,
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookLearnMode,
+        pages: [lesson.endPage + 1],
+      ),
+    );
+    await waitFor(tester, () => find.text('当前页尚未关联课时。').evaluate().isNotEmpty);
+    expect(find.widgetWithText(AppTile, '合并数量'), findsNothing);
+
+    router!.go(
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookPracticeMode,
+        pages: [lesson.endPage + 1],
+      ),
+    );
+    await waitFor(tester, () => find.text('当前页尚未关联课时。').evaluate().isNotEmpty);
+    expect(find.widgetWithText(AppTile, '教材原题'), findsNothing);
+  });
+
+  testWidgets('课时详情用导航栏显示当前课名，不重复显示名称和顶部进度统计', (tester) async {
+    await tester.runAsync(() => install(mathLearningFixture()));
+    await mount(tester, AppRoutes.mathTextbookBookOf(book.pdfSha256));
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, lesson.title).evaluate().isNotEmpty,
+    );
+    await tap(tester, find.widgetWithText(AppTile, lesson.title));
+    await waitFor(tester, () => find.text('看一看').evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(AppBar).last,
+        matching: find.text(lesson.title),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(lesson.title), findsOneWidget);
+    expect(find.text('本课学习'), findsNothing);
+    expect(find.text('看一看'), findsOneWidget);
+    expect(find.text('学一学'), findsOneWidget);
+    expect(find.text('做一做'), findsOneWidget);
+    expect(find.textContaining('原题 0/'), findsNothing);
+    expect(find.textContaining('巩固 0/'), findsNothing);
+
+    await tap(tester, find.text('做一做'));
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '教材原题').evaluate().isNotEmpty,
+    );
+    expect(find.widgetWithText(AppTile, '本课巩固'), findsOneWidget);
   });
 
   testWidgets('长摘要以简短入口呈现，双倍字号可直接打开对应完整内容', (tester) async {
@@ -745,7 +1235,8 @@ void defineMathTextbookLearningTests({
       scale: 2,
       brightness: Brightness.dark,
     );
-    await waitFor(tester, () => find.text('知识与例题').evaluate().isNotEmpty);
+    await waitFor(tester, () => find.text('学一学').evaluate().isNotEmpty);
+    await tap(tester, find.text('学一学'));
     await visible(tester, find.text(knowledge.title));
     final entry = find.ancestor(
       of: find.text(knowledge.title),
@@ -832,7 +1323,7 @@ void defineMathTextbookLearningTests({
         size: large ? const Size(320, 820) : const Size(360, 800),
         scale: large ? 2 : 1,
       );
-      await waitFor(tester, () => find.text('阅读本课内容').evaluate().isNotEmpty);
+      await waitFor(tester, () => find.text('看一看').evaluate().isNotEmpty);
       await visible(tester, find.text('看完本课，标记已读'));
       final offsetBeforeRead = tester
           .state<ScrollableState>(find.byType(Scrollable).first)
@@ -845,8 +1336,7 @@ void defineMathTextbookLearningTests({
           .state<ScrollableState>(find.byType(Scrollable).first)
           .position;
       if (large) {
-        expect(offsetBeforeRead, greaterThan(0));
-        expect(afterRead.pixels, greaterThan(0));
+        expect(afterRead.pixels, closeTo(offsetBeforeRead, .1));
       }
       expect(find.text('本课已读').hitTestable(), findsOneWidget);
       expect((await io(tester, () => repository().load())).readLessons, {
@@ -859,11 +1349,16 @@ void defineMathTextbookLearningTests({
       router!.go(AppRoutes.mathTextbookBookOf(book.pdfSha256));
       await waitFor(
         tester,
-        () => find.text('可学 1 课 · 已读 1 课 · 练习完成 0 课').evaluate().isNotEmpty,
+        () => find.widgetWithText(AppTile, lesson.title).evaluate().isNotEmpty,
       );
       await tap(tester, find.widgetWithText(AppTile, lesson.title));
-      await waitFor(tester, () => find.text('阅读本课内容').evaluate().isNotEmpty);
-      await tap(tester, find.text('教材原题'));
+      await waitFor(tester, () => find.text('看一看').evaluate().isNotEmpty);
+      await tap(tester, find.text('做一做'));
+      await waitFor(
+        tester,
+        () => find.widgetWithText(AppTile, '教材原题').evaluate().isNotEmpty,
+      );
+      await tap(tester, find.widgetWithText(AppTile, '教材原题'));
       await waitFor(
         tester,
         () => find.byType(MathTextbookStudyContent).evaluate().isNotEmpty,
@@ -880,7 +1375,7 @@ void defineMathTextbookLearningTests({
     await mount(tester, AppRoutes.mathTextbookBookOf(book.pdfSha256));
     await waitFor(
       tester,
-      () => find.text('可学 1 课 · 已读 0 课 · 练习完成 0 课').evaluate().isNotEmpty,
+      () => find.widgetWithText(AppTile, lesson.title).evaluate().isNotEmpty,
     );
     expect(find.text('请家长整理与审核'), findsNothing);
     await tester.runAsync(
@@ -891,10 +1386,12 @@ void defineMathTextbookLearningTests({
       listen: false,
     );
     scope.invalidate(mathTextbookCourseProvider(book.pdfSha256));
-    await waitFor(tester, () => find.text('更新后的大课时').evaluate().isNotEmpty);
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '更新后的大课时').evaluate().isNotEmpty,
+    );
     expect(find.text('更新后的大课时'), findsOneWidget);
-    expect(find.text('可学 1 课 · 已读 0 课 · 练习完成 0 课'), findsOneWidget);
-    expect(find.text('未读\nPDF 第 1～2 页'), findsOneWidget);
+    expect(find.text('未读'), findsOneWidget);
   });
 
   testWidgets('320dp 双倍字号、深色与键盘下完成原题，返回显示持久进度', (tester) async {
@@ -918,6 +1415,11 @@ void defineMathTextbookLearningTests({
           progress.valueOrNull?.readLessons.length == 1;
     });
     await visible(tester, find.text('本课已读'));
+    await tap(tester, find.text('做一做'));
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '教材原题').evaluate().isNotEmpty,
+    );
     await tap(tester, find.widgetWithText(AppTile, '教材原题'));
     await waitFor(
       tester,
@@ -942,8 +1444,12 @@ void defineMathTextbookLearningTests({
     await waitFor(
       tester,
       () =>
-          find.byType(MathTextbookStudyPage).evaluate().isNotEmpty &&
+          find.widgetWithText(AppTile, '教材原题').evaluate().isNotEmpty &&
           find.byType(CircularProgressIndicator).evaluate().isEmpty,
+    );
+    await waitFor(
+      tester,
+      () => find.textContaining('已通过 1 组').evaluate().isNotEmpty,
     );
     await visible(tester, find.textContaining('已通过 1 组'));
     final progress = await io(tester, () => repository().load());
@@ -1008,7 +1514,12 @@ void defineMathTextbookLearningTests({
       tester,
       AppRoutes.mathTextbookStudyOf(book.pdfSha256, lesson.id),
     );
-    await waitFor(tester, () => find.text('教材原题').evaluate().isNotEmpty);
+    await waitFor(tester, () => find.text('做一做').evaluate().isNotEmpty);
+    await tap(tester, find.text('做一做'));
+    await waitFor(
+      tester,
+      () => find.widgetWithText(AppTile, '教材原题').evaluate().isNotEmpty,
+    );
     await tap(tester, find.widgetWithText(AppTile, '教材原题'));
     await visible(tester, input('长度'));
     await enter(tester, '长度', '100厘米');
@@ -1034,7 +1545,7 @@ void defineMathTextbookLearningTests({
     await tester.runAsync(() => tester.tap(find.byTooltip('保存并返回')));
     await waitFor(
       tester,
-      () => find.byType(MathTextbookStudyPage).evaluate().isNotEmpty,
+      () => find.widgetWithText(AppTile, '教材原题').evaluate().isNotEmpty,
     );
     await tap(tester, find.widgetWithText(AppTile, '教材原题'));
     await visible(tester, input('长度'));

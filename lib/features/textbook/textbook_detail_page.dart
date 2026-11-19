@@ -579,11 +579,40 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   ) {
     if (book.subject != TextbookSubject.chinese) {
       if (book.subject == TextbookSubject.math && !widget.manage) {
-        return TextButton(
-          onPressed: !_turning && _previewVisible
-              ? () => _openRoute(AppRoutes.mathTextbookBookOf(widget.bookId))
-              : null,
-          child: const Text('课时学习'),
+        const entries = <({String mode, String label})>[
+          (mode: AppRoutes.mathTextbookLearnMode, label: '学一学'),
+          (mode: AppRoutes.mathTextbookPracticeMode, label: '做一做'),
+        ];
+        return Wrap(
+          key: const ValueKey('math-textbook-content-actions'),
+          alignment: WrapAlignment.center,
+          spacing: SpacingTokens.xs,
+          runSpacing: SpacingTokens.xs,
+          children: [
+            for (final entry in entries)
+              TextButton(
+                onPressed: !_turning && _previewVisible
+                    ? () => _openRoute(
+                        AppRoutes.mathTextbookBookOf(
+                          widget.bookId,
+                          mode: entry.mode,
+                          pages: pages,
+                        ),
+                      )
+                    : null,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(
+                    SpacingTokens.minTapTarget,
+                    SpacingTokens.minTapTarget,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SpacingTokens.sm,
+                    vertical: SpacingTokens.sm,
+                  ),
+                ),
+                child: Text(entry.label, textAlign: TextAlign.center),
+              ),
+          ],
         );
       }
       if (!widget.manage || book.subject == TextbookSubject.english) {

@@ -418,7 +418,7 @@ void main() {
   }
 
   for (final large in [false, true]) {
-    testWidgets('数学书架先打开原书内容，课时学习需明确进入${large ? '，320dp双倍字号' : ''}', (
+    testWidgets('数学书架先打开原书内容，学习与练习入口分开${large ? '，320dp双倍字号' : ''}', (
       tester,
     ) async {
       final mathBook = textbookFixture(
@@ -488,13 +488,42 @@ void main() {
       expect(find.byType(MathTextbookReviewPage), findsNothing);
       expect(find.byTooltip('内容审核'), findsNothing);
       expect(repo.selected, isEmpty);
+      expect(find.text('课时学习'), findsNothing);
+      expect(find.text('看一看'), findsNothing);
+      expect(find.text('学一学'), findsOneWidget);
+      expect(find.text('做一做'), findsOneWidget);
+      final modeActions = find.byKey(
+        const ValueKey('math-textbook-content-actions'),
+      );
+      expect(modeActions, findsOneWidget);
+      expect(tester.widget<Wrap>(modeActions).alignment, WrapAlignment.center);
+      expect(
+        find.descendant(of: modeActions, matching: find.byType(TextButton)),
+        findsNWidgets(2),
+      );
+      expect(
+        find.descendant(of: modeActions, matching: find.byType(Icon)),
+        findsNothing,
+      );
 
       await tester.tap(find.text('下一页'));
       await tester.pumpAndSettle();
       expect(repo.reading('default', mathBook.pdfSha256).page, 3);
-      await tester.tap(find.text('课时学习'));
+      await tester.tap(find.text('学一学'));
       await tester.pumpAndSettle();
       expect(find.byType(MathTextbookBookPage), findsOneWidget);
+      expect(
+        tester
+            .widget<MathTextbookBookPage>(find.byType(MathTextbookBookPage))
+            .mode,
+        AppRoutes.mathTextbookLearnMode,
+      );
+      expect(
+        tester
+            .widget<MathTextbookBookPage>(find.byType(MathTextbookBookPage))
+            .currentPages,
+        [3],
+      );
       expect(find.byType(MathTextbookReviewPage), findsNothing);
       expect(
         find.text('${mathBook.title} · ${mathBook.volumeLabel}'),
@@ -505,7 +534,8 @@ void main() {
       expect(find.text('这是当前使用的数学课本'), findsNothing);
       expect(find.text('设为当前数学课本'), findsNothing);
       expect(find.text(placeholder.title), findsNothing);
-      expect(find.text(lesson.title), findsOneWidget);
+      expect(find.text(lesson.title), findsNothing);
+      expect(find.text('当前页尚未关联课时。'), findsOneWidget);
       expect(find.textContaining('PDF 第'), findsNothing);
       expect(repo.selected, isEmpty);
 
@@ -572,7 +602,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('下一页'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('课时学习'));
+    router.push(AppRoutes.mathTextbookBookOf(mathBook.pdfSha256));
     await tester.pumpAndSettle();
 
     final titles = [unitTitle, '第二课', '第三课'];

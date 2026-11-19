@@ -169,8 +169,9 @@ lib/
 │   ├── math/          # 数学模块 (口算/错题本/应用题 AI 出题/AI 解析)
 │   ├── formula/       # 公式知识库
 │   ├── profile/       # 个人中心 (设置/题库管理与 AI 出题/备份/服务配置)
-│   └── shell/         # Shell + 4-Tab 导航 + 启动页
+│   └── shell/         # Shell + 4-Tab 导航 + 首次引导
 ├── math_engine/       # 口算引擎 (纯 Dart, 12 类生成器)
+├── app_bootstrap.dart # 统一准备存储、学习资料与索引，完成后进入首页或首次引导
 └── app.dart           # 应用根 Widget
 ```
 

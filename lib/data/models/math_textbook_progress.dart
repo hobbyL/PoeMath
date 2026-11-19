@@ -313,6 +313,7 @@ class MathTextbookPracticeDraft {
     required List<MathTextbookPracticeItem> items,
     required List<String> operationIds,
     required this.startedAt,
+    List<String>? exerciseIds,
     this.planId,
     this.planDigest,
     this.seed,
@@ -323,6 +324,9 @@ class MathTextbookPracticeDraft {
     List<MathTextbookResult?>? results,
   }) : items = List.unmodifiable(items),
        operationIds = List.unmodifiable(operationIds),
+       exerciseIds = exerciseIds == null
+           ? null
+           : List.unmodifiable(exerciseIds.toSet().toList()..sort()),
        answers = List.unmodifiable(
          (answers ?? List.generate(items.length, (_) => <String, String>{}))
              .map(Map<String, String>.unmodifiable),
@@ -332,6 +336,7 @@ class MathTextbookPracticeDraft {
        );
   final String sessionId, profileId, bookId, editionId, lessonId, lessonDigest;
   final String? planId, planDigest;
+  final List<String>? exerciseIds;
   final int? seed;
   final List<MathTextbookPracticeItem> items;
   final List<String> operationIds;
@@ -340,7 +345,9 @@ class MathTextbookPracticeDraft {
   final int index, elapsedSeconds;
   final List<Map<String, String>> answers;
   final List<MathTextbookResult?> results;
-  String get scope => jsonEncode([bookId, lessonId, planId]);
+  String get scope => exerciseIds == null
+      ? jsonEncode([bookId, lessonId, planId])
+      : jsonEncode([bookId, lessonId, planId, exerciseIds]);
   String get fingerprint => textbookContentDigest({
     'sessionId': sessionId,
     'profileId': profileId,
@@ -350,6 +357,7 @@ class MathTextbookPracticeDraft {
     'lessonDigest': lessonDigest,
     'planId': planId,
     'planDigest': planDigest,
+    'exerciseIds': exerciseIds,
     'seed': seed,
     'startedAt': startedAt.toUtc().toIso8601String(),
     'items': items.map((item) => item.toJson()).toList(),
@@ -373,6 +381,7 @@ class MathTextbookPracticeDraft {
     startedAt: startedAt,
     planId: planId,
     planDigest: planDigest,
+    exerciseIds: exerciseIds,
     seed: seed,
     finishedAt: finishedAt ?? this.finishedAt,
     index: index ?? this.index,
@@ -389,6 +398,7 @@ class MathTextbookPracticeDraft {
     'lessonDigest': lessonDigest,
     'planId': planId,
     'planDigest': planDigest,
+    if (exerciseIds != null) 'exerciseIds': exerciseIds,
     'seed': seed,
     'finishedAt': finishedAt?.toUtc().toIso8601String(),
     'items': items.map((i) => i.toJson()).toList(),
@@ -409,6 +419,11 @@ class MathTextbookPracticeDraft {
       raw['operationIds'],
       1000,
     ).map((v) => _string(v, '草稿操作标识')).toList();
+    final exerciseIds = raw['exerciseIds'] == null
+        ? null
+        : _list(raw['exerciseIds'], 1000)
+              .map((v) => _string(v, '限定原题'))
+              .toList();
     final answers = _list(raw['answers'], 1000)
         .map(
           (v) => _map(v).map(
@@ -428,6 +443,9 @@ class MathTextbookPracticeDraft {
         answers.length != items.length ||
         results.length != items.length ||
         index > items.length ||
+        exerciseIds != null &&
+            (exerciseIds.isEmpty ||
+                exerciseIds.toSet().length != exerciseIds.length) ||
         items.map((item) => item.exercise.id).toSet().length != items.length ||
         ops.toSet().length != ops.length) {
       throw const FormatException('数学练习草稿缺少题目或位置无效');
@@ -476,6 +494,7 @@ class MathTextbookPracticeDraft {
       items: items,
       operationIds: ops,
       startedAt: started,
+      exerciseIds: exerciseIds,
       index: index,
       elapsedSeconds: elapsed,
       answers: answers,

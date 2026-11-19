@@ -16,6 +16,9 @@ class ColorTokens {
   /// 宣纸底：Scaffold 背景
   static const Color poemPaper = Color(0xFFF9F7F2);
 
+  /// 启动水墨画的宣纸底，与图片外沿及 Android ic_launcher_background 同色。
+  static const Color startupPaper = Color(0xFFF9E7C8);
+
   /// 宣纸深：卡片/次级背景
   static const Color poemPaperDeep = Color(0xFFEFEAE0);
 

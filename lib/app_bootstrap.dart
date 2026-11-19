@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:poemath/app.dart';
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/constants/hive_keys.dart';
+import 'package:poemath/core/routing/app_router.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/hive_encryption_key_resolver.dart';
 import 'package:poemath/core/services/hive_encryption_key_provider.dart';
 import 'package:poemath/core/services/notification_service.dart';
@@ -17,10 +20,12 @@ import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/hive/bootstrap.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/hive/hive_registrar.dart';
 import 'package:poemath/data/hive/migrations/math_mistake_key_migration.dart';
 import 'package:poemath/data/hive/migrations/poem_identity_migration.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 typedef AppInitializer = Future<void> Function();
@@ -68,11 +73,7 @@ Future<void> initializeCoreStorage() async {
   try {
     await _settingsRepository().migratePlaintextWebDavCredentials();
   } on Object catch (error) {
-    AppLogger.e(
-      'WebDAV 凭据整体迁移失败，明文凭据保留在 Hive',
-      tag: 'Startup',
-      error: error,
-    );
+    AppLogger.e('WebDAV 凭据整体迁移失败，明文凭据保留在 Hive', tag: 'Startup', error: error);
   }
 }
 
@@ -85,13 +86,14 @@ Future<void> initializeOptionalServices({
     (
       name: '通知',
       initialize:
-          notificationInitializer ?? NotificationService.instance.initialize
+          notificationInitializer ?? NotificationService.instance.initialize,
     ),
     (name: '遗留语音清理', initialize: speechCleanup ?? LegacySpeechCleanup.run),
     (
       name: '看图说话选图恢复',
-      initialize: pictureStoryRecovery ??
-          PictureStoryEditorService.instance.recoverLostImage
+      initialize:
+          pictureStoryRecovery ??
+          PictureStoryEditorService.instance.recoverLostImage,
     ),
   ];
   // 可选初始化独立处理失败，通知异常也不能跳过 Android 丢失选图恢复。
@@ -127,34 +129,47 @@ Future<void> _markKeyRecoveredIfNeeded(HiveKeyStatus status) async {
   try {
     await HiveBoxes.meta.put(HiveKeys.metaHiveKeyRecovered, true);
   } on Object catch (error) {
-    AppLogger.e(
-      '写入「Hive 密钥丢失」标记失败，用户不会看到提示',
-      tag: 'Startup',
-      error: error,
-    );
+    AppLogger.e('写入「Hive 密钥丢失」标记失败，用户不会看到提示', tag: 'Startup', error: error);
   }
 }
 
-/// 在 Flutter UI 启动后初始化核心存储，并为失败提供重试入口。
-class AppBootstrap extends StatefulWidget {
+typedef StartupDataInitializer = Future<bool> Function(
+  BootstrapProgressCallback onProgress,
+);
+typedef StartupIndexBuilder = Future<void> Function();
+
+/// 初始化存储和静态学习资料，准备完成后直接进入首页或首次引导。
+class AppBootstrap extends ConsumerStatefulWidget {
   const AppBootstrap({
     super.key,
     this.coreInitializer,
     this.optionalInitializer,
-    this.readyChild = const App(),
+    this.dataInitializer,
+    this.indexBuilder,
+    this.readyChild,
   });
 
   final AppInitializer? coreInitializer;
   final AppInitializer? optionalInitializer;
-  final Widget readyChild;
+  final StartupDataInitializer? dataInitializer;
+  final StartupIndexBuilder? indexBuilder;
+  final Widget? readyChild;
 
   @override
-  State<AppBootstrap> createState() => _AppBootstrapState();
+  ConsumerState<AppBootstrap> createState() => _AppBootstrapState();
 }
 
-class _AppBootstrapState extends State<AppBootstrap> {
+enum _StartupPhase { coreStorage, learningData }
+
+class _AppBootstrapState extends ConsumerState<AppBootstrap> {
   bool _isInitializing = false;
+  bool _coreReady = false;
+  bool _optionalServicesStarted = false;
   bool _isReady = false;
+  bool _isImporting = false;
+  double _progress = 0;
+  String _statusText = '正在准备韵算…';
+  String? _errorMessage;
   Object? _error;
 
   @override
@@ -167,45 +182,108 @@ class _AppBootstrapState extends State<AppBootstrap> {
     if (_isInitializing) return;
     setState(() {
       _isInitializing = true;
+      _isImporting = false;
+      _progress = 0;
+      _statusText = '正在准备韵算…';
+      _error = null;
+      _errorMessage = null;
     });
 
+    var phase = _StartupPhase.coreStorage;
     try {
-      await (widget.coreInitializer ?? initializeCoreStorage)();
-      if (!mounted) return;
+      if (!_coreReady) {
+        await (widget.coreInitializer ?? initializeCoreStorage)();
+        if (!mounted) return;
+        _coreReady = true;
+        if (!_optionalServicesStarted) {
+          _optionalServicesStarted = true;
+          unawaited(_initializeOptionalServices());
+        }
+      }
+
+      phase = _StartupPhase.learningData;
       setState(() {
-        _isInitializing = false;
+        _statusText = '正在加载学习资料…';
+      });
+      final didImport = widget.dataInitializer != null
+          ? await widget.dataInitializer!(_updateProgress)
+          : await DataBootstrap.ensureInitialized(onProgress: _updateProgress);
+      if (!mounted) return;
+
+      if (didImport) {
+        setState(() {
+          _statusText = '正在整理诗词索引…';
+        });
+      }
+
+      if (widget.indexBuilder != null) {
+        await widget.indexBuilder!();
+      } else {
+        await ref.read(poemRepositoryProvider).buildIndices();
+      }
+
+      if (!mounted) return;
+      if (widget.readyChild == null) {
+        final hasOnboarded = ref.read(settingsRepositoryProvider).hasOnboarded;
+        ref.read(appStartupLocationProvider.notifier).state = hasOnboarded
+            ? AppRoutes.home
+            : AppRoutes.onboarding;
+      }
+      setState(() {
         _isReady = true;
       });
-      unawaited(_initializeOptionalServices());
     } catch (error) {
       AppLogger.e(
-        '核心存储初始化失败',
+        phase == _StartupPhase.coreStorage ? '核心存储初始化失败' : '静态学习资料初始化失败',
         tag: 'Startup',
         error: error,
       );
       if (!mounted) return;
       setState(() {
-        _isInitializing = false;
         _error = error;
+        _errorMessage = phase == _StartupPhase.coreStorage
+            ? '本地数据暂时无法打开，原有文件已保留。请检查设备存储空间后重试。'
+            : '学习资料加载失败，请重试。';
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+      }
     }
+  }
+
+  void _updateProgress(double progress) {
+    if (!mounted) return;
+    setState(() {
+      _progress = progress;
+      _isImporting = true;
+      if (progress < 0.3) {
+        _statusText = '正在加载诗词数据…';
+      } else if (progress < 0.6) {
+        _statusText = '正在整理古诗…';
+      } else if (progress < 0.8) {
+        _statusText = '正在加载作者资料…';
+      } else if (progress < 0.95) {
+        _statusText = '正在加载数学公式…';
+      } else {
+        _statusText = '即将完成…';
+      }
+    });
   }
 
   Future<void> _initializeOptionalServices() async {
     try {
       await (widget.optionalInitializer ?? initializeOptionalServices)();
     } catch (error) {
-      AppLogger.e(
-        '可选服务初始化失败，应用继续启动',
-        tag: 'Startup',
-        error: error,
-      );
+      AppLogger.e('可选服务初始化失败，应用继续启动', tag: 'Startup', error: error);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isReady) return widget.readyChild;
+    if (_isReady) return widget.readyChild ?? const App();
 
     return MaterialApp(
       title: AppConstants.appName,
@@ -219,43 +297,86 @@ class _AppBootstrapState extends State<AppBootstrap> {
         brightness: Brightness.dark,
       ),
       home: Scaffold(
+        backgroundColor: _error == null ? ColorTokens.startupPaper : null,
         body: _error != null
             ? StartupFailureView(
                 message: _error is HiveKeyUnavailable
                     ? _error.toString()
-                    : '本地数据暂时无法打开，原有文件已保留。请检查设备存储空间后重试。',
+                    : _errorMessage ?? '启动失败，请重试。',
                 onRetry: _initialize,
                 isRetrying: _isInitializing,
               )
-            : const _StartupLoadingView(),
+            : _StartupLoadingView(
+                progress: _progress,
+                statusText: _statusText,
+                isImporting: _isImporting,
+              ),
       ),
     );
   }
 }
 
 class _StartupLoadingView extends StatelessWidget {
-  const _StartupLoadingView();
+  const _StartupLoadingView({
+    required this.progress,
+    required this.statusText,
+    required this.isImporting,
+  });
+
+  final double progress;
+  final String statusText;
+  final bool isImporting;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SafeArea(
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.auto_stories_rounded,
-              size: 56,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: SpacingTokens.lg),
-            const CircularProgressIndicator(),
-            const SizedBox(height: SpacingTokens.md),
-            const Text('正在准备${AppConstants.appName}…'),
-          ],
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'assets/images/splash_art.png',
+          fit: BoxFit.contain,
+          alignment: Alignment.center,
+          excludeFromSemantics: true,
         ),
-      ),
+        SafeArea(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                SpacingTokens.xl,
+                SpacingTokens.md,
+                SpacingTokens.xl,
+                SpacingTokens.xl,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(
+                      SpacingTokens.radiusSmall,
+                    ),
+                    child: LinearProgressIndicator(
+                      value: isImporting ? progress : null,
+                      minHeight: SpacingTokens.xs,
+                      backgroundColor: ColorTokens.poemPaperDeep,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        ColorTokens.poemGreen,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: SpacingTokens.md),
+                  Text(
+                    statusText,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: ColorTokens.poemInk),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

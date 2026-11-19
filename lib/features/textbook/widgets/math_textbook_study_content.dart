@@ -109,11 +109,13 @@ class MathTextbookSourceContentPage extends StatelessWidget {
     required this.title,
     required this.blocks,
     this.knowledgePoint = false,
+    this.bottomAction,
   });
   final Textbook book;
   final String title;
   final List<MathTextbookBlock> blocks;
   final bool knowledgePoint;
+  final Widget? bottomAction;
   @override
   Widget build(BuildContext context) {
     final reading = mathTextbookReadingBlocks(blocks);
@@ -184,6 +186,14 @@ class MathTextbookSourceContentPage extends StatelessWidget {
           },
         ),
       ),
+      bottomNavigationBar: bottomAction == null
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(SpacingTokens.md),
+                child: bottomAction,
+              ),
+            ),
     );
   }
 }

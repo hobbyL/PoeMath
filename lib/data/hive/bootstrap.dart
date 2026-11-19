@@ -24,7 +24,7 @@ class DataBootstrap {
 
   /// 检查数据版本，必要时执行导入。
   ///
-  /// [onProgress] 报告 0.0 → 1.0 进度，供 SplashPage 显示。
+  /// [onProgress] 报告 0.0 → 1.0 进度，供 AppBootstrap 显示。
   /// 返回 true 表示执行了导入，false 表示跳过。
   static Future<bool> ensureInitialized({
     BootstrapProgressCallback? onProgress,
@@ -70,16 +70,20 @@ class DataBootstrap {
 
     // 5. 标记首次启动（如果是首次）
     if (HiveBoxes.meta.get(HiveKeys.metaFirstLaunch) == null) {
-      await HiveBoxes.meta
-          .put(HiveKeys.metaFirstLaunch, DateTime.now().toIso8601String());
+      await HiveBoxes.meta.put(
+        HiveKeys.metaFirstLaunch,
+        DateTime.now().toIso8601String(),
+      );
     }
 
     PoemRepository.resetIndices();
     await HiveBoxes.meta.put('content_revision', AppConstants.contentRevision);
 
     // 6. 更新数据版本
-    await HiveBoxes.meta
-        .put(HiveKeys.metaDataVersion, AppConstants.dataVersion);
+    await HiveBoxes.meta.put(
+      HiveKeys.metaDataVersion,
+      AppConstants.dataVersion,
+    );
     onProgress?.call(1.0);
 
     return true;

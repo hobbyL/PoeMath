@@ -216,14 +216,20 @@ class MathTextbookLearningRepository {
         );
       });
 
-  String scopeFor(String lessonId, String? planId) =>
-      jsonEncode([book.pdfSha256, lessonId, planId]);
+  String scopeFor(String lessonId, String? planId, {Set<String>? exerciseIds}) {
+    if (exerciseIds == null) {
+      return jsonEncode([book.pdfSha256, lessonId, planId]);
+    }
+    final selected = exerciseIds.toList()..sort();
+    return jsonEncode([book.pdfSha256, lessonId, planId, selected]);
+  }
 
   Future<MathTextbookPracticeDraft?> loadDraft(
     String lessonId, {
     String? planId,
+    Set<String>? exerciseIds,
   }) => _serial((course) async {
-    final scope = scopeFor(lessonId, planId);
+    final scope = scopeFor(lessonId, planId, exerciseIds: exerciseIds);
     drafts.claim(draftKind, scope: scope);
     final raw = drafts.get(draftKind, scope: scope);
     if (raw == null) return null;
@@ -237,6 +243,14 @@ class MathTextbookLearningRepository {
     String? planId,
     Set<String>? exerciseIds,
   }) => _serial((course) async {
+    if (planId != null && exerciseIds != null) {
+      throw ArgumentError('巩固计划不能限定教材原题');
+    }
+    if (exerciseIds != null && exerciseIds.isEmpty) {
+      throw const FormatException('当前页面没有可练习的原题');
+    }
+    final selectedExerciseIds = exerciseIds?.toList();
+    selectedExerciseIds?.sort();
     final lesson = _lesson(course, lessonId, requireLearning: false);
     final access = _practiceAccess(
       lesson,
@@ -275,6 +289,7 @@ class MathTextbookLearningRepository {
       lessonDigest: lesson.contentDigest(book.pdfSha256),
       planId: planId,
       planDigest: plan?.digest,
+      exerciseIds: selectedExerciseIds,
       seed: seed,
       items: items,
       operationIds: List.generate(items.length, (_) => _newId()),
@@ -342,8 +357,20 @@ class MathTextbookLearningRepository {
       draft.lessonId,
       digest: draft.lessonDigest,
       planId: draft.planId,
-      exerciseIds: draft.items.map((item) => item.exercise.id).toSet(),
+      exerciseIds:
+          draft.exerciseIds?.toSet() ??
+          draft.items.map((item) => item.exercise.id).toSet(),
     );
+    if (draft.exerciseIds != null &&
+            draft.items.map((item) => item.exercise.id).toSet().length !=
+                draft.exerciseIds!.length ||
+        draft.exerciseIds != null &&
+            !draft.items
+                .map((item) => item.exercise.id)
+                .toSet()
+                .containsAll(draft.exerciseIds!)) {
+      throw const FormatException('限定页练习草稿与原题清单不一致');
+    }
     final snapshotDigest = textbookContentDigest({
       'lesson': draft.lessonDigest,
       'plan': draft.planDigest,

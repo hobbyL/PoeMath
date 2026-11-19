@@ -30,9 +30,11 @@ class MathTextbookPracticePage extends ConsumerStatefulWidget {
     required this.bookId,
     required this.lessonId,
     this.planId,
+    this.exerciseIds,
   });
   final String bookId, lessonId;
   final String? planId;
+  final Set<String>? exerciseIds;
   @override
   ConsumerState<MathTextbookPracticePage> createState() =>
       _MathTextbookPracticePageState();
@@ -147,10 +149,15 @@ class _MathTextbookPracticePageState
       final previous = await repository.loadDraft(
         widget.lessonId,
         planId: widget.planId,
+        exerciseIds: widget.exerciseIds,
       );
       final draft =
           previous ??
-          await repository.start(widget.lessonId, planId: widget.planId);
+          await repository.start(
+            widget.lessonId,
+            planId: widget.planId,
+            exerciseIds: widget.exerciseIds,
+          );
       if (!mounted) return;
       setState(() {
         _draft = draft;
@@ -423,6 +430,7 @@ class _MathTextbookPracticePageState
       final draft = await _repository!.start(
         widget.lessonId,
         planId: widget.planId,
+        exerciseIds: widget.exerciseIds,
       );
       if (!mounted) return;
       setState(() {

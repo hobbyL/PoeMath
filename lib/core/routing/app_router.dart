@@ -3,7 +3,7 @@
 // 层级：core/routing
 // 职责：基于 go_router 构造 Navigator 2.0 语义的应用路由器；
 //       通过 Provider 暴露以便 ConsumerWidget 消费。
-// 依赖：go_router / AppRoutes / MainShell / SplashPage / 各 Tab 页面。
+// 依赖：go_router / AppRoutes / MainShell / 各页面。
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
@@ -67,7 +67,6 @@ import 'package:poemath/features/profile/update_page.dart';
 import 'package:poemath/features/profile/weekly_report_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
 import 'package:poemath/features/shell/onboarding_page.dart';
-import 'package:poemath/features/shell/splash_page.dart';
 import 'package:poemath/features/textbook/textbook_shelf_page.dart';
 import 'package:poemath/features/textbook/textbook_management_page.dart';
 import 'package:poemath/features/textbook/math_textbook_review_page.dart';
@@ -87,14 +86,24 @@ import 'package:poemath/features/textbook/writing/textbook_writing_records_page.
 import 'package:poemath/features/textbook/writing/textbook_dictation_page.dart';
 import 'package:poemath/domain/textbook_lesson_content.dart';
 
+/// 启动准备完成后由 AppBootstrap 选择首页或首次引导页。
+final appStartupLocationProvider = StateProvider<String>(
+  (ref) => AppRoutes.home,
+);
+
 /// `Provider<GoRouter>`：整个应用共享一份 GoRouter 实例。
-final appRouterProvider = Provider<GoRouter>((ref) => createAppRouter());
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final router = createAppRouter(
+    initialLocation: ref.watch(appStartupLocationProvider),
+  );
+  ref.onDispose(router.dispose);
+  return router;
+});
 
 /// 构造应用路由器。
 ///
-/// [initialLocation] 仅为测试预留：测试需要直达某条深层路由验证兜底行为，
-/// 而默认启动页会触发真实数据导入。生产代码一律用默认值。
-GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
+/// [initialLocation] 可用于首启分流或测试直达某条深层路由。
+GoRouter createAppRouter({String initialLocation = AppRoutes.home}) {
   final textbookObserver = RouteObserver<ModalRoute<dynamic>>();
   return GoRouter(
     observers: [textbookObserver],
@@ -104,10 +113,6 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
     errorBuilder: (context, state) =>
         RouteFallbackPage.notFound(path: state.uri.path),
     routes: <RouteBase>[
-      GoRoute(
-        path: AppRoutes.splash,
-        builder: (context, state) => const SplashPage(),
-      ),
       GoRoute(
         path: AppRoutes.onboarding,
         builder: (context, state) => const OnboardingPage(),
@@ -199,7 +204,11 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         path: AppRoutes.mathTextbookBook,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child: MathTextbookBookPage(bookId: state.pathParameters['id']!),
+          child: MathTextbookBookPage(
+            bookId: state.pathParameters['id']!,
+            mode: state.uri.queryParameters['mode'],
+            currentPages: _parsePageList(state.uri.queryParameters['pages']),
+          ),
         ),
       ),
       GoRoute(
@@ -209,6 +218,8 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           child: MathTextbookStudyPage(
             bookId: state.pathParameters['id']!,
             lessonId: state.pathParameters['lesson']!,
+            mode: state.uri.queryParameters['mode'],
+            knowledgePointId: state.uri.queryParameters['point'],
           ),
         ),
       ),
@@ -223,6 +234,9 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
             bookId: state.pathParameters['id']!,
             lessonId: state.pathParameters['lesson']!,
             planId: state.uri.queryParameters['plan'],
+            exerciseIds: _parseStringSet(
+              state.uri.queryParameters['exercises'],
+            ),
           ),
         ),
       ),
@@ -808,4 +822,28 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
       ),
     ],
   );
+}
+
+List<int>? _parsePageList(String? value) {
+  if (value == null || value.isEmpty) return null;
+  final pages =
+      value
+          .split(',')
+          .map(int.tryParse)
+          .whereType<int>()
+          .where((page) => page > 0)
+          .toSet()
+          .toList()
+        ..sort();
+  return pages.isEmpty ? null : pages;
+}
+
+Set<String>? _parseStringSet(String? value) {
+  if (value == null || value.isEmpty) return null;
+  final items = value
+      .split(',')
+      .map((item) => item.trim())
+      .where((item) => item.isNotEmpty)
+      .toSet();
+  return items.isEmpty ? null : items;
 }

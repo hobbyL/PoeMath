@@ -15,11 +15,20 @@ import 'package:poemath/domain/math_textbook_course_plan.dart';
 import 'package:poemath/features/textbook/math_textbook_labels.dart';
 import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
+import 'package:poemath/features/textbook/textbook_reader_page.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_study_content.dart';
+import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
 
 class MathTextbookBookPage extends ConsumerWidget {
-  const MathTextbookBookPage({super.key, required this.bookId});
+  const MathTextbookBookPage({
+    super.key,
+    required this.bookId,
+    this.mode,
+    this.currentPages,
+  });
   final String bookId;
+  final String? mode;
+  final List<int>? currentPages;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(mathTextbookProfileProvider);
@@ -31,7 +40,7 @@ class MathTextbookBookPage extends ConsumerWidget {
         .firstOrNull;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('数学课本'),
+        title: Text(_modeLabel(mode) ?? '数学课本'),
         actions: [
           IconButton(
             tooltip: '本书学习记录',
@@ -92,6 +101,8 @@ class MathTextbookBookPage extends ConsumerWidget {
                             context,
                             snapshot.course,
                             snapshot.lessons,
+                            mode: mode,
+                            currentPages: currentPages,
                           ),
                         ),
                   ),
@@ -102,8 +113,11 @@ class MathTextbookBookPage extends ConsumerWidget {
   Widget _content(
     BuildContext context,
     MathTextbookCourse? course,
-    Map<String, MathTextbookLessonProgress> summaries,
-  ) {
+    Map<String, MathTextbookLessonProgress> summaries, {
+    String? mode,
+    List<int>? currentPages,
+  }) {
+    final selectedMode = _validMode(mode);
     final color = Theme.of(context).colorScheme.primary;
     final unconfirmedPurposeLessonIds = {
       for (final range
@@ -114,6 +128,16 @@ class MathTextbookBookPage extends ConsumerWidget {
     final lessons = [...?course?.currentLessons]
       ..removeWhere((lesson) => unconfirmedPurposeLessonIds.contains(lesson.id))
       ..sort((a, b) => a.startPage.compareTo(b.startPage));
+    // 页码只用于定位课时；同一课时的任意页共享完整的知识点和练习。
+    final pageLessons = currentPages == null
+        ? lessons
+        : lessons
+              .where(
+                (lesson) => currentPages.any(
+                  (page) => page >= lesson.startPage && page <= lesson.endPage,
+                ),
+              )
+              .toList();
     final needsCourseUpdate =
         course?.outline != null &&
         course!.outline!.organizationVersion < mathTextbookOrganizationVersion;
@@ -134,10 +158,210 @@ class MathTextbookBookPage extends ConsumerWidget {
       lessonGroups.last.lessons.add(lesson);
       previousUnit = unit;
     }
-    final showIntro = lessons.isEmpty || needsCourseUpdate;
+    final knowledgeEntries = [
+      for (final lesson in pageLessons)
+        for (final point
+            in lesson.learning?.knowledgePoints ??
+                const <MathTextbookKnowledgePoint>[])
+          (lesson: lesson, point: point),
+    ];
+    final practiceEntries =
+        <
+          ({
+            MathTextbookLesson lesson,
+            String title,
+            String subtitle,
+            IconData icon,
+            String? planId,
+            bool original,
+            bool enabled,
+          })
+        >[];
+    for (final lesson in pageLessons) {
+      final learning = lesson.learning;
+      if (learning == null) continue;
+      final availability = mathTextbookPracticeAvailability(lesson, bookId);
+      final summary = summaries[lesson.id]!;
+      if (!learning.noExercises && learning.exercises.isNotEmpty) {
+        final subtitle = availability.exerciseIds.isEmpty
+            ? '${lesson.title} · 原书题目，可按纸上练习完成'
+            : availability.exerciseIds.length < learning.exercises.length
+            ? '${lesson.title} · ${availability.exerciseIds.length}/${learning.exercises.length} 组可练'
+            : '${lesson.title} · 已通过 ${summary.originalPassed}/${summary.originalTotal} 组';
+        practiceEntries.add((
+          lesson: lesson,
+          title: '教材原题',
+          subtitle: subtitle,
+          icon: Icons.edit_note_outlined,
+          planId: null,
+          original: true,
+          enabled: true,
+        ));
+      }
+      for (final plan in learning.practicePlans) {
+        final enabled = availability.planIds.contains(plan.id);
+        final detail = !enabled
+            ? '答案与练习范围待核对'
+            : plan.kind == MathTextbookPracticeKind.parentTask
+            ? mathTextbookPaperTaskInstruction(plan.task, previewVisible: false)
+            : '${mathTextbookPracticeLabel(plan.kind)} · ${plan.count} 题';
+        practiceEntries.add((
+          lesson: lesson,
+          title: plan.title,
+          subtitle: '${lesson.title} · $detail',
+          icon: Icons.fitness_center_outlined,
+          planId: plan.id,
+          original: false,
+          enabled: enabled,
+        ));
+      }
+    }
+    final hasModeContent = switch (selectedMode) {
+      AppRoutes.mathTextbookLearnMode => knowledgeEntries.isNotEmpty,
+      AppRoutes.mathTextbookPracticeMode => practiceEntries.isNotEmpty,
+      _ => lessons.isNotEmpty,
+    };
+    final showIntro = !hasModeContent || needsCourseUpdate;
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = ResponsiveLayout.columns(constraints.maxWidth);
+        final modeSlivers = <Widget>[];
+        if (selectedMode == AppRoutes.mathTextbookLearnMode &&
+            knowledgeEntries.isNotEmpty) {
+          modeSlivers.add(
+            SliverPadding(
+              padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+              sliver: SliverToBoxAdapter(
+                child: MasonryLayout(
+                  key: const ValueKey('math-textbook-knowledge-masonry'),
+                  columnCount: columns,
+                  gap: SpacingTokens.sm,
+                  children: [
+                    for (final entry in knowledgeEntries)
+                      AppTile(
+                        icon: Icons.lightbulb_outline,
+                        iconColor: color,
+                        title: entry.point.title,
+                        titleMaxLines: 2,
+                        subtitle:
+                            '${entry.lesson.title} · ${entry.point.summary}',
+                        subtitleMaxLines: 3,
+                        onTap: () => context.push(
+                          AppRoutes.mathTextbookStudyOf(
+                            bookId,
+                            entry.lesson.id,
+                            mode: AppRoutes.mathTextbookLearnMode,
+                            knowledgePointId: entry.point.id,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        } else if (selectedMode == AppRoutes.mathTextbookPracticeMode &&
+            practiceEntries.isNotEmpty) {
+          modeSlivers.add(
+            SliverPadding(
+              padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+              sliver: SliverToBoxAdapter(
+                child: MasonryLayout(
+                  key: const ValueKey('math-textbook-practice-masonry'),
+                  columnCount: columns,
+                  gap: SpacingTokens.sm,
+                  children: [
+                    for (final entry in practiceEntries)
+                      AppTile(
+                        icon: entry.icon,
+                        iconColor: color,
+                        title: entry.title,
+                        titleMaxLines: 2,
+                        subtitle: entry.subtitle,
+                        subtitleMaxLines: 3,
+                        onTap: !entry.enabled
+                            ? null
+                            : entry.original &&
+                                  mathTextbookPracticeAvailability(
+                                    entry.lesson,
+                                    bookId,
+                                  ).exerciseIds.isEmpty
+                            ? () => context.push(
+                                AppRoutes.mathTextbookStudyOf(
+                                  bookId,
+                                  entry.lesson.id,
+                                  mode: AppRoutes.mathTextbookReadMode,
+                                ),
+                              )
+                            : () => context.push(
+                                AppRoutes.mathTextbookPracticeOf(
+                                  bookId,
+                                  entry.lesson.id,
+                                  planId: entry.planId,
+                                ),
+                              ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        } else if (selectedMode != AppRoutes.mathTextbookLearnMode &&
+            selectedMode != AppRoutes.mathTextbookPracticeMode) {
+          for (final group in lessonGroups) {
+            if (group.unit.isNotEmpty) {
+              modeSlivers.add(
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: SpacingTokens.md,
+                    ),
+                    child: Text(
+                      group.unit,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ),
+              );
+            }
+            modeSlivers.add(
+              SliverPadding(
+                padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+                sliver: SliverCardGrid(
+                  columnCount: columns,
+                  itemCount: group.lessons.length,
+                  itemBuilder: (context, index) {
+                    final lesson = group.lessons[index];
+                    final summary = summaries[lesson.id]!;
+                    return AppTile(
+                      icon: selectedMode == AppRoutes.mathTextbookReadMode
+                          ? summary.read
+                                ? Icons.check_circle_outline
+                                : Icons.auto_stories_outlined
+                          : summary.complete
+                          ? Icons.check_circle_outline
+                          : Icons.school_outlined,
+                      iconColor: color,
+                      title: lesson.title,
+                      subtitle: selectedMode == AppRoutes.mathTextbookReadMode
+                          ? summary.read
+                                ? '本课已读'
+                                : '按课时顺序阅读'
+                          : summary.label,
+                      onTap: () => context.push(
+                        AppRoutes.mathTextbookStudyOf(
+                          bookId,
+                          lesson.id,
+                          mode: selectedMode,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          }
+        }
         return Padding(
           padding: const EdgeInsets.fromLTRB(
             SpacingTokens.md,
@@ -166,9 +390,23 @@ class MathTextbookBookPage extends ConsumerWidget {
                               AppRoutes.mathTextbookReviewOf(bookId),
                             ),
                           ),
-                        if (lessons.isEmpty) ...[
+                        if (!hasModeContent) ...[
                           const SizedBox(height: SpacingTokens.md),
-                          const Text('还没有整理的课时。'),
+                          Text(
+                            currentPages != null && pageLessons.isEmpty
+                                ? '当前页尚未关联课时。'
+                                : switch (selectedMode) {
+                                    AppRoutes.mathTextbookLearnMode =>
+                                      currentPages == null
+                                          ? '本书尚未整理知识点。'
+                                          : '本课时尚未整理知识点。',
+                                    AppRoutes.mathTextbookPracticeMode =>
+                                      currentPages == null
+                                          ? '本书尚未整理练习。'
+                                          : '本课时尚未整理练习。',
+                                    _ => '还没有整理的课时。',
+                                  },
+                          ),
                           Padding(
                             padding: const EdgeInsets.symmetric(
                               vertical: SpacingTokens.md,
@@ -177,7 +415,7 @@ class MathTextbookBookPage extends ConsumerWidget {
                               onPressed: () => context.push(
                                 AppRoutes.mathTextbookReviewOf(bookId),
                               ),
-                              child: const Text('整理课时'),
+                              child: const Text('整理教材内容'),
                             ),
                           ),
                         ],
@@ -185,46 +423,194 @@ class MathTextbookBookPage extends ConsumerWidget {
                     ),
                   ),
                 ),
-              for (final group in lessonGroups) ...[
-                if (group.unit.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: SpacingTokens.md,
-                      ),
-                      child: Text(
-                        group.unit,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                  ),
-                SliverPadding(
-                  padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
-                  sliver: SliverCardGrid(
-                    columnCount: columns,
-                    itemCount: group.lessons.length,
-                    itemBuilder: (context, index) {
-                      final lesson = group.lessons[index];
-                      final summary = summaries[lesson.id]!;
-                      return AppTile(
-                        icon: summary.complete
-                            ? Icons.check_circle_outline
-                            : Icons.school_outlined,
-                        iconColor: color,
-                        title: lesson.title,
-                        subtitle: summary.label,
-                        onTap: () => context.push(
-                          AppRoutes.mathTextbookStudyOf(bookId, lesson.id),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+              ...modeSlivers,
             ],
           ),
         );
       },
+    );
+  }
+
+  static String? _validMode(String? mode) => switch (mode) {
+    AppRoutes.mathTextbookReadMode ||
+    AppRoutes.mathTextbookLearnMode ||
+    AppRoutes.mathTextbookPracticeMode => mode,
+    _ => null,
+  };
+
+  static String? _modeLabel(String? mode) => switch (_validMode(mode)) {
+    AppRoutes.mathTextbookReadMode => '看一看',
+    AppRoutes.mathTextbookLearnMode => '学一学',
+    AppRoutes.mathTextbookPracticeMode => '做一做',
+    _ => null,
+  };
+}
+
+class _MathTextbookKnowledgePage extends StatelessWidget {
+  const _MathTextbookKnowledgePage({
+    required this.lesson,
+    required this.onRead,
+    required this.onKnowledge,
+  });
+
+  final MathTextbookLesson lesson;
+  final VoidCallback onRead;
+  final ValueChanged<MathTextbookKnowledgePoint> onKnowledge;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = lesson.learning?.knowledgePoints ?? const [];
+    return Scaffold(
+      appBar: AppBar(title: Text(lesson.title)),
+      body: SafeArea(
+        child: points.isEmpty
+            ? AppEmptyState(
+                icon: Icons.lightbulb_outline,
+                title: '本课暂无知识点',
+                description: '可以先看一看本课完整内容。',
+                actions: [
+                  TextButton.icon(
+                    onPressed: onRead,
+                    icon: const Icon(Icons.auto_stories_outlined),
+                    label: const Text('看一看本课内容'),
+                  ),
+                ],
+              )
+            : ListView.separated(
+                padding: const EdgeInsets.all(SpacingTokens.md),
+                itemCount: points.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(height: SpacingTokens.sm),
+                itemBuilder: (context, index) {
+                  final point = points[index];
+                  return AppTile(
+                    icon: Icons.lightbulb_outline,
+                    iconColor: Theme.of(context).colorScheme.primary,
+                    title: point.title,
+                    titleMaxLines: 2,
+                    subtitle: point.summary,
+                    subtitleMaxLines: 3,
+                    onTap: () => onKnowledge(point),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+}
+
+class _MathTextbookPracticeOverviewPage extends ConsumerWidget {
+  const _MathTextbookPracticeOverviewPage({
+    required this.book,
+    required this.lesson,
+    required this.summary,
+    required this.availability,
+    required this.onRead,
+    required this.onOriginal,
+    required this.onPlan,
+    required this.onConfigure,
+    required this.onHistory,
+  });
+
+  final Textbook book;
+  final MathTextbookLesson lesson;
+  final MathTextbookLessonProgress summary;
+  final MathTextbookPracticeAvailability availability;
+  final VoidCallback onRead, onOriginal, onConfigure, onHistory;
+  final ValueChanged<MathTextbookPracticePlan> onPlan;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final learning = lesson.learning;
+    final plans = learning?.practicePlans ?? <MathTextbookPracticePlan>[];
+    final latestProgress = ref
+        .watch(mathTextbookProgressProvider(book.pdfSha256))
+        .valueOrNull;
+    final currentSummary = latestProgress == null
+        ? summary
+        : mathTextbookLessonProgress(
+            lesson,
+            book.pdfSha256,
+            latestProgress,
+            availability: availability,
+          );
+    final hasOriginal =
+        learning != null &&
+        !learning.noExercises &&
+        learning.exercises.isNotEmpty;
+    if (!hasOriginal && plans.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: Text(lesson.title)),
+        body: SafeArea(
+          child: AppEmptyState(
+            icon: Icons.edit_note_outlined,
+            title: '本课暂无练习',
+            description: '可以先看一看本课完整内容。',
+            actions: [
+              TextButton.icon(
+                onPressed: onRead,
+                icon: const Icon(Icons.auto_stories_outlined),
+                label: const Text('看一看本课内容'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Scaffold(
+      appBar: AppBar(title: Text(lesson.title)),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(SpacingTokens.md),
+          children: [
+            if (hasOriginal)
+              AppTile(
+                icon: Icons.edit_note_outlined,
+                iconColor: Theme.of(context).colorScheme.primary,
+                title: '教材原题',
+                subtitle: learning.noExercises
+                    ? '原书本课没有独立习题'
+                    : availability.exerciseIds.length <
+                          learning.exercises.length
+                    ? '共 ${learning.exercises.length} 组 · 可练 ${availability.exerciseIds.length} 组纸上题'
+                    : '共 ${learning.exercises.length} 组 · 已通过 ${currentSummary.originalPassed} 组',
+                onTap: onOriginal,
+              ),
+            if (plans.isNotEmpty) ...[
+              if (hasOriginal) const SizedBox(height: SpacingTokens.lg),
+              Text('本课巩固', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: SpacingTokens.sm),
+              for (final plan in plans)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+                  child: AppTile(
+                    icon: Icons.fitness_center_outlined,
+                    iconColor: Theme.of(context).colorScheme.primary,
+                    title: plan.title,
+                    subtitle: availability.planIds.contains(plan.id)
+                        ? plan.kind == MathTextbookPracticeKind.parentTask
+                              ? mathTextbookPaperTaskInstruction(
+                                  plan.task,
+                                  previewVisible: false,
+                                )
+                              : '${mathTextbookPracticeLabel(plan.kind)} · ${plan.count} 题'
+                        : '答案与练习范围待核对',
+                    subtitleMaxLines: 3,
+                    onTap: availability.planIds.contains(plan.id)
+                        ? () => onPlan(plan)
+                        : null,
+                  ),
+                ),
+            ],
+            if (learning != null &&
+                (availability.exerciseIds.length < learning.exercises.length ||
+                    availability.planIds.length <
+                        learning.practicePlans.length))
+              TextButton(onPressed: onConfigure, child: const Text('配置本课自动练习')),
+            TextButton(onPressed: onHistory, child: const Text('查看作答记录与待核对项')),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -234,8 +620,14 @@ class MathTextbookStudyPage extends ConsumerStatefulWidget {
     super.key,
     required this.bookId,
     required this.lessonId,
+    this.mode,
+    this.knowledgePointId,
+    this.viewerBuilder,
   });
   final String bookId, lessonId;
+  final String? mode;
+  final String? knowledgePointId;
+  final TextbookViewerBuilder? viewerBuilder;
   @override
   ConsumerState<MathTextbookStudyPage> createState() =>
       _MathTextbookStudyPageState();
@@ -254,63 +646,209 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
               b.pdfSha256 == widget.bookId && b.subject == TextbookSubject.math,
         )
         .firstOrNull;
-    return Scaffold(
-      appBar: AppBar(title: const Text('本课学习')),
-      body: SafeArea(
-        child: book == null
-            ? const AppEmptyState(
-                icon: Icons.menu_book_outlined,
-                title: '本书已移除',
-                description: '请返回课本重新选择。',
-              )
-            : ref
-                  .watch(mathTextbookCourseProvider(widget.bookId))
-                  .when(
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (error, _) => AppEmptyState(
-                      icon: Icons.error_outline,
-                      title: '课时暂时无法读取',
-                      description: mathTextbookDisplayError(error, '请返回重试。'),
+    final courseState = ref.watch(mathTextbookCourseProvider(widget.bookId));
+    final lesson = courseState.valueOrNull?.currentLessons
+        .where((lesson) => lesson.id == widget.lessonId)
+        .firstOrNull;
+    if (book == null) {
+      return _statusPage(
+        '本课学习',
+        const AppEmptyState(
+          icon: Icons.menu_book_outlined,
+          title: '本书已移除',
+          description: '请返回课本重新选择。',
+        ),
+      );
+    }
+    return courseState.when(
+      loading: () => _statusPage(
+        lesson?.title ?? '本课学习',
+        const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, _) => _statusPage(
+        lesson?.title ?? '本课学习',
+        AppEmptyState(
+          icon: Icons.error_outline,
+          title: '课时暂时无法读取',
+          description: mathTextbookDisplayError(error, '请返回重试。'),
+        ),
+      ),
+      data: (course) {
+        final selectedLesson = course?.currentLessons
+            .where((value) => value.id == widget.lessonId)
+            .firstOrNull;
+        if (selectedLesson == null) {
+          return _statusPage(
+            '本课学习',
+            const AppEmptyState(
+              icon: Icons.school_outlined,
+              title: '课时已更新',
+              description: '请返回本书重新选择。',
+            ),
+          );
+        }
+        return ref
+            .watch(mathTextbookProgressProvider(widget.bookId))
+            .when(
+              loading: () => _statusPage(
+                selectedLesson.title,
+                const Center(child: CircularProgressIndicator()),
+              ),
+              error: (error, _) => _statusPage(
+                selectedLesson.title,
+                AppEmptyState(
+                  icon: Icons.error_outline,
+                  title: '学习记录暂时无法读取',
+                  description: mathTextbookDisplayError(error, '请返回重试。'),
+                ),
+              ),
+              data: (progress) => _pageForMode(
+                book,
+                selectedLesson,
+                progress ??
+                    MathTextbookProgress(
+                      profileId: ProfileScope.currentId,
+                      bookId: book.pdfSha256,
+                      editionId: book.learningEditionId,
                     ),
-                    data: (course) {
-                      final lesson = course?.currentLessons
-                          .where((l) => l.id == widget.lessonId)
-                          .firstOrNull;
-                      if (lesson == null) {
-                        return const AppEmptyState(
-                          icon: Icons.school_outlined,
-                          title: '课时已更新',
-                          description: '请返回本书重新选择。',
-                        );
-                      }
-                      return ref
-                          .watch(mathTextbookProgressProvider(widget.bookId))
-                          .when(
-                            loading: () => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                            error: (error, _) => AppEmptyState(
-                              icon: Icons.error_outline,
-                              title: '学习记录暂时无法读取',
-                              description: mathTextbookDisplayError(
-                                error,
-                                '请返回重试。',
-                              ),
-                            ),
-                            data: (progress) => _content(
-                              book,
-                              lesson,
-                              progress ??
-                                  MathTextbookProgress(
-                                    profileId: ProfileScope.currentId,
-                                    bookId: book.pdfSha256,
-                                    editionId: book.learningEditionId,
-                                  ),
-                            ),
-                          );
-                    },
-                  ),
+              ),
+            );
+      },
+    );
+  }
+
+  Widget _statusPage(String title, Widget body) => Scaffold(
+    appBar: AppBar(title: Text(title)),
+    body: SafeArea(child: body),
+  );
+
+  Widget _pageForMode(
+    Textbook book,
+    MathTextbookLesson lesson,
+    MathTextbookProgress progress,
+  ) {
+    final availability = mathTextbookPracticeAvailability(
+      lesson,
+      book.pdfSha256,
+    );
+    final summary = mathTextbookLessonProgress(
+      lesson,
+      book.pdfSha256,
+      progress,
+      availability: availability,
+    );
+    return switch (widget.mode) {
+      AppRoutes.mathTextbookReadMode => _reader(book, lesson, summary),
+      AppRoutes.mathTextbookLearnMode => _knowledgePage(book, lesson),
+      AppRoutes.mathTextbookPracticeMode => _MathTextbookPracticeOverviewPage(
+        book: book,
+        lesson: lesson,
+        summary: summary,
+        availability: availability,
+        onRead: () => _openOriginalLesson(book, lesson),
+        onOriginal: () {
+          if (availability.exerciseIds.isEmpty) {
+            _openOriginalLesson(book, lesson);
+          } else {
+            context.push(
+              AppRoutes.mathTextbookPracticeOf(book.pdfSha256, lesson.id),
+            );
+          }
+        },
+        onPlan: (plan) => context.push(
+          AppRoutes.mathTextbookPracticeOf(
+            book.pdfSha256,
+            lesson.id,
+            planId: plan.id,
+          ),
+        ),
+        onConfigure: () => context.push(
+          AppRoutes.mathTextbookLessonOf(book.pdfSha256, lesson.id),
+        ),
+        onHistory: () =>
+            context.push(AppRoutes.mathTextbookHistoryOf(book.pdfSha256)),
+      ),
+      _ => Scaffold(
+        appBar: AppBar(title: Text(lesson.title)),
+        body: SafeArea(child: _content(book, lesson, progress)),
+      ),
+    };
+  }
+
+  Widget _reader(
+    Textbook book,
+    MathTextbookLesson lesson,
+    MathTextbookLessonProgress summary,
+  ) => TextbookReaderPage(
+    bookId: book.pdfSha256,
+    initialPage: lesson.startPage,
+    title: lesson.title,
+    viewerBuilder: widget.viewerBuilder,
+    bottomAction: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_error != null)
+          ColoredCard(
+            color: Theme.of(context).colorScheme.error,
+            child: Text(_error!),
+          ),
+        OutlinedButton.icon(
+          onPressed: _saving || summary.read ? null : () => _read(book, lesson),
+          icon: Icon(summary.read ? Icons.check : Icons.done_all),
+          label: Text(
+            _saving
+                ? '正在保存…'
+                : summary.read
+                ? '本课已读'
+                : '看完本课，标记已读',
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _knowledgePage(Textbook book, MathTextbookLesson lesson) {
+    final pointId = widget.knowledgePointId;
+    final point = pointId == null
+        ? null
+        : lesson.learning?.knowledgePoints
+              .where((value) => value.id == pointId)
+              .firstOrNull;
+    if (pointId == null) {
+      return _MathTextbookKnowledgePage(
+        lesson: lesson,
+        onRead: () => _openOriginalLesson(book, lesson),
+        onKnowledge: (knowledge) =>
+            _showContent(book, lesson, knowledge: knowledge),
+      );
+    }
+    if (point == null) {
+      return _statusPage(
+        lesson.title,
+        const AppEmptyState(
+          icon: Icons.lightbulb_outline,
+          title: '知识点已更新',
+          description: '请返回本书重新选择。',
+        ),
+      );
+    }
+    return MathTextbookSourceContentPage(
+      book: book,
+      title: point.title,
+      knowledgePoint: true,
+      blocks: lesson.blocks
+          .where((block) => point.blockIds.contains(block.id))
+          .toList(),
+    );
+  }
+
+  void _openOriginalLesson(Textbook book, MathTextbookLesson lesson) {
+    context.push(
+      AppRoutes.mathTextbookStudyOf(
+        book.pdfSha256,
+        lesson.id,
+        mode: AppRoutes.mathTextbookReadMode,
       ),
     );
   }
@@ -331,6 +869,59 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
               : lesson.blocks
                     .where((b) => knowledge.blockIds.contains(b.id))
                     .toList(),
+        ),
+      ),
+    );
+  }
+
+  void _showKnowledge(Textbook book, MathTextbookLesson lesson) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => _MathTextbookKnowledgePage(
+          lesson: lesson,
+          onRead: () => _openOriginalLesson(book, lesson),
+          onKnowledge: (knowledge) =>
+              _showContent(book, lesson, knowledge: knowledge),
+        ),
+      ),
+    );
+  }
+
+  void _showPractice(
+    Textbook book,
+    MathTextbookLesson lesson,
+    MathTextbookLessonProgress summary,
+    MathTextbookPracticeAvailability availability,
+  ) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => _MathTextbookPracticeOverviewPage(
+          book: book,
+          lesson: lesson,
+          summary: summary,
+          availability: availability,
+          onRead: () => _openOriginalLesson(book, lesson),
+          onOriginal: () {
+            if (availability.exerciseIds.isEmpty) {
+              _openOriginalLesson(book, lesson);
+            } else {
+              context.push(
+                AppRoutes.mathTextbookPracticeOf(book.pdfSha256, lesson.id),
+              );
+            }
+          },
+          onPlan: (plan) => context.push(
+            AppRoutes.mathTextbookPracticeOf(
+              book.pdfSha256,
+              lesson.id,
+              planId: plan.id,
+            ),
+          ),
+          onConfigure: () => context.push(
+            AppRoutes.mathTextbookLessonOf(book.pdfSha256, lesson.id),
+          ),
+          onHistory: () =>
+              context.push(AppRoutes.mathTextbookHistoryOf(book.pdfSha256)),
         ),
       ),
     );
@@ -378,47 +969,49 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
       availability: availability,
     );
     final learning = lesson.learning;
-    final originalReady =
-        learning != null && availability.exerciseIds.isNotEmpty;
+    final knowledgePoints =
+        learning?.knowledgePoints ?? <MathTextbookKnowledgePoint>[];
+    final hasPractice =
+        (learning?.exercises.isNotEmpty ?? false) ||
+        (learning?.practicePlans.isNotEmpty ?? false);
     return ListView(
       key: PageStorageKey(
         'math-study-${progress.profileId}-${book.pdfSha256}-${lesson.id}',
       ),
       padding: const EdgeInsets.all(SpacingTokens.md),
       children: [
-        Text(lesson.title, style: Theme.of(context).textTheme.headlineSmall),
         if ((learning?.unitTitle.isNotEmpty ?? false) &&
             learning!.unitTitle != lesson.title)
-          Text(learning.unitTitle),
-        const SizedBox(height: SpacingTokens.sm),
-        Text(summary.label),
-        const SizedBox(height: SpacingTokens.md),
+          Padding(
+            padding: const EdgeInsets.only(bottom: SpacingTokens.md),
+            child: Text(learning.unitTitle),
+          ),
         AppTile(
           icon: Icons.auto_stories_outlined,
           iconColor: color,
-          title: '阅读本课内容',
-          subtitle: '按原书顺序阅读讲解、例题与练习',
+          title: '看一看',
+          subtitle: '按原书顺序查看本课内容',
           onTap: () => _showContent(book, lesson),
         ),
         const SizedBox(height: SpacingTokens.md),
-        if (learning?.knowledgePoints.isNotEmpty ?? false) ...[
-          Text('知识与例题', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: SpacingTokens.sm),
-        ],
-        for (final k
-            in learning?.knowledgePoints ?? <MathTextbookKnowledgePoint>[])
-          Padding(
-            padding: const EdgeInsets.only(bottom: SpacingTokens.md),
-            child: AppTile(
-              icon: Icons.lightbulb_outline,
-              iconColor: color,
-              title: k.title,
-              titleMaxLines: 2,
-              subtitle: k.summary,
-              subtitleMaxLines: 3,
-              onTap: () => _showContent(book, lesson, knowledge: k),
-            ),
-          ),
+        AppTile(
+          icon: Icons.lightbulb_outline,
+          iconColor: color,
+          title: '学一学',
+          subtitle: knowledgePoints.isEmpty
+              ? '本课暂无知识点'
+              : '${knowledgePoints.length} 个知识点与例题',
+          onTap: () => _showKnowledge(book, lesson),
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        AppTile(
+          icon: Icons.edit_note_outlined,
+          iconColor: color,
+          title: '做一做',
+          subtitle: hasPractice ? '教材原题与本课巩固练习' : '本课暂无练习',
+          onTap: () => _showPractice(book, lesson, summary, availability),
+        ),
+        const SizedBox(height: SpacingTokens.lg),
         if (_error != null)
           ColoredCard(
             color: Theme.of(context).colorScheme.error,
@@ -434,75 +1027,6 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
                 ? '本课已读'
                 : '看完本课，标记已读',
           ),
-        ),
-        const SizedBox(height: SpacingTokens.lg),
-        AppTile(
-          icon: Icons.edit_note_outlined,
-          iconColor: color,
-          title: '教材原题',
-          subtitle: learning == null
-              ? '阅读本课内容中的例题与习题'
-              : learning.noExercises
-              ? '原书本课没有独立习题'
-              : originalReady
-              ? availability.exerciseIds.length < learning.exercises.length
-                    ? '共 ${learning.exercises.length} 组 · 可练 ${availability.exerciseIds.length} 组纸上题'
-                    : '共 ${learning.exercises.length} 组 · 已通过 ${summary.originalPassed} 组'
-              : '可在本课内容中对照原书学习',
-          onTap: originalReady
-              ? () => context.push(
-                  AppRoutes.mathTextbookPracticeOf(book.pdfSha256, lesson.id),
-                )
-              : learning?.noExercises == true
-              ? null
-              : () => _showContent(book, lesson),
-        ),
-        if (learning?.practicePlans.isNotEmpty ?? false) ...[
-          const SizedBox(height: SpacingTokens.lg),
-          Text('本课巩固', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: SpacingTokens.sm),
-        ],
-        for (final plan
-            in learning?.practicePlans ?? <MathTextbookPracticePlan>[])
-          Padding(
-            padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
-            child: AppTile(
-              icon: Icons.fitness_center_outlined,
-              iconColor: color,
-              title: plan.title,
-              subtitle: availability.planIds.contains(plan.id)
-                  ? plan.kind == MathTextbookPracticeKind.parentTask
-                        ? mathTextbookPaperTaskInstruction(
-                            plan.task,
-                            previewVisible: false,
-                          )
-                        : '${mathTextbookPracticeLabel(plan.kind)} · ${plan.count} 题'
-                  : '答案与练习范围待核对',
-              subtitleMaxLines: 3,
-              onTap: availability.planIds.contains(plan.id)
-                  ? () => context.push(
-                      AppRoutes.mathTextbookPracticeOf(
-                        book.pdfSha256,
-                        lesson.id,
-                        planId: plan.id,
-                      ),
-                    )
-                  : null,
-            ),
-          ),
-        if (learning != null &&
-            (availability.exerciseIds.length < learning.exercises.length ||
-                availability.planIds.length < learning.practicePlans.length))
-          TextButton(
-            onPressed: () => context.push(
-              AppRoutes.mathTextbookLessonOf(book.pdfSha256, lesson.id),
-            ),
-            child: const Text('配置本课自动练习'),
-          ),
-        TextButton(
-          onPressed: () =>
-              context.push(AppRoutes.mathTextbookHistoryOf(book.pdfSha256)),
-          child: const Text('查看作答记录与待核对项'),
         ),
       ],
     );
