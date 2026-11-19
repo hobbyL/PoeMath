@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
-import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
@@ -240,7 +240,7 @@ class _TextbookManagementPageState
                           onTap: () => _open(book),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(
-                              SpacingTokens.radiusMedium,
+                              theme.appearance.cardRadius,
                             ),
                             child: paths[book.pdfSha256]!.when(
                               data: (path) => path == null

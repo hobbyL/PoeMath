@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
@@ -122,7 +122,7 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
         padding: EdgeInsets.zero,
         onTap: () => _open(book),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+          borderRadius: BorderRadius.circular(theme.appearance.cardRadius),
           child: path.when(
             data: (path) => path == null
                 ? TextbookCoverPlaceholder(title: title, status: '请家长补齐课本文件')

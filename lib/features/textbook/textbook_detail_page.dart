@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -788,7 +788,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                                   padding: EdgeInsets.zero,
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(
-                                      SpacingTokens.radiusMedium,
+                                      theme.appearance.cardRadius,
                                     ),
                                     child: available
                                         ? _previewVisible
