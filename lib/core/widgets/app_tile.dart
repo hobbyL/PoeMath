@@ -152,7 +152,7 @@ class AppTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final titleStyle = theme.textTheme.titleSmall?.copyWith(
-      fontFamily: flat ? null : TypographyTokens.inkFontFamily,
+      fontFamily: flat ? null : theme.textTheme.titleLarge?.fontFamily,
       fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
       color: selected ? theme.colorScheme.onPrimaryContainer : null,
     );
@@ -349,11 +349,11 @@ class AppTile extends StatelessWidget {
           type: selected ? MaterialType.canvas : MaterialType.transparency,
           color: selected ? theme.colorScheme.primaryContainer : null,
           borderRadius: selected
-              ? BorderRadius.circular(SpacingTokens.radiusSmall)
+              ? BorderRadius.circular(theme.appearance.controlRadius)
               : null,
           clipBehavior: selected ? Clip.antiAlias : Clip.none,
           child: InkWell(
-            borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+            borderRadius: BorderRadius.circular(theme.appearance.controlRadius),
             onTap: trailing == null || allowTapWithTrailing ? onTap : null,
             child: ConstrainedBox(
               constraints: const BoxConstraints(
@@ -381,7 +381,7 @@ class AppTile extends StatelessWidget {
     final cardContent = edgeWidth == null
         ? content
         : ClipRRect(
-            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+            borderRadius: BorderRadius.circular(theme.appearance.cardRadius),
             child: Stack(
               fit: StackFit.passthrough,
               children: [

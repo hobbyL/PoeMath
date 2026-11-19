@@ -374,7 +374,9 @@ Color _readableHeroLight(Color depth, Color foreground, Color candidate) {
   for (var step = 0; step < 12; step++) {
     final mix = (low + high) / 2;
     final luminance = Color.lerp(depth, candidate, mix)!.computeLuminance();
-    if ((front + .05) / (luminance + .05) >= 6.5) {
+    if ((math.max(front, luminance) + .05) /
+            (math.min(front, luminance) + .05) >=
+        6.5) {
       low = mix;
     } else {
       high = mix;

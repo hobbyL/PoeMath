@@ -669,7 +669,7 @@ class SettingsRepository {
   // 一律不得加入白名单（设备绑定，换机重配）。
   static const String _keyThemeMode =
       'theme_mode'; // 'system' | 'light' | 'dark'
-  static const String _keyActiveSubject = 'active_subject'; // 'poem' | 'math'
+  static const String _keyActiveSubject = 'active_subject'; // AppSubject.name
   static const String _keySoundEnabled = 'sound_enabled';
   static const String _keyHapticEnabled = 'haptic_enabled';
   static const String pageAnimationsEnabledKey = 'page_animations_enabled';

@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/app.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/color_tokens.dart';
-import 'package:poemath/core/theme/ink_theme.dart';
+import 'package:poemath/core/theme/app_appearance.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
@@ -79,8 +79,8 @@ void main() {
         isNot(ochre.colorScheme.outlineVariant),
       );
       expect(
-        pine.extension<InkThemeExt>()!.heroImage,
-        isNot(ochre.extension<InkThemeExt>()!.heroImage),
+        pine.extension<AppAppearance>()!.heroImage,
+        isNot(ochre.extension<AppAppearance>()!.heroImage),
       );
     }
   });
@@ -116,6 +116,30 @@ void main() {
       addTearDown(container.dispose);
 
       expect(container.read(themeModeProvider), ThemeMode.system);
+    });
+
+    test('四种主题经设置修改、重建和旧偏好恢复后保持一致', () async {
+      for (final preset in AppSubject.values) {
+        await HiveBoxes.settings.put(
+          'active_subject',
+          preset == AppSubject.poem ? 'space' : 'poem',
+        );
+        final first = ProviderContainer();
+        first.read(activeSubjectProvider.notifier).setSubject(preset);
+        await Future<void>.delayed(Duration.zero);
+        await HiveBoxes.settings.flush();
+        expect(HiveBoxes.settings.get('active_subject'), preset.name);
+        first.dispose();
+        final restored = ProviderContainer();
+        expect(restored.read(activeSubjectProvider), preset);
+        restored.dispose();
+      }
+      for (final invalid in <Object>['unknown', 7]) {
+        await HiveBoxes.settings.put('active_subject', invalid);
+        final restored = ProviderContainer();
+        expect(restored.read(activeSubjectProvider), AppSubject.poem);
+        restored.dispose();
+      }
     });
 
     test('恢复后统一刷新立即重建主题风格和外观模式', () async {
@@ -174,8 +198,8 @@ void main() {
         light2.scaffoldBackgroundColor,
       );
       expect(
-        renderedTheme.extension<InkThemeExt>()!.heroImage,
-        light2.extension<InkThemeExt>()!.heroImage,
+        renderedTheme.extension<AppAppearance>()!.heroImage,
+        light2.extension<AppAppearance>()!.heroImage,
       );
 
       // 排空 Hive 写链，否则 tearDown 的 Hive.close() 在 fake 时钟下永不返回。

@@ -25,24 +25,39 @@ class PracticeEntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
+    final playful = theme.appearance.playful;
 
     return ColoredCard(
       color: primary,
       onTap: onTap,
       padding: const EdgeInsets.all(SpacingTokens.md),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: playful
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: SpacingTokens.xl, color: primary),
-              const Spacer(),
-              Icon(Icons.arrow_forward, size: SpacingTokens.md, color: primary),
-            ],
-          ),
+          if (playful)
+            CircleAvatar(
+              backgroundColor: theme.colorScheme.primaryContainer,
+              radius: SpacingTokens.lg,
+              child: Icon(icon, size: SpacingTokens.xl, color: primary),
+            )
+          else
+            Row(
+              children: [
+                Icon(icon, size: SpacingTokens.xl, color: primary),
+                const Spacer(),
+                Icon(
+                  Icons.arrow_forward,
+                  size: SpacingTokens.md,
+                  color: primary,
+                ),
+              ],
+            ),
           const SizedBox(height: SpacingTokens.lg),
           Text(
             title,
+            textAlign: playful ? TextAlign.center : TextAlign.start,
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w600,
               color: theme.colorScheme.onSurface,
@@ -51,6 +66,7 @@ class PracticeEntryCard extends StatelessWidget {
           const SizedBox(height: SpacingTokens.sm),
           Text(
             description,
+            textAlign: playful ? TextAlign.center : TextAlign.start,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),

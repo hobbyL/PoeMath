@@ -2,7 +2,7 @@
 //
 // 层级：core/theme（Riverpod Providers）
 // 职责：暴露主题相关的可变状态和派生 ThemeData。
-//       - activeSubjectProvider: 当前学科（poem / math），驱动主题切换。
+//       - activeSubjectProvider: 外观预设，保留既有偏好键。
 //       - themeModeProvider: 亮色/暗色/跟随系统。
 //       - lightThemeProvider / darkThemeProvider: 派生 ThemeData。
 
@@ -14,7 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 
-/// 当前活跃学科 Notifier — 初始值从 Hive 读取，变更时自动写回。
+/// 外观预设 Notifier — 初始值从 Hive 读取，变更时自动写回。
 ///
 /// 使用 [Zone.root] 调度 Hive 写入，避免 Flutter 测试中
 /// FakeAsync zone 无法完成 I/O Future 导致测试超时。
@@ -24,31 +24,28 @@ class ActiveSubjectNotifier extends Notifier<AppSubject> {
     final stored = HiveBoxes.settings.get(
       'active_subject',
       defaultValue: 'poem',
-    ) as String;
+    );
 
     // 监听后续变更，自动持久化到 Hive
     listenSelf((prev, next) {
       if (prev != null && prev != next) {
         // 在根 Zone 中执行 I/O，避免 FakeAsync 追踪导致测试卡死
         Zone.root.run(() {
-          HiveBoxes.settings.put(
-            'active_subject',
-            next == AppSubject.math ? 'math' : 'poem',
-          );
+          HiveBoxes.settings.put('active_subject', next.name);
         });
       }
     });
 
-    return stored == 'math' ? AppSubject.math : AppSubject.poem;
+    return AppSubject.fromId(stored) ?? AppSubject.poem;
   }
 
-  /// 切换当前学科。
+  /// 切换整个应用的外观预设。
   void setSubject(AppSubject subject) {
     state = subject;
   }
 }
 
-/// 当前配色偏好（松墨 / 赭石；存储标识保持兼容）。
+/// 当前外观预设；切换学习栏目不会改变偏好。
 final activeSubjectProvider =
     NotifierProvider<ActiveSubjectNotifier, AppSubject>(
       ActiveSubjectNotifier.new,

@@ -1,7 +1,7 @@
 // lib/core/widgets/colored_card.dart
 //
 // 层级：core/widgets
-// 职责：统一纸面卡片、语义着色与点击反馈。
+// 职责：统一主题卡片、语义着色与点击反馈。
 //
 // 用法：
 //   ColoredCard(
@@ -16,14 +16,14 @@ import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
 
-/// 全局统一的纸面卡片。
+/// 全局统一的主题卡片。
 ///
 /// 视觉规则：
-/// - 普通卡片：在主题纸色上叠加 [color]，配细墨线和纸页底边。
+/// - 普通卡片：在主题底色上叠加 [color]，外观跟随 [AppAppearance.cardStyle]。
 /// - [backgroundOpacity] 为 0 / 1 时保留透明 / 实色表面，不附加纸页装饰。
 /// - 渐变路径：背景 = [gradient]（提供时优先生效，忽略 [color] 着色）
-/// - 圆角 = [SpacingTokens.radiusMedium]
-/// - [border] / [boxShadow] 可覆盖纸面默认装饰。
+/// - 默认圆角由 [AppAppearance.cardRadius] 提供。
+/// - [border] / [boxShadow] 可覆盖主题默认装饰。
 ///
 /// 可选参数：
 /// - [onTap] 添加点击水波纹
@@ -43,9 +43,7 @@ class ColoredCard extends StatelessWidget {
     this.paperSurface = true,
     this.width,
     this.constraints,
-    this.borderRadius = const BorderRadius.all(
-      Radius.circular(SpacingTokens.radiusMedium),
-    ),
+    this.borderRadius,
   }) : assert(color != null || gradient != null, 'color 与 gradient 至少提供一个');
 
   /// 卡片主色调，背景色将基于此色生成；提供 [gradient] 时可省略。
@@ -54,7 +52,7 @@ class ColoredCard extends StatelessWidget {
   /// 渐变背景（LinearGradient）；非空时优先于 [color] 渲染。
   final LinearGradient? gradient;
 
-  /// 可选阴影；普通卡片默认一条轻薄纸页底边，空列表可取消。
+  /// 可选阴影；默认跟随主题，空列表可取消。
   final List<BoxShadow>? boxShadow;
 
   final BoxBorder? border;
@@ -81,11 +79,14 @@ class ColoredCard extends StatelessWidget {
   final BoxConstraints? constraints;
 
   /// 默认卡片圆角；铺满页面的背景区域可显式使用 [BorderRadius.zero]。
-  final BorderRadius borderRadius;
+  final BorderRadius? borderRadius;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final appearance = theme.appearance;
+    final radius = borderRadius ?? BorderRadius.circular(appearance.cardRadius);
     final paper =
         paperSurface &&
         gradient == null &&
@@ -100,22 +101,40 @@ class ColoredCard extends StatelessWidget {
       boxShadow:
           boxShadow ??
           (paper
-              ? [
-                  BoxShadow(
-                    color: scheme.outlineVariant.withValues(alpha: .45),
-                    offset: const Offset(0, 2),
-                  ),
-                ]
+              ? switch (appearance.cardStyle) {
+                  AppCardStyle.paper => [
+                    BoxShadow(
+                      color: scheme.outlineVariant.withValues(alpha: .45),
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                  AppCardStyle.soft => [
+                    BoxShadow(
+                      color: scheme.primary.withValues(alpha: .1),
+                      blurRadius: SpacingTokens.sm,
+                      offset: const Offset(0, SpacingTokens.xs),
+                    ),
+                  ],
+                  AppCardStyle.outlined => null,
+                }
               : null),
       border:
           border ??
           (paper
-              ? Border.all(
-                  color: scheme.outlineVariant,
-                  strokeAlign: BorderSide.strokeAlignOutside,
-                )
+              ? switch (appearance.cardStyle) {
+                  AppCardStyle.paper => Border.all(
+                    color: scheme.outlineVariant,
+                    strokeAlign: BorderSide.strokeAlignOutside,
+                  ),
+                  AppCardStyle.soft => null,
+                  AppCardStyle.outlined => Border.all(
+                    color: scheme.outlineVariant,
+                    width: 2,
+                    strokeAlign: BorderSide.strokeAlignOutside,
+                  ),
+                }
               : null),
-      borderRadius: borderRadius,
+      borderRadius: radius,
     );
     final content = Padding(
       padding: padding ?? const EdgeInsets.all(SpacingTokens.md),
@@ -131,7 +150,7 @@ class ColoredCard extends StatelessWidget {
               type: MaterialType.transparency,
               child: InkWell(
                 onTap: onTap,
-                borderRadius: borderRadius,
+                borderRadius: radius,
                 child: content,
               ),
             ),

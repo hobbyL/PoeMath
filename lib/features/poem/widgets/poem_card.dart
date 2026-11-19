@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:poemath/core/theme/poem_theme.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
@@ -93,9 +94,15 @@ class PoemCard extends StatelessWidget {
           const SizedBox(height: SpacingTokens.sm),
           Text(
             poem.content.split('\n').take(2).join('\n'),
-            style: TypographyTokens.poemContentStyle(
-              color: theme.colorScheme.onSurface,
-            ).copyWith(fontSize: TypographyTokens.fsTitle, letterSpacing: 0),
+            style:
+                (theme.extension<PoemThemeExt>()?.poemContent ??
+                        TypographyTokens.poemContentStyle(
+                          color: theme.colorScheme.onSurface,
+                        ))
+                    .copyWith(
+                      fontSize: TypographyTokens.fsTitle,
+                      letterSpacing: 0,
+                    ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -153,7 +160,11 @@ class PoemCard extends StatelessWidget {
           : BorderSide(color: color.withValues(alpha: .3)),
       backgroundColor: filled ? color : theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(SpacingTokens.xs),
+        borderRadius: BorderRadius.circular(
+          theme.appearance.playful
+              ? SpacingTokens.radiusPill
+              : SpacingTokens.xs,
+        ),
       ),
     );
   }

@@ -238,6 +238,9 @@ void main() {
 
     expect(find.text('主题风格'), findsOneWidget);
     final choices = find.byType(RadioListTile<AppSubject>);
+    expect(choices, findsNWidgets(4));
+    expect(find.text('奶糖乐园'), findsOneWidget);
+    expect(find.text('星海探险'), findsOneWidget);
     expect(
       find.descendant(of: choices, matching: find.text('宣纸 · 松墨')),
       findsOneWidget,

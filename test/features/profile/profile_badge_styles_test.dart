@@ -9,6 +9,8 @@ import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/profile/widgets/profile_badge_styles.dart';
 
+import '../../helpers/theme_contrast.dart';
+
 void main() {
   late ScrollController scroll;
   setUp(() => scroll = ScrollController());
@@ -127,7 +129,7 @@ void main() {
             brightness: brightness,
           );
           final text = tester.widget<Text>(find.text('成长徽章'));
-          final foreground = text.style!.color!.computeLuminance();
+          final foreground = text.style!.color!;
           final card = tester.widget<ColoredCard>(
             find.descendant(
               of: find.byKey(const ValueKey('badge')),
@@ -136,7 +138,7 @@ void main() {
           );
           for (final color in card.gradient!.colors) {
             expect(
-              (foreground + .05) / (color.computeLuminance() + .05),
+              contrastRatio(foreground, color),
               greaterThanOrEqualTo(4.5),
               reason: '$subject / $brightness 的徽章背景应满足文字对比度',
             );

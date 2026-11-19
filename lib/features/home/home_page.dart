@@ -289,8 +289,12 @@ class _HomePageState extends ConsumerState<HomePage> {
               }
             },
             style: FilledButton.styleFrom(
-              backgroundColor: colors.foreground,
-              foregroundColor: colors.base,
+              backgroundColor: theme.appearance.playful
+                  ? theme.colorScheme.primary
+                  : colors.foreground,
+              foregroundColor: theme.appearance.playful
+                  ? theme.colorScheme.onPrimary
+                  : colors.base,
             ),
             child: Text(pendingGoal?.action ?? '打卡'),
           );
@@ -347,8 +351,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         media.size.width - media.padding.horizontal - SpacingTokens.lg * 2;
     final textScale = media.textScaler.scale(16) / 16;
     final effectiveWidth = contentWidth / textScale;
-    if (effectiveWidth >= ResponsiveLayout.mediumBreakpoint ||
-        textScale <= 1.25) {
+    if (!theme.appearance.playful &&
+        (effectiveWidth >= ResponsiveLayout.mediumBreakpoint ||
+            textScale <= 1.25)) {
       return Row(
         key: const ValueKey('home-check-in-content'),
         children: [
@@ -365,7 +370,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       children: [
         summary,
         const SizedBox(height: SpacingTokens.md),
-        Align(alignment: Alignment.center, child: reminder),
+        Align(
+          alignment: theme.appearance.playful
+              ? Alignment.centerLeft
+              : Alignment.center,
+          child: reminder,
+        ),
       ],
     );
   }
@@ -679,6 +689,9 @@ class _LevelBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final foreground = theme.appearance.playful
+        ? theme.colorScheme.onPrimaryContainer
+        : colors.base;
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -686,18 +699,20 @@ class _LevelBadge extends StatelessWidget {
         vertical: SpacingTokens.xs,
       ),
       decoration: BoxDecoration(
-        color: colors.foreground,
+        color: theme.appearance.playful
+            ? theme.colorScheme.primaryContainer
+            : colors.foreground,
         borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.stars_rounded, size: 14, color: colors.base),
+          Icon(Icons.stars_rounded, size: 14, color: foreground),
           const SizedBox(width: 4),
           Text(
             levelName,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: colors.base,
+              color: foreground,
               fontWeight: FontWeight.w600,
             ),
           ),

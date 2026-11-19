@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 
 void main() {
@@ -27,6 +28,49 @@ void main() {
   }
 
   Widget wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
+
+  testWidgets('同一张卡片切换主题后改变材质与轮廓并保留点击反馈', (tester) async {
+    var taps = 0;
+    final card = ColoredCard(
+      color: kBlue,
+      onTap: () => taps++,
+      child: const Text('开始练习'),
+    );
+    for (final preset in [
+      AppSubject.poem,
+      AppSubject.candy,
+      AppSubject.space,
+    ]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.resolve(
+            subject: preset,
+            brightness: Brightness.light,
+          ),
+          home: Scaffold(body: card),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final decoration = decorationOf(tester);
+      expect(decoration.color!.a, 1);
+      if (preset == AppSubject.poem) {
+        expect(decoration.borderRadius, BorderRadius.circular(8));
+      } else {
+        expect(decoration.borderRadius, BorderRadius.circular(16));
+      }
+      if (preset == AppSubject.candy) {
+        expect(decoration.border, isNull);
+        expect(decoration.boxShadow, isNotEmpty);
+      }
+      if (preset == AppSubject.space) {
+        expect(decoration.border, isNotNull);
+        expect(decoration.boxShadow, isNull);
+      }
+      await tester.tap(find.text('开始练习'));
+      await tester.pumpAndSettle();
+    }
+    expect(taps, 3);
+  });
 
   testWidgets('默认纸面是独立的不透明表面，带细边线和纸页底边', (tester) async {
     await tester.pumpWidget(

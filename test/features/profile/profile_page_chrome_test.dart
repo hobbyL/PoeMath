@@ -28,6 +28,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/theme/app_appearance.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
@@ -78,6 +79,14 @@ Future<void> _pump(
   );
   await tester.pump(const Duration(milliseconds: 100));
   await tester.pump(const Duration(seconds: 1));
+  final pageContext = tester.element(find.byType(ProfilePage));
+  await tester.runAsync(
+    () => precacheImage(
+      AssetImage(Theme.of(pageContext).appearance.heroImage),
+      pageContext,
+    ),
+  );
+  await tester.pump();
 }
 
 void main() {
@@ -116,7 +125,12 @@ void main() {
           const ValueKey('profile-header-background'),
         );
         expect(tester.getTopLeft(background), Offset.zero);
-        expectStatusBar(Brightness.light);
+        final headerIcons =
+            brightness == Brightness.light &&
+                (subject == AppSubject.candy || subject == AppSubject.space)
+            ? Brightness.dark
+            : Brightness.light;
+        expectStatusBar(headerIcons);
         final scroll = tester.state<ScrollableState>(
           find.byType(Scrollable).first,
         );
@@ -131,7 +145,7 @@ void main() {
         );
         scroll.position.jumpTo(0);
         await tester.pump();
-        expectStatusBar(Brightness.light);
+        expectStatusBar(headerIcons);
       });
     }
   }
@@ -358,6 +372,7 @@ void main() {
             }
           }))!;
           var brightest = 0.0;
+          var darkest = 1.0;
           for (var i = 0; i < pixels.lengthInBytes; i += 4) {
             final color = Color.fromARGB(
               pixels.getUint8(i + 3),
@@ -367,9 +382,14 @@ void main() {
             );
             final luminance = color.computeLuminance();
             if (luminance > brightest) brightest = luminance;
+            if (luminance < darkest) darkest = luminance;
           }
           expect(
-            (foreground + .05) / (brightest + .05),
+            foreground > brightest
+                ? (foreground + .05) / (brightest + .05)
+                : foreground < darkest
+                ? (darkest + .05) / (foreground + .05)
+                : 1.0,
             greaterThanOrEqualTo(4.5),
           );
           await tester.pump(const Duration(seconds: 2));

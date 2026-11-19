@@ -91,6 +91,46 @@ class ColorTokens {
   static const Color ochreCaution = Color(0xFF69451E);
   static const Color ochreSuccess = Color(0xFF24542D);
 
+  // 奶糖乐园：柔粉与莓果，青薄荷和葡萄紫作点缀。
+  static const Color candyPage = Color(0xFFFFF0F6);
+  static const Color candySurface = Color(0xFFFFFAFD);
+  static const Color candyRaised = Color(0xFFF8DDEB);
+  static const Color candyPrimary = Color(0xFF9B345E);
+  static const Color candySecondary = Color(0xFF376553);
+  static const Color candyTertiary = Color(0xFF6E4595);
+  static const Color candyInk = Color(0xFF30192A);
+  static const Color candyMuted = Color(0xFF765469);
+  static const Color candyRule = Color(0xFFE8BED1);
+  static const Color candyNight = Color(0xFF2C1D30);
+  static const Color candyNightSurface = Color(0xFF3D2A43);
+  static const Color candyNightRaised = Color(0xFF503657);
+  static const Color candyNightInk = Color(0xFFFFECF6);
+  static const Color candyNightMuted = Color(0xFFDAB7D0);
+  static const Color candyNightRule = Color(0xFF71506A);
+  static const Color candyPrimaryLight = Color(0xFFFFB3D3);
+  static const Color candySecondaryLight = Color(0xFFA6DEC8);
+  static const Color candyTertiaryLight = Color(0xFFD8BBFF);
+
+  // 星海探险：天空蓝、星光金与紫罗兰，夜间保留深蓝天幕。
+  static const Color spacePage = Color(0xFFE8F3FF);
+  static const Color spaceSurface = Color(0xFFF9FCFF);
+  static const Color spaceRaised = Color(0xFFD9E9FC);
+  static const Color spacePrimary = Color(0xFF2558A5);
+  static const Color spaceSecondary = Color(0xFF7B5100);
+  static const Color spaceTertiary = Color(0xFF6648A3);
+  static const Color spaceInk = Color(0xFF11253F);
+  static const Color spaceMuted = Color(0xFF4D627F);
+  static const Color spaceRule = Color(0xFFB4D1EF);
+  static const Color spaceNight = Color(0xFF101F3B);
+  static const Color spaceNightSurface = Color(0xFF1D3153);
+  static const Color spaceNightRaised = Color(0xFF2B4267);
+  static const Color spaceNightInk = Color(0xFFE9F3FF);
+  static const Color spaceNightMuted = Color(0xFFB4C9E5);
+  static const Color spaceNightRule = Color(0xFF47668C);
+  static const Color spacePrimaryLight = Color(0xFFA8CEFF);
+  static const Color spaceSecondaryLight = Color(0xFFFFE096);
+  static const Color spaceTertiaryLight = Color(0xFFC9BEFF);
+
   /// 印章红：勋章 / 收藏标记
   static const Color poemSeal = Color(0xFFA83E3E);
 

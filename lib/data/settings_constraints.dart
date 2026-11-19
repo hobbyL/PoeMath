@@ -1,4 +1,5 @@
 import 'package:poemath/domain/math_entry_kind.dart';
+import 'package:poemath/domain/app_subject.dart';
 import 'package:poemath/domain/completion_sound.dart';
 import 'package:poemath/domain/answer_feedback_sound.dart';
 import 'package:poemath/domain/daily_goal_activity.dart';
@@ -31,7 +32,7 @@ class SettingsConstraints {
       'tts_speed' =>
         value is num && value.isFinite && value >= 0.1 && value <= 1.0,
       'theme_mode' => const ['system', 'light', 'dark'].contains(value),
-      'active_subject' => const ['poem', 'math'].contains(value),
+      'active_subject' => AppSubject.fromId(value) != null,
       'selected_semester' => const ['上', '下'].contains(value),
       'math_difficulty' => const ['easy', 'medium', 'hard'].contains(value),
       'math_practice_mode' => const [

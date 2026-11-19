@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
-import 'package:poemath/core/theme/ink_theme.dart';
 import 'package:poemath/core/theme/math_theme.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
@@ -137,7 +136,7 @@ void main() {
         await drainHiveWritesForTesting(tester);
         await tester.runAsync(
           () => precacheImage(
-            AssetImage(theme.extension<InkThemeExt>()!.heroImage),
+            AssetImage(theme.extension<AppAppearance>()!.heroImage),
             tester.element(find.byType(HomePage)),
           ),
         );

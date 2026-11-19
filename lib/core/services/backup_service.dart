@@ -119,7 +119,7 @@ const Map<String, String> _settingsValueType = <String, String>{
   ImageGenerationProviderConfig.providersSettingsKey: 'string', // 生图供应商列表
   ImageGenerationProviderConfig.activeProviderSettingsKey: 'string', // 生效生图供应商
   'theme_mode': 'string', // 外观模式 system/light/dark
-  'active_subject': 'string', // 当前主题 poem/math
+  'active_subject': 'string', // AppSubject.name，由 SettingsConstraints 校验
   SettingsRepository.pageAnimationsEnabledKey: 'bool', // 页面动画开关，跨设备用户偏好
   'sound_enabled': 'bool', // 音效开关
   CompletionSound.settingsKey: 'string', // 练习完成提示音，跨设备用户偏好

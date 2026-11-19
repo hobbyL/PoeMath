@@ -52,15 +52,17 @@ class TypographyTokens {
   ];
 
   /// 诗句正文样式（挂到 PoemThemeExt.poemContent）
-  static TextStyle poemContentStyle({Color color = ColorTokens.poemInk}) =>
-      TextStyle(
-        fontSize: fsPoemContent,
-        height: 1.8,
-        letterSpacing: 2.0,
-        color: color,
-        fontFamily: inkFontFamily,
-        fontFamilyFallback: serifFallback,
-      );
+  static TextStyle poemContentStyle({
+    Color color = ColorTokens.poemInk,
+    String? fontFamily = inkFontFamily,
+  }) => TextStyle(
+    fontSize: fsPoemContent,
+    height: 1.8,
+    letterSpacing: 2.0,
+    color: color,
+    fontFamily: fontFamily,
+    fontFamilyFallback: fontFamily == null ? null : serifFallback,
+  );
 
   /// 口算题目大数字样式（挂到 MathThemeExt.problemNumber）
   static TextStyle mathProblemStyle({Color color = ColorTokens.mathTextDark}) =>

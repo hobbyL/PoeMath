@@ -96,7 +96,12 @@ void main() {
         }
 
         expect(tester.getTopLeft(_background), Offset.zero);
-        expectStatusBar(Brightness.light);
+        final headerIcons =
+            brightness == Brightness.light &&
+                (subject == AppSubject.candy || subject == AppSubject.space)
+            ? Brightness.dark
+            : Brightness.light;
+        expectStatusBar(headerIcons);
         final scroll = tester.state<ScrollableState>(
           find.byType(Scrollable).first,
         );
@@ -107,7 +112,7 @@ void main() {
         );
         scroll.position.jumpTo(0);
         await tester.pump();
-        expectStatusBar(Brightness.light);
+        expectStatusBar(headerIcons);
       });
     }
   }

@@ -350,7 +350,7 @@ class _NavigationTab extends StatelessWidget {
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(
-                        SpacingTokens.radiusSmall,
+                        theme.appearance.navigationRadius,
                       ),
                     ),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,

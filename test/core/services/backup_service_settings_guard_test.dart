@@ -146,6 +146,23 @@ void main() {
     return jsonEncode(<String, dynamic>{'version': 1, 'settings': settings});
   }
 
+  test('童趣主题经真实备份导出恢复，未知主题保留已有选择', () async {
+    final settings = SettingsRepository();
+    for (final id in ['candy', 'space', 'poem', 'math']) {
+      await settings.setActiveSubject(id);
+      final exported = await backupService.exportToJson();
+      expect((jsonDecode(exported)['settings'] as Map)['active_subject'], id);
+      await settings.setActiveSubject(id == 'poem' ? 'math' : 'poem');
+      await backupService.restoreFromJson(exported);
+      expect(settings.activeSubject, id);
+    }
+    await settings.setActiveSubject('space');
+    await backupService.restoreFromJson(
+      await backupWithSettings({'active_subject': 'unknown'}),
+    );
+    expect(settings.activeSubject, 'space');
+  });
+
   test('页面动画偏好真实导出恢复，旧备份缺失或类型损坏时保留本机选择', () async {
     final settings = SettingsRepository();
     await settings.setPageAnimationsEnabled(false);

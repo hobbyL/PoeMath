@@ -75,10 +75,7 @@ class SettingsPage extends ConsumerWidget {
         MediaQuery.platformBrightnessOf(context) == Brightness.dark,
     };
 
-    final subjectLabel = switch (subject) {
-      AppSubject.poem => '宣纸 · 松墨',
-      AppSubject.math => '宣纸 · 赭石',
-    };
+    final subjectLabel = subject.label;
 
     final modeLabel = switch (mode) {
       ThemeMode.system => '跟随系统',
@@ -516,19 +513,15 @@ class SettingsPage extends ConsumerWidget {
                         ref.read(activeSubjectProvider.notifier).setSubject(v);
                         Navigator.pop(ctx);
                       },
-                      child: const Column(
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          RadioListTile<AppSubject>(
-                            title: Text('宣纸 · 松墨'),
-                            subtitle: Text('青白素宣 · 松绿冷墨 · 松枝山水'),
-                            value: AppSubject.poem,
-                          ),
-                          RadioListTile<AppSubject>(
-                            title: Text('宣纸 · 赭石'),
-                            subtitle: Text('暖黄旧纸 · 棕墨朱砂 · 梅枝书案'),
-                            value: AppSubject.math,
-                          ),
+                          for (final choice in AppSubject.values)
+                            RadioListTile<AppSubject>(
+                              title: Text(choice.label),
+                              subtitle: Text(choice.description),
+                              value: choice,
+                            ),
                         ],
                       ),
                     ),

@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
-import 'package:poemath/core/theme/ink_theme.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/hero_starlight_painter.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
@@ -24,6 +23,19 @@ class AnimatedHeroColors {
     final dark = theme.brightness == Brightness.dark;
     final starlight = style == AnimatedHeroStyle.starlight;
     final scheme = theme.colorScheme;
+    if (theme.appearance.playful) {
+      return AnimatedHeroColors._(
+        foreground: scheme.onSurface,
+        base: dark
+            ? scheme.surface
+            : Color.alphaBlend(
+                scheme.primary.withValues(alpha: .06),
+                scheme.surface,
+              ),
+        depth: dark ? theme.scaffoldBackgroundColor : scheme.primaryContainer,
+        glow: scheme.tertiaryContainer,
+      );
+    }
     final accent = starlight
         ? Color.lerp(scheme.primary, scheme.tertiary, .18)!
         : scheme.primary;
@@ -237,9 +249,10 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                         children: [
                                           CustomPaint(
                                                 painter:
-                                                    widget.style ==
-                                                        AnimatedHeroStyle
-                                                            .starlight
+                                                    !theme.appearance.playful &&
+                                                        widget.style ==
+                                                            AnimatedHeroStyle
+                                                                .starlight
                                                     ? HeroStarlightPainter(
                                                         base: colors.base,
                                                         depth: colors.depth,
@@ -258,6 +271,12 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                             colors.foreground,
                                                         glow: colors.glow,
                                                         motion: _motion,
+                                                        minimumContrast:
+                                                            theme
+                                                                .appearance
+                                                                .playful
+                                                            ? 12
+                                                            : 6.5,
                                                         pull:
                                                             stretch /
                                                             (height + stretch),
@@ -271,18 +290,20 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                               ),
                                           RepaintBoundary(
                                             child: Image.asset(
-                                              theme
-                                                      .extension<InkThemeExt>()
-                                                      ?.heroImage ??
-                                                  'assets/images/ink_landscape_overlay.png',
+                                              theme.appearance.heroImage,
                                               fit: BoxFit.cover,
                                               alignment: Alignment.centerRight,
                                               cacheWidth: 640,
-                                              color: colors.foreground,
-                                              opacity:
-                                                  const AlwaysStoppedAnimation(
-                                                    .14,
-                                                  ),
+                                              color: theme.appearance.playful
+                                                  ? null
+                                                  : colors.foreground,
+                                              opacity: AlwaysStoppedAnimation(
+                                                theme.appearance.playful &&
+                                                        theme.brightness ==
+                                                            Brightness.light
+                                                    ? .4
+                                                    : .14,
+                                              ),
                                               excludeFromSemantics: true,
                                             ),
                                           ),
@@ -453,10 +474,23 @@ class HeroStatusTag extends StatelessWidget {
       style: AnimatedHeroStyle.starlight,
     );
     final motion = context.dependOnInheritedWidgetOfExactType<_HeroMotion>()!;
+    final decoration = theme.appearance.playful
+        ? HeroTagStyle(
+            accent: Color.lerp(
+              theme.colorScheme.primary,
+              theme.colorScheme.tertiary,
+              style.emphasis,
+            )!,
+            secondaryAccent: theme.colorScheme.secondary,
+            emphasis: style.emphasis,
+            trailCount: style.trailCount,
+            sparkleCount: style.sparkleCount,
+          )
+        : style;
     return RepaintBoundary(
       child: CustomPaint(
         foregroundPainter: _HeroTagEdgePainter(
-          style: style,
+          style: decoration,
           foreground: colors.foreground,
           motion: motion.animation,
           phaseOffset: phaseOffset,
@@ -466,8 +500,8 @@ class HeroStatusTag extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color.lerp(colors.depth, style.accent, .24)!,
-              Color.lerp(colors.depth, style.secondaryAccent, .08)!,
+              Color.lerp(colors.depth, decoration.accent, .24)!,
+              Color.lerp(colors.depth, decoration.secondaryAccent, .08)!,
             ],
           ),
           borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
@@ -479,7 +513,11 @@ class HeroStatusTag extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               ExcludeSemantics(
-                child: Icon(icon, size: SpacingTokens.md, color: style.accent),
+                child: Icon(
+                  icon,
+                  size: SpacingTokens.md,
+                  color: decoration.accent,
+                ),
               ),
               const SizedBox(width: SpacingTokens.xs),
               Flexible(
@@ -694,6 +732,7 @@ class _HeroAuroraPainter extends CustomPainter {
     required this.glow,
     required this.pull,
     required this.motion,
+    this.minimumContrast = 6.5,
   }) : super(repaint: motion);
 
   final Color base;
@@ -702,6 +741,7 @@ class _HeroAuroraPainter extends CustomPainter {
   final Color glow;
   final double pull;
   final Animation<double> motion;
+  final double minimumContrast;
 
   // 背景很矮，固定网格足以平滑插值；复用缓冲区，避免逐帧创建点列表。
   static const _columns = 40;
@@ -733,12 +773,12 @@ class _HeroAuroraPainter extends CustomPainter {
       return (math.max(front, back) + .05) / (math.min(front, back) + .05);
     }
 
-    if (contrast(candidate) >= 6.5) return candidate;
+    if (contrast(candidate) >= minimumContrast) return candidate;
     var low = 0.0;
     var high = 1.0;
     for (var step = 0; step < 12; step++) {
       final mix = (low + high) / 2;
-      if (contrast(Color.lerp(depth, candidate, mix)!) >= 6.5) {
+      if (contrast(Color.lerp(depth, candidate, mix)!) >= minimumContrast) {
         low = mix;
       } else {
         high = mix;
@@ -842,5 +882,6 @@ class _HeroAuroraPainter extends CustomPainter {
       oldDelegate.foreground != foreground ||
       oldDelegate.glow != glow ||
       oldDelegate.pull != pull ||
+      oldDelegate.minimumContrast != minimumContrast ||
       oldDelegate.motion != motion;
 }
