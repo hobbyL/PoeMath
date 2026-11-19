@@ -268,7 +268,7 @@ extension _StorageCacheLabels on StorageCacheKind {
 
   String get description => switch (this) {
         StorageCacheKind.textbookCovers => '原书首页生成的封面图片',
-        StorageCacheKind.textbookContent => '目录、逐页文字与页面布局',
+        StorageCacheKind.textbookContent => '目录、逐页文字、页面布局与学习配图',
         StorageCacheKind.textbookAudio => '系统或云端生成的教材音频及校验文件',
         StorageCacheKind.cloudAudio => '本次使用中复用的云端朗读音频',
         StorageCacheKind.images => '用于加快图片显示的闲置解码图片',

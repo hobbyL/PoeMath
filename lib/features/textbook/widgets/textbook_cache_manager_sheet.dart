@@ -338,7 +338,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                     key: ValueKey('cache-empty'),
                     icon: Icons.cleaning_services_outlined,
                     title: '暂无缓存',
-                    description: '目录提取、封面和朗读音频会在使用时自动生成。',
+                    description: '目录、学习配图、封面和朗读音频会在使用时自动生成。',
                     padding: EdgeInsets.all(SpacingTokens.md),
                   ),
                 const SizedBox(height: SpacingTokens.sm),
@@ -374,7 +374,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   title: '目录与提取内容',
                   subtitle: usage.contentFiles > 0
                       ? '${usage.contentFiles} 个文件 · '
-                            '${formatBytes(usage.contentBytes)} · 可重新生成'
+                            '${formatBytes(usage.contentBytes)} · 含文字与学习配图，可重新生成'
                       : '未生成',
                   onDelete: () => _clear(
                     '目录与提取内容',

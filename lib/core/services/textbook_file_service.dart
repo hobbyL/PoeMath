@@ -84,7 +84,7 @@ class TextbookStorageUsage {
   /// 封面 PNG（与目录提取同目录）。
   final int coverBytes;
 
-  /// 目录、逐页文字与版面 JSON。
+  /// 目录、逐页文字、版面 JSON 与学习配图 PNG。
   final int contentBytes;
   final int contentFiles;
 
@@ -512,11 +512,10 @@ class TextbookFileService {
     if (await cacheDirectory.exists()) {
       await for (final entity in cacheDirectory.list(followLinks: false)) {
         if (entity is! File) continue;
-        final name = entity.path.split(Platform.pathSeparator).last;
         final size = await entity.length();
-        if (name.startsWith('cover-v') && name.endsWith('.png')) {
+        if (TextbookCoverCache.isCoverFile(entity.path)) {
           coverBytes += size;
-        } else if (name.endsWith('.json')) {
+        } else {
           contentBytes += size;
           contentFiles++;
         }

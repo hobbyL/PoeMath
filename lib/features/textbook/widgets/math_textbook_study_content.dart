@@ -18,6 +18,7 @@ class MathTextbookStudyContent extends StatefulWidget {
     this.showTitle = true,
     this.showTextToggle = true,
     this.forceSourcePreview = false,
+    this.workedExample = false,
   });
   final Textbook book;
   final MathTextbookBlock block;
@@ -25,6 +26,7 @@ class MathTextbookStudyContent extends StatefulWidget {
   final bool showTitle;
   final bool showTextToggle;
   final bool forceSourcePreview;
+  final bool workedExample;
   @override
   State<MathTextbookStudyContent> createState() =>
       _MathTextbookStudyContentState();
@@ -65,6 +67,7 @@ class _MathTextbookStudyContentState extends State<MathTextbookStudyContent> {
                 source: source,
                 expandToWidth: true,
                 framed: false,
+                workedExample: widget.workedExample,
               ),
             ),
         ],
@@ -109,12 +112,14 @@ class MathTextbookSourceContentPage extends StatelessWidget {
     required this.title,
     required this.blocks,
     this.knowledgePoint = false,
+    this.workedExample = false,
     this.bottomAction,
   });
   final Textbook book;
   final String title;
   final List<MathTextbookBlock> blocks;
   final bool knowledgePoint;
+  final bool workedExample;
   final Widget? bottomAction;
   @override
   Widget build(BuildContext context) {
@@ -153,7 +158,7 @@ class MathTextbookSourceContentPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (newPage && !knowledgePoint)
+                  if (newPage && !knowledgePoint && !workedExample)
                     AppTile(
                       flat: true,
                       icon: Icons.menu_book_outlined,
@@ -176,9 +181,10 @@ class MathTextbookSourceContentPage extends StatelessWidget {
                     MathTextbookStudyContent(
                       book: book,
                       block: block,
-                      framed: !knowledgePoint,
-                      showTitle: !knowledgePoint,
-                      showTextToggle: !knowledgePoint,
+                      framed: !knowledgePoint && !workedExample,
+                      showTitle: !knowledgePoint && !workedExample,
+                      showTextToggle: !knowledgePoint && !workedExample,
+                      workedExample: workedExample,
                     ),
                 ],
               ),

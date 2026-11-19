@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:poemath/core/services/cache_file_storage.dart';
 import 'package:poemath/core/services/textbook_cover_cache.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
 import 'package:poemath/data/models/textbook_page_numbers.dart';
@@ -30,6 +32,7 @@ class TextbookContentCache {
   static const layoutVersion = 2;
   static const _maxBookLayoutBytes = 64 * 1024 * 1024;
   static const _maxMemoryLayouts = 4;
+  static const _maxMathImageBytes = 16 * 1024 * 1024;
   final Textbook book;
   final Future<Directory> Function() _directoryProvider;
   final _texts = <int, String>{};
@@ -81,22 +84,30 @@ class TextbookContentCache {
     }
   }
 
-  Future<void> _write(String name, Object data, int generation) {
+  Future<void> _write(String name, Object data, int generation) async {
+    try {
+      final bytes = utf8.encode(jsonEncode(_envelope(data)));
+      if (bytes.length > _maxFileBytes ||
+          (name.startsWith('page-') &&
+              bytes.length > _maxBookTextBytes ~/ book.pageCount) ||
+          (name.startsWith('layout-') &&
+              bytes.length > _maxBookLayoutBytes ~/ book.pageCount)) {
+        return;
+      }
+      await _writeBytes('$name.json', bytes, generation);
+    } on Object {
+      // Derived data must not make its usable source result fail.
+    }
+  }
+
+  Future<void> _writeBytes(String name, List<int> bytes, int generation) {
     final result = _writes.then((_) async {
       File? pending;
       try {
         if (generation != _generation) return;
-        final bytes = utf8.encode(jsonEncode(_envelope(data)));
-        if (bytes.length > _maxFileBytes ||
-            (name.startsWith('page-') &&
-                bytes.length > _maxBookTextBytes ~/ book.pageCount) ||
-            (name.startsWith('layout-') &&
-                bytes.length > _maxBookLayoutBytes ~/ book.pageCount)) {
-          return;
-        }
         final directory = await (await _directory()).create(recursive: true);
         if (generation != _generation) return;
-        final target = File('${directory.path}/$name.json');
+        final target = File('${directory.path}/$name');
         pending = File(
           '${target.path}.${Random.secure().nextInt(1 << 32)}.pending',
         );
@@ -118,6 +129,64 @@ class TextbookContentCache {
     });
     _writes = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     return result;
+  }
+
+  /// Persist both empty and non-empty completed diagram selections. A cache
+  /// clear invalidates the entire operation, including work still extracting.
+  Future<List<MathTextbookRegion>> mathKnowledgeRegions(
+    String key,
+    Future<List<MathTextbookRegion>> Function() load,
+  ) async {
+    if (!Textbook.isValidId(key)) throw ArgumentError.value(key, 'key');
+    final generation = revision;
+    void check() {
+      if (generation != revision) throw StateError('原书缓存已失效');
+    }
+
+    final raw = await _read('math-knowledge-$key');
+    check();
+    if (raw is List && raw.length <= 4000) {
+      try {
+        final regions = raw.map(MathTextbookRegion.fromJson).toList();
+        if (regions.every((r) => r.page <= book.pageCount)) return regions;
+      } on Object {
+        // Invalid cached coordinates are rebuilt from the original page.
+      }
+    }
+    final regions = await load();
+    check();
+    await _write(
+      'math-knowledge-$key',
+      regions.map((r) => r.toJson()).toList(),
+      generation,
+    );
+    check();
+    return regions;
+  }
+
+  Future<Uint8List?> readMathImage(String key) async {
+    if (!Textbook.isValidId(key)) throw ArgumentError.value(key, 'key');
+    final generation = revision;
+    try {
+      final file = File('${(await _directory()).path}/math-image-$key.png');
+      if (!await file.exists() || await file.length() > _maxMathImageBytes) {
+        return null;
+      }
+      final bytes = await file.readAsBytes();
+      return generation == revision ? bytes : null;
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> writeMathImage(
+    String key,
+    Uint8List bytes, {
+    required int generation,
+  }) {
+    if (!Textbook.isValidId(key)) throw ArgumentError.value(key, 'key');
+    if (bytes.length > _maxMathImageBytes) return Future<void>.value();
+    return _writeBytes('math-image-$key.png', bytes, generation);
   }
 
   void _remember(int page, String text) {

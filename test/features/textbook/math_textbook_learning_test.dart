@@ -40,6 +40,8 @@ import '../../helpers/math_textbook_learning_fixture.dart';
 import '../../helpers/parent_access_test_helper.dart';
 
 class _TaskClarityFiles extends TextbookFileService {
+  _TaskClarityFiles(Directory directory)
+    : super(directoryProvider: () async => directory);
   @override
   Future<String?> installedPath(Textbook book) async => '/self-owned-task.pdf';
 }
@@ -294,7 +296,9 @@ void defineMathTextbookLearningTests({
             textbookRepositoryProvider.overrideWithValue(books),
             mathTextbookRepositoryProvider.overrideWithValue(courses),
             textbookCatalogProvider.overrideWith((ref) async => []),
-            textbookFileServiceProvider.overrideWithValue(_TaskClarityFiles()),
+            textbookFileServiceProvider.overrideWithValue(
+              _TaskClarityFiles(directory),
+            ),
             mathTextbookRegionRendererProvider.overrideWithValue((
               path,
               source,
@@ -420,6 +424,16 @@ void defineMathTextbookLearningTests({
     await tester.pump();
   }
 
+  Future<void> waitForImages(WidgetTester tester) => waitFor(tester, () {
+    final previews = find.byType(MathTextbookSourcePreview);
+    return previews.evaluate().isNotEmpty &&
+        find
+                .descendant(of: previews, matching: find.byType(RawImage))
+                .evaluate()
+                .length ==
+            previews.evaluate().length;
+  });
+
   Finder input(String label) => find.byWidgetPredicate(
     (widget) => widget is TextField && widget.decoration?.labelText == label,
   );
@@ -477,6 +491,7 @@ void defineMathTextbookLearningTests({
           renderedSources: rendered,
         );
         await waitFor(tester, () => rendered.isNotEmpty);
+        await waitForImages(tester);
         expect(previous!.items.single.blocks.single.needsSource, isFalse);
         expect(find.text('1 / 1'), findsNothing);
         expect(find.text('原书第1题'), findsNothing);
@@ -725,6 +740,7 @@ void defineMathTextbookLearningTests({
             rendered.any((source) => source.page == 1) &&
             rendered.any((source) => source.page == 2),
       );
+      await waitForImages(tester);
       expect(find.text('教材原题'), findsOneWidget);
       expect(
         find.text('照例2的方法，画一个角并标出顶点和两条边。', findRichText: true),
@@ -1427,6 +1443,7 @@ void defineMathTextbookLearningTests({
           find.byType(MathTextbookPracticePage).evaluate().isNotEmpty &&
           input('你的答案').evaluate().isNotEmpty,
     );
+    await waitForImages(tester);
     tester.view.viewInsets = const FakeViewPadding(bottom: 220);
     await tester.pumpAndSettle();
     await enter(tester, '你的答案', '5');
@@ -1522,6 +1539,7 @@ void defineMathTextbookLearningTests({
     );
     await tap(tester, find.widgetWithText(AppTile, '教材原题'));
     await visible(tester, input('长度'));
+    await waitForImages(tester);
     await enter(tester, '长度', '100厘米');
     await enter(tester, '商', '3');
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);

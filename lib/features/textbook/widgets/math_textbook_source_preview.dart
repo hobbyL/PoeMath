@@ -6,11 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:poemath/core/services/textbook_pdf_source.dart';
+import 'package:poemath/core/services/math_textbook_image_cache.dart';
+import 'package:poemath/core/services/textbook_pdf_page_loader.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/domain/math_textbook_study.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 
 class MathTextbookRenderToken extends TextbookDraftToken {
@@ -31,6 +34,34 @@ typedef MathTextbookRegionRenderer = Future<ui.Image> Function(
 final mathTextbookRegionRendererProvider = Provider<MathTextbookRegionRenderer>(
   (ref) => renderMathTextbookRegion,
 );
+
+final mathTextbookExampleRendererProvider =
+    Provider<MathTextbookRegionRenderer>(
+      (ref) => renderMathTextbookExampleRegion,
+    );
+
+Future<ui.Image> renderMathTextbookExampleRegion(
+  String path,
+  MathTextbookRegion source,
+  MathTextbookRenderToken token,
+) async {
+  token.check();
+  await pdfrxFlutterInitialize();
+  token.check();
+  final document = await PdfDocument.openFile(path);
+  late final MathTextbookRegion bounded;
+  try {
+    final page = await loadTextbookPdfPage(
+      document: document,
+      number: source.page,
+      checkAvailable: token.check,
+    );
+    bounded = mathTextbookExampleRegion(source, page);
+  } finally {
+    await document.dispose();
+  }
+  return renderMathTextbookRegion(path, bounded, token);
+}
 
 /// 仅渲染正在对照的区域。多渲染 32 像素再裁回，避免边缘字形被 PDF 裁切改变。
 Future<ui.Image> renderMathTextbookRegion(
@@ -124,11 +155,13 @@ class MathTextbookSourcePreview extends ConsumerStatefulWidget {
     required this.source,
     this.expandToWidth = false,
     this.framed = true,
+    this.workedExample = false,
   });
   final Textbook book;
   final MathTextbookRegion source;
   final bool expandToWidth;
   final bool framed;
+  final bool workedExample;
   @override
   ConsumerState<MathTextbookSourcePreview> createState() =>
       _MathTextbookSourcePreviewState();
@@ -149,6 +182,7 @@ class _MathTextbookSourcePreviewState
   void didUpdateWidget(MathTextbookSourcePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.book.pdfSha256 != widget.book.pdfSha256 ||
+        oldWidget.workedExample != widget.workedExample ||
         oldWidget.source.toJson().toString() !=
             widget.source.toJson().toString()) {
       unawaited(_load());
@@ -165,14 +199,27 @@ class _MathTextbookSourcePreviewState
       _error = null;
     });
     final files = ref.read(textbookFileServiceProvider);
-    final render = ref.read(mathTextbookRegionRendererProvider);
+    final render = ref.read(
+      widget.workedExample
+          ? mathTextbookExampleRendererProvider
+          : mathTextbookRegionRendererProvider,
+    );
     final cache = files.contentCache(widget.book);
     final revision = cache.revision;
     try {
       final path = await files.installedPath(widget.book);
       token.check();
+      if (revision != cache.revision) {
+        throw const FormatException('原书缓存已变化，请重新加载');
+      }
       if (path == null) throw const FormatException('本地原书已移除，请重新导入同一 PDF 后对照');
-      final image = await render(path, widget.source, token);
+      final image = await cachedMathTextbookImage(
+        cache: cache,
+        source: widget.source,
+        workedExample: widget.workedExample,
+        checkAvailable: token.check,
+        render: () => render(path, widget.source, token),
+      );
       if (!mounted || token.cancelled || revision != cache.revision) {
         image.dispose();
         if (!token.cancelled) throw const FormatException('原书缓存已变化，请重新加载');

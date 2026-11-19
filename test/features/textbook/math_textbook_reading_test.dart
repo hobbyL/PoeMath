@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -16,8 +17,10 @@ import 'package:poemath/features/textbook/widgets/math_textbook_source_preview.d
 import 'package:poemath/features/textbook/widgets/math_textbook_study_content.dart';
 
 import '../../helpers/math_textbook_fixture.dart';
+import '../../helpers/math_textbook_image_test_helper.dart';
 
 class _ReadingFiles extends TextbookFileService {
+  _ReadingFiles(Directory root) : super(directoryProvider: () async => root);
   @override
   Future<String?> installedPath(Textbook book) async => '/self-owned.pdf';
 }
@@ -33,6 +36,10 @@ void defineMathTextbookReadingTests() {
       testWidgets('原书排版、知识点导航及完整阅读交互（知识点：$knowledgePoint，大字：$large）', (
         tester,
       ) async {
+        final root = (await tester.runAsync(
+          () => Directory.systemTemp.createTemp('math-reading-images-'),
+        ))!;
+        addTearDown(() => root.delete(recursive: true));
         final book = mathTextbookFixture();
         const source = MathTextbookRegion(
           page: 1,
@@ -94,7 +101,9 @@ void defineMathTextbookReadingTests() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
-              textbookFileServiceProvider.overrideWithValue(_ReadingFiles()),
+              textbookFileServiceProvider.overrideWithValue(
+                _ReadingFiles(root),
+              ),
               mathTextbookRegionRendererProvider.overrideWithValue((
                 path,
                 source,
@@ -129,7 +138,7 @@ void defineMathTextbookReadingTests() {
             ),
           ),
         );
-        await tester.pumpAndSettle();
+        await settleMathTextbookImages(tester);
         expect(find.text('观察图形并说明你的比较方法。', findRichText: true), findsNothing);
         expect(
           rendered.any(
@@ -204,7 +213,7 @@ void defineMathTextbookReadingTests() {
           200,
           scrollable: find.byType(Scrollable).first,
         );
-        await tester.pumpAndSettle();
+        await settleMathTextbookImages(tester);
         expect(
           rendered.any((r) => r.page == 2 && r.top == 0 && r.bottom == 1),
           isTrue,

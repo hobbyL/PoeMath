@@ -29,6 +29,7 @@ import 'package:poemath/features/textbook/widgets/math_textbook_study_content.da
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/math_textbook_fixture.dart';
 import '../../helpers/math_textbook_learning_fixture.dart';
+import '../../helpers/math_textbook_image_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 
 class _Courses extends MathTextbookCourseRepository {
@@ -79,6 +80,8 @@ class _Courses extends MathTextbookCourseRepository {
 }
 
 class _Files extends TextbookFileService {
+  _Files([Directory? root])
+    : super(directoryProvider: root == null ? null : () async => root);
   @override
   Future<String?> installedPath(Textbook book) async => '/self-owned.pdf';
 }
@@ -197,7 +200,9 @@ void main() {
   final book = mathTextbookFixture();
   late _Courses courses;
   late _Generator generator;
+  late Directory imageCache;
   setUp(() async {
+    imageCache = await Directory.systemTemp.createTemp('math-review-images-');
     await setUpHiveForTesting();
     await unlockParentForTesting();
     await TextbookRepository().addIfAbsent(book);
@@ -209,6 +214,7 @@ void main() {
   tearDown(() async {
     lockParentForTesting();
     await tearDownHiveForTesting();
+    await imageCache.delete(recursive: true);
   });
 
   Future<void> mount(
@@ -228,7 +234,7 @@ void main() {
         overrides: [
           mathTextbookRepositoryProvider.overrideWithValue(courses),
           mathTextbookGenerationServiceProvider.overrideWithValue(generator),
-          textbookFileServiceProvider.overrideWithValue(_Files()),
+          textbookFileServiceProvider.overrideWithValue(_Files(imageCache)),
           textbookCatalogProvider.overrideWith(
             (ref) async => knownCatalog
                 ? [
@@ -273,7 +279,7 @@ void main() {
       ),
     );
     if (settle) {
-      await tester.pumpAndSettle();
+      await settleMathTextbookImages(tester);
     } else {
       await tester.pump();
     }
@@ -293,7 +299,7 @@ void main() {
       scrollable: find.byType(Scrollable).first,
       maxScrolls: 30,
     );
-    await tester.pumpAndSettle();
+    await settleMathTextbookImages(tester);
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
   }
@@ -341,7 +347,7 @@ void main() {
       ),
     );
     await tester.tap(find.text('原书第1题'));
-    await tester.pumpAndSettle();
+    await settleMathTextbookImages(tester);
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
@@ -368,7 +374,7 @@ void main() {
     expect(find.textContaining('把2个圆和3个圆合在一起'), findsOneWidget);
     await visible(tester, find.text('你的答案'));
     await tester.tap(find.text('你的答案'));
-    await tester.pumpAndSettle();
+    await settleMathTextbookImages(tester);
     expect(find.text('编辑作答项'), findsOneWidget);
     expect(
       tester
@@ -414,7 +420,7 @@ void main() {
       ),
     );
     await tester.tap(find.text('合并数量'));
-    await tester.pumpAndSettle();
+    await settleMathTextbookImages(tester);
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
@@ -1159,7 +1165,7 @@ void main() {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
-    await tester.pumpAndSettle();
+    await settleMathTextbookImages(tester);
     await visible(tester, input('文字内容'));
     await tester.enterText(input('文字内容'), '家长补齐的文字');
     await tester.tap(find.byTooltip('返回'));
@@ -1204,7 +1210,7 @@ void main() {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
-    await tester.pumpAndSettle();
+    await settleMathTextbookImages(tester);
     expect(find.byType(MathTextbookSourcePreview), findsOneWidget);
     await tester.tap(find.text('新整理结果'));
     await tester.pumpAndSettle();

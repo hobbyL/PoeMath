@@ -34,8 +34,8 @@ void main() {
     toc = await File('${cacheDirectory.path}/toc.json').writeAsString('{}');
     page = await File('${cacheDirectory.path}/page-1.json')
         .writeAsString('{"a":1}');
-    cover =
-        await File('${cacheDirectory.path}/cover-v1.png').writeAsBytes([0, 0, 0]);
+    cover = await File('${cacheDirectory.path}/cover-v1.png')
+        .writeAsBytes([0, 0, 0]);
     await File('${audioDirectory.path}/key.mp3').writeAsBytes([1, 2, 3, 4]);
     // 元数据不计入音频占用。
     await File('${audioDirectory.path}/key.mp3.json').writeAsString('{}');
@@ -72,6 +72,23 @@ void main() {
 
     await service.clearCover(book);
     expect(await cover.exists(), isFalse);
+    expect(await pdf.exists(), isTrue);
+    expect(await course.exists(), isTrue);
+  });
+
+  test('学习配图和练习图片计入本书内容缓存，清理时一起移除', () async {
+    final image = await File('${cacheDirectory.path}/math-image-sample.png')
+        .writeAsBytes([1, 2, 3, 4]);
+    final regions = await File(
+      '${cacheDirectory.path}/math-knowledge-sample.json',
+    ).writeAsString('[]');
+    final usage = await service.storageUsage(book);
+    expect(usage.contentFiles, 4);
+    expect(usage.contentBytes, '{}'.length + '{"a":1}'.length + 4 + 2);
+    await service.clearExtractedContent(book);
+    expect(await image.exists(), isFalse);
+    expect(await regions.exists(), isFalse);
+    expect(await cover.exists(), isTrue);
     expect(await pdf.exists(), isTrue);
     expect(await course.exists(), isTrue);
   });
