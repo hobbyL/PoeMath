@@ -16,6 +16,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/widgets/stat_overview_card.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -45,6 +47,7 @@ Future<_RouteProbe> _pumpTab(
   Size size = const Size(800, 1600),
   double textScale = 1,
   bool home = false,
+  ThemeData? theme,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -101,6 +104,7 @@ Future<_RouteProbe> _pumpTab(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp.router(
+        theme: theme,
         routerConfig: router,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context)
@@ -118,6 +122,53 @@ Future<_RouteProbe> _pumpTab(
 void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
+
+  for (final subject in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('数学统计卡完整位于滚动区域内：$subject/$brightness', (tester) async {
+        final container = ProviderContainer(
+          overrides: [
+            totalProblemsCountProvider.overrideWith((ref) => 21),
+            overallAccuracyProvider.overrideWith((ref) => .48),
+            mistakeCountProvider.overrideWith((ref) => 11),
+            subjectTextbooksProvider(TextbookSubject.math)
+                .overrideWith((ref) => const []),
+          ],
+        );
+        addTearDown(container.dispose);
+        await _pumpTab(
+          tester,
+          container: container,
+          home: true,
+          size: const Size(411, 914),
+          theme: AppTheme.resolve(subject: subject, brightness: brightness),
+        );
+        final stats = find.byType(StatOverviewCard);
+        final viewport = find.ancestor(
+          of: stats,
+          matching: find.byType(Viewport),
+        );
+        final statsBounds = tester.getRect(stats);
+        final viewportBounds = tester.getRect(viewport);
+        // 手账的统计无独立边框；其余主题的外侧描边需要完整绘制空间。
+        expect(
+          statsBounds.top - viewportBounds.top,
+          subject == AppSubject.candy
+              ? greaterThanOrEqualTo(0)
+              : greaterThanOrEqualTo(4),
+        );
+        for (final label in ['21', '48%', '11', '已做题', '正确率', '错题']) {
+          final text = find.descendant(of: stats, matching: find.text(label));
+          expect(text.hitTestable(), findsOneWidget);
+          expect(tester.getRect(text).top, greaterThan(viewportBounds.top));
+        }
+        expect(statsBounds.bottom, lessThan(viewportBounds.bottom));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await drainHiveWritesForTesting(tester);
+      });
+    }
+  }
 
   for (final large in [false, true]) {
     testWidgets('数学导航按钮直接打开原工具，课本切换后恢复（大字号：$large）', (tester) async {

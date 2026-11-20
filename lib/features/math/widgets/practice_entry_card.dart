@@ -14,21 +14,37 @@ class PracticeEntryCard extends StatelessWidget {
     required this.title,
     required this.description,
     required this.onTap,
+    this.accent,
   });
 
   final IconData icon;
   final String title;
   final String description;
   final VoidCallback onTap;
+  final Color? accent;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
+    final primary = theme.appearance.storybook
+        ? accent ?? theme.colorScheme.primary
+        : theme.colorScheme.primary;
     final playful = theme.appearance.playful;
+
+    if (theme.appearance.space) {
+      return AppTile(
+        icon: icon,
+        iconColor: primary,
+        title: title,
+        subtitle: description,
+        trailingIcon: Icons.arrow_forward_rounded,
+        onTap: onTap,
+      );
+    }
 
     return ColoredCard(
       color: primary,
+      backgroundOpacity: playful ? .1 : .02,
       onTap: onTap,
       padding: const EdgeInsets.all(SpacingTokens.md),
       child: Column(
@@ -37,11 +53,7 @@ class PracticeEntryCard extends StatelessWidget {
             : CrossAxisAlignment.start,
         children: [
           if (playful)
-            CircleAvatar(
-              backgroundColor: theme.colorScheme.primaryContainer,
-              radius: SpacingTokens.lg,
-              child: Icon(icon, size: SpacingTokens.xl, color: primary),
-            )
+            Icon(icon, color: primary, size: SpacingTokens.xl)
           else
             Row(
               children: [

@@ -268,18 +268,20 @@ class MathTabPage extends ConsumerWidget {
             final gridWidth = constraints.maxWidth - SpacingTokens.md * 2;
             final entryFontSize = theme.textTheme.titleSmall!.fontSize!;
             final entryScale = textScaler.scale(entryFontSize) / entryFontSize;
-            final columns = (gridWidth / (160 * entryScale)).floor().clamp(
-              entryScale > 1.3 ? 1 : 2,
-              4,
-            );
+            final columns = theme.appearance.space
+                ? (gridWidth / (360 * entryScale)).floor().clamp(1, 2)
+                : (gridWidth / (160 * entryScale)).floor().clamp(
+                    entryScale > 1.3 ? 1 : 2,
+                    4,
+                  );
 
-            return ListView(
-              // 顶部 0：统计卡与 AppBar 下沿之间不留白。左右保持 md
-              //（Tab 页统一值）。
-              padding: const EdgeInsets.fromLTRB(
-                SpacingTokens.md,
-                0,
-                SpacingTokens.md,
+            final list = ListView(
+              // 为首张卡片的外侧描边留出空间，避免被滚动视口裁掉顶边。
+              // 手账已有阅读面留白，且统计不绘制独立边框。
+              padding: EdgeInsets.fromLTRB(
+                theme.appearance.storybook ? 0 : SpacingTokens.md,
+                theme.appearance.storybook ? 0 : SpacingTokens.sm,
+                theme.appearance.storybook ? 0 : SpacingTokens.md,
                 SpacingTokens.md,
               ),
               children: [
@@ -339,6 +341,9 @@ class MathTabPage extends ConsumerWidget {
                   ],
               ],
             );
+            return theme.appearance.storybook
+                ? ThemePagePanel(child: list)
+                : list;
           },
         ),
       ),
@@ -380,6 +385,12 @@ class MathTabPage extends ConsumerWidget {
       }
     }
     return PracticeEntryCard(
+      accent: switch (kind) {
+        MathEntryKind.wordProblem => theme.colorScheme.tertiary,
+        MathEntryKind.challenge => theme.semantic.caution,
+        MathEntryKind.vertical => theme.colorScheme.secondary,
+        _ => theme.colorScheme.primary,
+      },
       icon: appearance.icon,
       title: appearance.title,
       description: description,

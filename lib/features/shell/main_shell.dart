@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/services/notification_service.dart';
@@ -265,6 +266,26 @@ class _MainShellState extends ConsumerState<MainShell>
   Widget build(BuildContext context) {
     final currentIndex = _indexFromRoute(context);
     final assistantEnabled = ref.watch(assistantEnabledProvider);
+    final theme = Theme.of(context);
+    final navigation = NavigationBar(
+      height: theme.appearance.space
+          ? SpacingTokens.xxl + SpacingTokens.lg
+          : SpacingTokens.xl * 2,
+      backgroundColor: theme.appearance.storybook ? Colors.transparent : null,
+      selectedIndex: currentIndex,
+      onDestinationSelected: _switch,
+      destinations: [
+        for (var i = 0; i < _destinations.length; i++)
+          _NavigationTab(
+            key: ValueKey('navigation-tab-${_destinations[i].label}'),
+            selected: i == currentIndex,
+            label: _destinations[i].label,
+            icon: _destinations[i].icon,
+            selectedIcon: _destinations[i].selectedIcon,
+            onTap: () => _switch(i),
+          ),
+      ],
+    );
 
     return Scaffold(
       body: Stack(
@@ -273,22 +294,26 @@ class _MainShellState extends ConsumerState<MainShell>
           if (assistantEnabled) const DraggableAssistantBubble(),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        height: SpacingTokens.xl * 2,
-        selectedIndex: currentIndex,
-        onDestinationSelected: _switch,
-        destinations: [
-          for (var i = 0; i < _destinations.length; i++)
-            _NavigationTab(
-              key: ValueKey('navigation-tab-${_destinations[i].label}'),
-              selected: i == currentIndex,
-              label: _destinations[i].label,
-              icon: _destinations[i].icon,
-              selectedIcon: _destinations[i].selectedIcon,
-              onTap: () => _switch(i),
-            ),
-        ],
-      ),
+      bottomNavigationBar: theme.appearance.storybook
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(
+                SpacingTokens.md,
+                SpacingTokens.sm,
+                SpacingTokens.md,
+                SpacingTokens.sm,
+              ),
+              child: ColoredCard(
+                color: theme.colorScheme.primary,
+                padding: EdgeInsets.zero,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(
+                    theme.appearance.cardRadius,
+                  ),
+                  child: navigation,
+                ),
+              ),
+            )
+          : navigation,
     );
   }
 }
@@ -314,13 +339,27 @@ class _NavigationTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final states = <WidgetState>{if (selected) WidgetState.selected};
-    final labelStyle =
+    final defaultLabelStyle =
         theme.navigationBarTheme.labelTextStyle?.resolve(states) ??
         theme.textTheme.labelMedium!.copyWith(
           color: selected
               ? theme.colorScheme.onPrimary
               : theme.colorScheme.onSurfaceVariant,
         );
+    final labelStyle = theme.appearance.space
+        ? defaultLabelStyle.copyWith(
+            color: selected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurfaceVariant,
+          )
+        : defaultLabelStyle;
+    final labelWidget = Text(label);
+    final glyph = Icon(
+      selected ? selectedIcon : icon,
+      size: theme.appearance.storybook
+          ? SpacingTokens.lg - SpacingTokens.xs
+          : SpacingTokens.lg,
+    );
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: SpacingTokens.xxl * 2),
@@ -339,7 +378,9 @@ class _NavigationTab extends StatelessWidget {
                   style: TextButton.styleFrom(
                     foregroundColor: labelStyle.color,
                     backgroundColor: selected
-                        ? theme.colorScheme.primary
+                        ? theme.appearance.space
+                              ? theme.colorScheme.primaryContainer
+                              : theme.colorScheme.primary
                         : Colors.transparent,
                     textStyle: labelStyle,
                     iconSize: SpacingTokens.lg,
@@ -358,15 +399,24 @@ class _NavigationTab extends StatelessWidget {
                         ? Duration.zero
                         : const Duration(milliseconds: 200),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(selected ? selectedIcon : icon),
-                      const SizedBox(width: SpacingTokens.xs),
-                      Text(label),
-                    ],
-                  ),
+                  child: theme.appearance.space
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            glyph,
+                            const SizedBox(height: SpacingTokens.xs),
+                            labelWidget,
+                          ],
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            glyph,
+                            const SizedBox(width: SpacingTokens.xs),
+                            labelWidget,
+                          ],
+                        ),
                 ),
               ),
             ),

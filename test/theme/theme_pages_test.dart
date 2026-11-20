@@ -314,7 +314,7 @@ void main() {
         for (final name in ['做口算', '查公式', '错题本', '7']) {
           expectReadableText(tester, find.text(name));
         }
-        _expectPrimaryTiles(tester, theme);
+        _expectTileIcons(tester);
         await _unmount(tester);
         await _pump(tester, theme, const SettingsPage());
         await tester.tap(find.text('外观与反馈'));
