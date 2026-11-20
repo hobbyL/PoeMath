@@ -118,11 +118,7 @@ class _CelebrationDialogContentState extends State<_CelebrationDialogContent> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // 动画图标
-                      Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: type.color.withValues(alpha: 0.15),
-                            ),
+                      Padding(
                             padding: const EdgeInsets.all(SpacingTokens.md),
                             child: Icon(type.icon, size: 60, color: type.color),
                           )

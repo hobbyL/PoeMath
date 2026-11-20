@@ -753,21 +753,12 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: (isSelected ? color : theme.colorScheme.onSurfaceVariant)
-                  .withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
-            ),
-            child: Icon(
-              icon,
-              color: isSelected
-                  ? (foreground ?? color)
-                  : theme.colorScheme.onSurfaceVariant,
-              size: 22,
-            ),
+          Icon(
+            icon,
+            color: isSelected
+                ? (foreground ?? color)
+                : theme.colorScheme.onSurfaceVariant,
+            size: 22,
           ),
           const SizedBox(width: SpacingTokens.md),
           Expanded(

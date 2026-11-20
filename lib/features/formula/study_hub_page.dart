@@ -133,13 +133,9 @@ class StudyHubPage extends ConsumerWidget {
                           backgroundOpacity: 0.06,
                           child: Row(
                             children: [
-                              CircleAvatar(
-                                backgroundColor: theme.colorScheme.primary
-                                    .withValues(alpha: 0.15),
-                                child: Icon(
-                                  Icons.functions,
-                                  color: theme.colorScheme.primary,
-                                ),
+                              Icon(
+                                Icons.functions,
+                                color: theme.colorScheme.primary,
                               ),
                               const SizedBox(width: SpacingTokens.md),
                               Expanded(

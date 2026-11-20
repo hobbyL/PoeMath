@@ -205,13 +205,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // 图标
-                Container(
+                SizedBox(
                       width: 120,
                       height: 120,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        shape: BoxShape.circle,
-                      ),
                       child: Icon(
                         data.icon,
                         size: 56,

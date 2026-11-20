@@ -241,23 +241,12 @@ class _AchievementTile extends StatelessWidget {
         child: Row(
           children: [
             // 图标
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: isUnlocked
-                    ? color.withValues(alpha: 0.15)
-                    : theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                icon,
-                size: 24,
-                color: isUnlocked
-                    ? color
-                    : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-              ),
+            Icon(
+              icon,
+              size: SpacingTokens.lg,
+              color: isUnlocked
+                  ? color
+                  : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
             ),
             const SizedBox(width: SpacingTokens.md),
 
