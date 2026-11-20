@@ -93,6 +93,12 @@ class ColoredCard extends StatelessWidget {
         backgroundOpacity > 0 &&
         backgroundOpacity < 1;
     final tint = color?.withValues(alpha: backgroundOpacity);
+    final cutCorners =
+        paper && appearance.space && borderRadius == null && border == null;
+    final cutShape = BeveledRectangleBorder(
+      borderRadius: BorderRadius.circular(SpacingTokens.radiusLarge),
+      side: BorderSide(color: scheme.outlineVariant),
+    );
     final decoration = BoxDecoration(
       color: gradient == null
           ? (paper ? Color.alphaBlend(tint!, scheme.surface) : tint)
@@ -110,8 +116,7 @@ class ColoredCard extends StatelessWidget {
                   ],
                   AppCardStyle.soft => [
                     BoxShadow(
-                      color: scheme.primary.withValues(alpha: .1),
-                      blurRadius: SpacingTokens.sm,
+                      color: scheme.primary.withValues(alpha: .16),
                       offset: const Offset(0, SpacingTokens.xs),
                     ),
                   ],
@@ -143,14 +148,21 @@ class ColoredCard extends StatelessWidget {
     return Container(
       width: width,
       constraints: constraints,
-      decoration: decoration,
+      decoration: cutCorners
+          ? ShapeDecoration(
+              color: decoration.color,
+              shape: cutShape,
+              shadows: boxShadow,
+            )
+          : decoration,
       child: onTap == null
           ? content
           : Material(
               type: MaterialType.transparency,
               child: InkWell(
                 onTap: onTap,
-                borderRadius: radius,
+                borderRadius: cutCorners ? null : radius,
+                customBorder: cutCorners ? cutShape : null,
                 child: content,
               ),
             ),

@@ -19,6 +19,13 @@ class AppThemeBuilder {
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(appearance.controlRadius),
     );
+    final buttonShape = switch (appearance.visualStyle) {
+      AppVisualStyle.storybook => const StadiumBorder(),
+      AppVisualStyle.space => BeveledRectangleBorder(
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+      ),
+      AppVisualStyle.ink => shape,
+    };
     final fieldBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(appearance.controlRadius),
       borderSide: BorderSide(color: scheme.outlineVariant),
@@ -42,7 +49,7 @@ class AppThemeBuilder {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(0, SpacingTokens.xxl),
-          shape: shape,
+          shape: buttonShape,
           textStyle: text.labelLarge,
         ),
       ),
@@ -50,14 +57,14 @@ class AppThemeBuilder {
         style: ElevatedButton.styleFrom(
           elevation: 0,
           minimumSize: const Size(0, SpacingTokens.xxl),
-          shape: shape,
+          shape: buttonShape,
           textStyle: text.labelLarge,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(0, SpacingTokens.xxl),
-          shape: shape,
+          shape: buttonShape,
           textStyle: text.labelLarge,
         ),
       ),

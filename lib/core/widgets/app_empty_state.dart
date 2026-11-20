@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 
 /// 统一的空内容与无结果提示，可用于页面、Sliver 或列表中的空区域。
@@ -26,6 +26,49 @@ class AppEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final glyph = ExcludeSemantics(
+      child: Icon(
+        icon,
+        size: SpacingTokens.xxl,
+        color: theme.appearance.playful
+            ? theme.colorScheme.primary
+            : theme.colorScheme.primary.withValues(alpha: 0.5),
+      ),
+    );
+    final alignment = theme.appearance.space
+        ? TextAlign.start
+        : TextAlign.center;
+    final message = <Widget>[
+      Semantics(
+        header: true,
+        child: Text(
+          title,
+          textAlign: alignment,
+          style: theme.textTheme.titleMedium,
+        ),
+      ),
+      if (description != null) ...[
+        const SizedBox(height: SpacingTokens.xs),
+        Text(
+          description!,
+          textAlign: alignment,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+      if (actions.isNotEmpty) ...[
+        const SizedBox(height: SpacingTokens.lg),
+        Wrap(
+          alignment: alignment == TextAlign.start
+              ? WrapAlignment.start
+              : WrapAlignment.center,
+          spacing: SpacingTokens.sm,
+          runSpacing: SpacingTokens.sm,
+          children: actions,
+        ),
+      ],
+    ];
     return Center(
       child: SingleChildScrollView(
         primary: false,
@@ -35,43 +78,14 @@ class AppEmptyState extends StatelessWidget {
             maxWidth: ResponsiveLayout.mediumBreakpoint,
           ),
           child: Column(
+            crossAxisAlignment: theme.appearance.space
+                ? CrossAxisAlignment.start
+                : CrossAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              ExcludeSemantics(
-                child: Icon(
-                  icon,
-                  size: SpacingTokens.xxl,
-                  color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                ),
-              ),
+              glyph,
               const SizedBox(height: SpacingTokens.md),
-              Semantics(
-                header: true,
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium,
-                ),
-              ),
-              if (description != null) ...[
-                const SizedBox(height: SpacingTokens.xs),
-                Text(
-                  description!,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-              if (actions.isNotEmpty) ...[
-                const SizedBox(height: SpacingTokens.lg),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: SpacingTokens.sm,
-                  runSpacing: SpacingTokens.sm,
-                  children: actions,
-                ),
-              ],
+              ...message,
             ],
           ),
         ),

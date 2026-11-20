@@ -2,8 +2,8 @@
 enum AppSubject {
   poem('宣纸 · 松墨', '青白素宣 · 松绿冷墨 · 松枝山水'),
   math('宣纸 · 赭石', '暖黄旧纸 · 棕墨朱砂 · 梅枝书案'),
-  candy('奶糖乐园', '奶油粉 · 软萌伙伴 · 轻盈圆角'),
-  space('星海探险', '天空蓝 · 星球火箭 · 活力色块');
+  candy('奶糖乐园', '学习手账 · 云上伙伴 · 贴纸入口'),
+  space('星海探险', '太空舷窗 · 目标航程 · 切角舱面');
 
   const AppSubject(this.label, this.description);
 

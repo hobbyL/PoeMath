@@ -18,6 +18,7 @@ class SpacingTokens {
   static const double xxl = 48.0;
 
   // ============ 圆角 ============
+  static const double radiusCompact = 4.0;
   static const double radiusSmall = 8.0;
   static const double radiusMedium = 8.0;
   static const double radiusLarge = 16.0;

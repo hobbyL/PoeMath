@@ -19,6 +19,8 @@ import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 
+enum AppTileLayout { row, poster }
+
 /// 通用列表行组件。
 ///
 /// 视觉规则继承 [ColoredCard]（纸面 + 细墨线），额外提供：
@@ -56,6 +58,7 @@ class AppTile extends StatelessWidget {
     this.flatTrailingEdgeAligned = false,
     this.selected = false,
     this.crossAxisAlignment = CrossAxisAlignment.center,
+    this.layout = AppTileLayout.row,
   }) : assert(trailing == null || trailingAction == null),
        assert(
          onTrailingTap == null || (trailing == null && trailingAction == null),
@@ -65,7 +68,8 @@ class AppTile extends StatelessWidget {
        assert(trailingTextMaxLines == null || trailingTextMaxLines > 0),
        assert(!selected || flat),
        assert(leadingEdgeWidth == null || leadingEdgeWidth > 0),
-       assert(leadingEdgeWidth == null || (leading != null && !flat));
+       assert(leadingEdgeWidth == null || (leading != null && !flat)),
+       assert(layout != AppTileLayout.poster || leadingEdgeWidth == null);
 
   /// 图标；未提供 [leading] 时展示，省略时不保留图标占位。
   final IconData? icon;
@@ -147,6 +151,9 @@ class AppTile extends StatelessWidget {
 
   /// 主行内前导内容、文本及尾部组件的垂直对齐方式。
   final CrossAxisAlignment crossAxisAlignment;
+
+  /// 海报式入口将图标置于文字上方，保留相同点击和尾部控件规则。
+  final AppTileLayout layout;
 
   @override
   Widget build(BuildContext context) {
@@ -283,19 +290,53 @@ class AppTile extends StatelessWidget {
               ),
             );
 
+      final leadingWidget =
+          leading ??
+          (icon == null
+              ? null
+              : Icon(
+                  icon,
+                  color: selected
+                      ? theme.colorScheme.onPrimaryContainer
+                      : iconColor,
+                  size: layout == AppTileLayout.poster ? SpacingTokens.xl : 22,
+                ));
+      if (layout == AppTileLayout.poster) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                if (leadingWidget != null) leadingWidget,
+                const Spacer(),
+                trailingWithText,
+              ],
+            ),
+            const SizedBox(height: SpacingTokens.md),
+            if (hasTitleRow) titleWidget,
+            if (subtitle.isNotEmpty) ...[
+              const SizedBox(height: SpacingTokens.xs),
+              Text(
+                subtitle,
+                maxLines: subtitleMaxLines,
+                overflow: subtitleMaxLines == null
+                    ? null
+                    : TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        );
+      }
       return Row(
         crossAxisAlignment: crossAxisAlignment,
         children: <Widget>[
           if (leadingEdgeWidth == null &&
               (leading != null || icon != null)) ...[
-            leading ??
-                Icon(
-                  icon,
-                  color: selected
-                      ? theme.colorScheme.onPrimaryContainer
-                      : iconColor,
-                  size: 22,
-                ),
+            leadingWidget!,
             const SizedBox(width: SpacingTokens.md),
           ],
           Expanded(
@@ -407,7 +448,11 @@ class AppTile extends StatelessWidget {
       constraints: const BoxConstraints(
         minHeight: SpacingTokens.minTapTarget + SpacingTokens.md,
       ),
-      padding: edgeWidth == null ? contentPadding : EdgeInsets.zero,
+      padding: edgeWidth != null
+          ? EdgeInsets.zero
+          : layout == AppTileLayout.poster
+          ? const EdgeInsets.all(SpacingTokens.md)
+          : contentPadding,
       child: cardContent,
     );
   }

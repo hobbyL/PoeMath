@@ -57,16 +57,19 @@ class PlayfulTheme {
         headingWeight: FontWeight.w700,
       ),
       appearance: AppAppearance(
+        visualStyle: space ? AppVisualStyle.space : AppVisualStyle.storybook,
         heroImage: space
             ? 'assets/images/theme_space_banner.png'
             : 'assets/images/theme_candy_banner.png',
         cardStyle: space ? AppCardStyle.outlined : AppCardStyle.soft,
-        cardRadius: SpacingTokens.radiusLarge,
+        cardRadius: space
+            ? SpacingTokens.radiusCompact
+            : SpacingTokens.radiusLarge,
         controlRadius: space
-            ? SpacingTokens.radiusSmall
+            ? SpacingTokens.radiusCompact
             : SpacingTokens.radiusLarge,
         navigationRadius: space
-            ? SpacingTokens.radiusLarge
+            ? SpacingTokens.radiusCompact
             : SpacingTokens.radiusPill,
       ),
       semantic: SemanticColorsExt(

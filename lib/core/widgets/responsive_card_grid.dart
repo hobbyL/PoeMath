@@ -6,17 +6,32 @@ import 'package:poemath/core/widgets/masonry_layout.dart';
 
 /// 按内容区宽度排列自然高度的卡片；卡片不足时铺满可用列。
 class ResponsiveCardGrid extends StatelessWidget {
-  const ResponsiveCardGrid({super.key, required this.children});
+  const ResponsiveCardGrid({
+    super.key,
+    required this.children,
+    this.preferredTileWidth,
+  }) : assert(preferredTileWidth == null || preferredTileWidth > 0);
 
   final List<Widget> children;
+
+  /// 海报式入口可缩小目标列宽；随文字缩放降低列数。
+  final double? preferredTileWidth;
 
   @override
   Widget build(BuildContext context) {
     if (children.isEmpty) return const SizedBox.shrink();
     return LayoutBuilder(
       builder: (context, constraints) => MasonryLayout(
-        columnCount: ResponsiveLayout.columns(constraints.maxWidth)
-            .clamp(1, children.length),
+        columnCount:
+            (preferredTileWidth == null
+                    ? ResponsiveLayout.columns(constraints.maxWidth)
+                    : (constraints.maxWidth /
+                              (preferredTileWidth! *
+                                  (MediaQuery.textScalerOf(context).scale(16) /
+                                      16)))
+                          .floor()
+                          .clamp(1, 3))
+                .clamp(1, children.length),
         gap: SpacingTokens.sm,
         children: children,
       ),

@@ -18,6 +18,8 @@ Color solidBackgroundOf(Element element) {
     switch (widget) {
       case DecoratedBox(decoration: final BoxDecoration decoration):
         if (decoration.color case final color?) colors.add(color);
+      case DecoratedBox(decoration: final ShapeDecoration decoration):
+        if (decoration.color case final color?) colors.add(color);
       case ColoredBox(:final color):
         colors.add(color);
       case Material(:final color?):

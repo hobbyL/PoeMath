@@ -42,6 +42,7 @@ class StatOverviewCard extends StatelessWidget {
           // 需要留白的调用方自行包 Padding。
           padding: const EdgeInsets.all(SpacingTokens.md),
           color: theme.colorScheme.primary,
+          backgroundOpacity: theme.appearance.storybook ? 0 : .02,
           child: Row(
             children: [
               for (var i = 0; i < items.length; i++) ...[

@@ -51,12 +51,33 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      if (preset == AppSubject.space) {
+        final surface = tester.widget<Container>(
+          find.descendant(
+            of: find.byType(ColoredCard),
+            matching: find.byType(Container),
+          ),
+        );
+        final decoration = surface.decoration! as ShapeDecoration;
+        expect(decoration.color!.a, 1);
+        expect(decoration.shape, isA<BeveledRectangleBorder>());
+        expect(decoration.shadows, isNull);
+        final shape = decoration.shape as BeveledRectangleBorder;
+        final path = shape.getOuterPath(const Rect.fromLTWH(0, 0, 100, 80));
+        expect(path.contains(const Offset(1, 1)), isFalse);
+        expect(path.contains(const Offset(50, 40)), isTrue);
+        await tester.tap(find.text('开始练习'));
+        await tester.pumpAndSettle();
+        continue;
+      }
       final decoration = decorationOf(tester);
       expect(decoration.color!.a, 1);
       if (preset == AppSubject.poem) {
         expect(decoration.borderRadius, BorderRadius.circular(8));
-      } else {
+      } else if (preset == AppSubject.candy) {
         expect(decoration.borderRadius, BorderRadius.circular(16));
+      } else {
+        expect(decoration.borderRadius, BorderRadius.circular(4));
       }
       if (preset == AppSubject.candy) {
         expect(decoration.border, isNull);

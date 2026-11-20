@@ -10,7 +10,6 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/theme/math_theme.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
-import 'package:poemath/core/widgets/stat_overview_card.dart';
 import 'package:poemath/features/home/home_page.dart';
 
 import '../helpers/day_key_override.dart';
@@ -161,12 +160,9 @@ void main() {
             );
           }
         }
-        final overview = find.byType(StatOverviewCard);
-        final overviewContainer = tester.widget<Container>(
-          find.descendant(of: overview, matching: find.byType(Container)).first,
+        final overviewBackground = solidBackgroundOf(
+          tester.element(find.text('已学诗词')),
         );
-        final overviewBackground =
-            (overviewContainer.decoration! as BoxDecoration).color!;
         for (final label in ['已学诗词', '数学做题', '总星星']) {
           final labelFinder = find.text(label);
           final statColumn = find

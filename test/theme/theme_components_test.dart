@@ -97,15 +97,13 @@ void main() {
                 )
                 .first,
           );
-          final cardBackground = (surface.decoration! as BoxDecoration).color!;
+          final cardBackground = switch (surface.decoration!) {
+            BoxDecoration(:final color) => color!,
+            ShapeDecoration(:final color) => color!,
+            _ => throw StateError('未识别的卡片表面'),
+          };
           final tag = find.text('必背');
-          final tagBox = tester.widget<Container>(
-            find.ancestor(of: tag, matching: find.byType(Container)).first,
-          );
-          final tagBackground = Color.alphaBlend(
-            (tagBox.decoration! as BoxDecoration).color!,
-            cardBackground,
-          );
+          final tagBackground = solidBackgroundOf(tester.element(tag));
           expect(
             contrastRatio(
               tester.widget<Text>(tag).style!.color!,
