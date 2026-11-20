@@ -243,6 +243,29 @@ class MathTextbookLearningRepository {
     return draft;
   });
 
+  /// Read-only source for the opening frame. No lease, answers or writable
+  /// draft is returned; loadDraft still validates everything before interaction.
+  MathTextbookPracticeItem? savedSourcePreview(
+    String lessonId, {
+    String? planId,
+    Set<String>? exerciseIds,
+  }) {
+    _current();
+    final scope = scopeFor(lessonId, planId, exerciseIds: exerciseIds);
+    final raw = drafts.get(draftKind, scope: scope);
+    if (raw == null) return null;
+    final draft = MathTextbookPracticeDraft.fromJson(raw);
+    if (draft.profileId != profileId ||
+        draft.bookId != book.pdfSha256 ||
+        draft.editionId != book.learningEditionId ||
+        draft.scope != scope ||
+        draft.finishedAt != null ||
+        draft.index >= draft.items.length) {
+      return null;
+    }
+    return draft.items[draft.index];
+  }
+
   Future<MathTextbookPracticeDraft> _repairIntroductionDraft(
     MathTextbookCourse? course,
     MathTextbookPracticeDraft draft,

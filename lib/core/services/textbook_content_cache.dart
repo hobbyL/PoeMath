@@ -69,6 +69,8 @@ class TextbookContentCache {
   );
 
   /// Each caller owns a clone. Releasing a preview must not release the cache.
+  bool hasMathImage(String key) => _mathImages.containsKey((this, key));
+
   ui.Image? takeMathImage(String key) {
     final identity = (this, key);
     final image = _mathImages.remove(identity);

@@ -844,6 +844,51 @@ void defineMathTextbookLearningTests({
     expect(find.text('做一做'), findsNothing);
     expect(find.text('书本第 8 页'), findsNothing);
     expect(find.text('请完成下方完整原页中“做一做”的题目，再记录结果，提交给家长核对。'), findsNothing);
+    await waitForImages(tester);
+    final firstImage = tester
+        .widgetList<RawImage>(find.byType(RawImage))
+        .firstWhere((image) => image.image != null)
+        .image!;
+    final size = (firstImage.width, firstImage.height);
+    final practicePath = AppRoutes.mathTextbookPracticeOf(
+      book.pdfSha256,
+      lesson.id,
+    );
+    router!.go(AppRoutes.mathTextbookBookOf(book.pdfSha256));
+    await waitFor(
+      tester,
+      () => find.byType(MathTextbookPracticePage).evaluate().isEmpty,
+    );
+    await tester.pumpAndSettle();
+    final blocked = Completer<void>();
+    final entered = Completer<void>();
+    late Future<void> pendingCourse;
+    await tester.runAsync(() async {
+      pendingCourse = courses.withCurrentCourse<void>(book, (_) async {
+        entered.complete();
+        await blocked.future;
+      });
+    });
+    await waitFor(tester, () => entered.isCompleted);
+    addTearDown(() async {
+      if (!blocked.isCompleted) blocked.complete();
+      await pendingCourse;
+    });
+    router!.go(practicePath);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(RawImage), findsOneWidget, reason: '草稿校验仍被阻塞时就显示缓存题图');
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(TextField), findsNothing, reason: '校验完成前只允许查看题图');
+    blocked.complete();
+    await waitFor(tester, () => find.byType(TextField).evaluate().isNotEmpty);
+    await waitForImages(tester);
+    expect(rendered, hasLength(1), reason: '退出重进同一原题直接读取 PNG，不重渲染 PDF');
+    final secondImage = tester
+        .widgetList<RawImage>(find.byType(RawImage))
+        .firstWhere((image) => image.image != null)
+        .image!;
+    expect((secondImage.width, secondImage.height), size);
     expect(tester.takeException(), isNull);
   });
 

@@ -407,6 +407,25 @@ void main() {
     expect((await repository().load()).readLessons, isEmpty);
   });
 
+  test('首帧来源只读当前档案的未完成题目，不接管草稿且课程变更仍拒绝恢复', () async {
+    final lesson = await saveLesson(mathLearningFixture());
+    final writer = repository();
+    final draft = await writer.start(lesson.id);
+    final reader = repository();
+    expect(
+      reader.savedSourcePreview(lesson.id)!.toJson(),
+      draft.items.first.toJson(),
+    );
+    expect(reader.savedSourcePreview(lesson.id, planId: 'plan'), isNull);
+    await writer.saveDraft(draft.copyWith(elapsedSeconds: 3));
+    expect((await writer.loadDraft(lesson.id))!.elapsedSeconds, 3);
+    await saveLesson(lesson.edit(title: '已修改的课程'));
+    await expectLater(reader.loadDraft(lesson.id), throwsStateError);
+    ProfileScope.switchTo('another-child');
+    expect(() => reader.savedSourcePreview(lesson.id), throwsStateError);
+    expect(repository().savedSourcePreview(lesson.id), isNull);
+  });
+
   test('内容审核可持久完成，未配置的自动练习仍不能开始', () async {
     final source = mathLearningFixture();
     final incomplete = MathTextbookLesson.fromJson({

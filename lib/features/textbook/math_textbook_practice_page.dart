@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/math_textbook_image_cache.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -21,6 +22,7 @@ import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/textbook/math_textbook_labels.dart';
 import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
+import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_study_content.dart';
 
 /// 教材练习独立冻结本课题目；普通口算会话和键盘状态继续独立。
@@ -47,6 +49,7 @@ class _MathTextbookPracticePageState
   MathTextbookPracticeDraft? _draft;
   MathTextbookLesson? _sourceLesson;
   List<MathTextbookBlock> _sourceReferences = const [];
+  List<MathTextbookBlock> _openingSources = const [];
   bool _sourceLoading = false;
   String? _sourceError;
   MathSession? _session;
@@ -104,6 +107,7 @@ class _MathTextbookPracticePageState
         recordStatistics: shared.recordStatistics,
         isActive: () => mounted && !_scopeChanged,
       );
+      _restoreOpeningSources();
     }
     WidgetsBinding.instance.addObserver(this);
     _profileSubscription = ProfileScope.changes.listen((_) {
@@ -117,6 +121,42 @@ class _MathTextbookPracticePageState
       }
     });
     unawaited(_load());
+  }
+
+  void _restoreOpeningSources() {
+    try {
+      final item = _repository!.savedSourcePreview(
+        widget.lessonId,
+        planId: widget.planId,
+        exerciseIds: widget.exerciseIds,
+      );
+      if (item == null) return;
+      final paper = item.exercise.fields.every(
+        (field) => field.rule.kind == MathTextbookAnswerKind.parent,
+      );
+      if (widget.planId != null && !paper) return;
+      final blocks = mathTextbookPracticeDisplayBlocks(
+        item,
+        parentPlan: widget.planId != null && paper,
+      );
+      final cache = ref.read(textbookFileServiceProvider).contentCache(_book!);
+      final sources = blocks.expand((block) => block.sources).toList();
+      if (sources.isNotEmpty &&
+          sources.every(
+            (source) => cache.hasMathImage(
+              mathTextbookImageCacheKey(
+                cache: cache,
+                source: source,
+                workedExample: false,
+              ),
+            ),
+          )) {
+        _openingSources = blocks;
+      }
+    } on Object {
+      // The authoritative asynchronous load reports invalid/stale drafts. A
+      // failed read-only preview must never reset or repair a child's work.
+    }
   }
 
   void _updateClock() {
@@ -172,7 +212,10 @@ class _MathTextbookPracticePageState
       _report(error, stackTrace, '本课练习暂时无法打开，已有草稿保留。');
     } finally {
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _loading = false;
+          _openingSources = const [];
+        });
         _updateClock();
       }
     }
@@ -504,13 +547,23 @@ class _MathTextbookPracticePageState
           ),
           IconButton(
             tooltip: '重新开始',
-            onPressed: _busy || _scopeChanged ? null : _restart,
+            onPressed: _loading || _busy || _scopeChanged ? null : _restart,
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? _openingSources.isEmpty || _scopeChanged
+                ? const Center(child: CircularProgressIndicator())
+                : SafeArea(
+                    child: ListView(
+                      padding: const EdgeInsets.all(SpacingTokens.md),
+                      children: _sourceWidgets(
+                        _openingSources,
+                        forcePreview: true,
+                      ),
+                    ),
+                  )
           : _draft == null
           ? AppEmptyState(
               icon: Icons.school_outlined,
@@ -609,6 +662,24 @@ class _MathTextbookPracticePageState
     ];
   }
 
+  List<Widget> _sourceWidgets(
+    List<MathTextbookBlock> blocks, {
+    required bool forcePreview,
+  }) => [
+    for (final block in blocks)
+      Padding(
+        padding: const EdgeInsets.only(bottom: SpacingTokens.md),
+        child: MathTextbookStudyContent(
+          book: _book!,
+          block: block,
+          framed: false,
+          showTitle: false,
+          showTextToggle: false,
+          forceSourcePreview: forcePreview,
+        ),
+      ),
+  ];
+
   List<Widget> _question() {
     final draft = _draft!,
         item = draft.items[draft.index],
@@ -637,18 +708,10 @@ class _MathTextbookPracticePageState
         const Text('按本课已审核范围生成的巩固题'),
         const SizedBox(height: SpacingTokens.md),
       ],
-      for (final block in displayBlocks)
-        Padding(
-          padding: const EdgeInsets.only(bottom: SpacingTokens.md),
-          child: MathTextbookStudyContent(
-            book: _book!,
-            block: block,
-            framed: false,
-            showTitle: false,
-            showTextToggle: false,
-            forceSourcePreview: widget.planId == null || paperPlan,
-          ),
-        ),
+      ..._sourceWidgets(
+        displayBlocks,
+        forcePreview: widget.planId == null || paperPlan,
+      ),
       if (_sourceLoading) const Text('正在载入原书参考…'),
       for (final reference in _sourceReferences) ...[
         AppTile(
