@@ -10,6 +10,10 @@ Future<bool?> choosePracticeResume(BuildContext context, String subject) =>
         content: const Text('继续上次题组，或放弃草稿后开始新的练习。已完成的答题记录会保留。'),
         actions: [
           TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('暂时返回'),
+          ),
+          TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('开始新练习'),
           ),

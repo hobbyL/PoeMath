@@ -20,6 +20,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
@@ -38,10 +39,21 @@ import 'package:poemath/features/math/math_practice_request.dart';
 import 'package:poemath/features/math/practice_clock.dart';
 import 'package:poemath/features/math/practice_resume_prompt.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
+import 'package:poemath/data/repositories/math_adventure_repository.dart';
+import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
+import 'package:poemath/domain/math_adventure_catalog.dart';
+import 'package:poemath/features/math/adventure/math_adventure_providers.dart';
 
 class MathPracticePage extends ConsumerStatefulWidget {
-  const MathPracticePage({super.key, this.resume = false});
+  const MathPracticePage({
+    super.key,
+    this.resume = false,
+    this.adventureNode,
+    this.fromMap = false,
+  });
   final bool resume;
+  final MathAdventureNode? adventureNode;
+  final bool fromMap;
 
   @override
   ConsumerState<MathPracticePage> createState() => _MathPracticePageState();
@@ -79,7 +91,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   int? _sessionBatchSize;
   MathPracticeRequest? _request;
   String? _generationError;
-  final _drafts = PracticeDraftRepository();
+  late final PracticeDraftRepository _drafts;
   late final PracticeClock _clock;
   List<MathProblem> _sessionProblems = [];
   int _draftIndex = 0;
@@ -88,14 +100,54 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   Timer? _draftTimer;
   VerticalAttempt _verticalAttempt = const VerticalAttempt();
   String _verticalField = 'ones';
+  MathAdventureRepository? _adventure;
+  StreamSubscription<String>? _profileSubscription;
+  bool _adventureClaimed = false;
+  String? _adventureFeedback;
+  bool _leavingAdventure = false;
+  bool _exitApproved = false;
+  String get _draftKind =>
+      widget.adventureNode == null ? 'math' : MathAdventureNode.draftKind;
+  String? get _draftScope => widget.adventureNode?.scope;
+
+  void _assertAdventure() {
+    if (_adventure == null) return;
+    _adventure!.assertCurrent();
+    if (!_adventureClaimed) throw StateError('探险练习尚未取得草稿');
+    _drafts.assertOwner(_draftKind, scope: _draftScope!);
+  }
+
+  Future<T> _practiceGuard<T>(Future<T> Function() action) => _drafts.guard(
+    () => ActivitySettlementLedger.withGuard(_assertAdventure, () async {
+      _assertAdventure();
+      return action();
+    }),
+  );
 
   @override
   void initState() {
     super.initState();
+    _drafts = widget.adventureNode == null
+        ? PracticeDraftRepository()
+        : ref.read(mathAdventureDraftRepositoryProvider)();
     _startTime = DateTime.now();
     _sessionId = DateTime.now().microsecondsSinceEpoch.toString();
     _confettiController = CelebrationController();
     _clock = PracticeClock()..onPause = _saveOnPause;
+    if (widget.adventureNode != null) {
+      _adventure = ref.read(mathAdventureRepositoryProvider);
+      _profileSubscription = ProfileScope.changes.listen((_) {
+        _draftTimer?.cancel();
+        _clock.finish();
+        _draftDisabled = true;
+        if (mounted) {
+          setState(() {
+            _ready = false;
+            _generationError = '学习档案已切换，请返回地图重新进入';
+          });
+        }
+      });
+    }
     _answerController.addListener(_queueDraftSave);
 
     // 延迟到 build 之后初始化题目
@@ -107,6 +159,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   Future<void> _initialize() async {
     try {
+      if (widget.adventureNode != null) {
+        await _initializeAdventure();
+        return;
+      }
       final draft = _drafts.get('math');
       // 本次入口想练什么（口算/竖式卡片各自 setNext 的意图）。
       // 在弹恢复框**之前**同步捕获：`consume()` 会清空 provider，
@@ -161,8 +217,119 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('练习已恢复，进度或结算暂未保存，请重试')));
       } else {
-        setState(() => _generationError = '上次练习暂时无法恢复，请返回首页放弃草稿后重试');
+        setState(
+          () => _generationError =
+              widget.adventureNode != null && error is StateError
+              ? error.message.toString()
+              : '上次练习暂时无法恢复，请返回首页放弃草稿后重试',
+        );
       }
+    }
+  }
+
+  Future<void> _initializeAdventure() async {
+    final node = widget.adventureNode!;
+    node.validate();
+    _adventure!.assertCurrent();
+    final draft = _drafts.get(_draftKind, scope: _draftScope);
+    if (draft != null) {
+      final resume = widget.resume
+          ? true
+          : await choosePracticeResume(context, node.skill.label);
+      if (!mounted) return;
+      _adventure!.assertCurrent();
+      if (resume == null) {
+        _returnToMap();
+        return;
+      }
+      if (resume) {
+        final request = MathPracticeRequest.fromJson(
+          draft['request'] as Map<String, dynamic>,
+        );
+        if (request.adventureProfileId != _adventure!.profileId ||
+            request.adventureNode?.scope != node.scope) {
+          throw const FormatException('草稿与探险节点不一致');
+        }
+        _claimAdventure();
+        await _restoreDraft(draft);
+        return;
+      }
+    }
+    _prepareAdventureRequest();
+    _claimAdventure();
+    if (draft != null) {
+      await _drafts.remove(
+        _draftKind,
+        scope: _draftScope,
+        sessionId: draft['sessionId'] as String?,
+      );
+    }
+    // 删除会释放 owner；新题组重新取得所有权。
+    _claimAdventure();
+    if (mounted) _generateProblems();
+  }
+
+  void _claimAdventure() {
+    _adventure!.assertCurrent();
+    _drafts.claim(_draftKind, scope: _draftScope!);
+    _adventureClaimed = true;
+  }
+
+  void _prepareAdventureRequest() {
+    final node = widget.adventureNode!;
+    final settings = ref.read(settingsRepositoryProvider);
+    if (settings.selectedGrade != node.grade ||
+        settings.selectedSemester != node.semester) {
+      throw StateError('学习册次已变化，请返回地图选择当前关卡');
+    }
+    final difficulty = DifficultyLevel.values.byName(settings.mathDifficulty);
+    _adventure!.assertCanStart(node, difficulty);
+    _request = MathPracticeRequest(
+      grade: node.grade,
+      semester: node.semester,
+      count: settings.mathBatchSize,
+      difficulty: difficulty,
+      skillId: node.skillId,
+      adventureProfileId: _adventure!.profileId,
+    );
+    _sessionBatchSize = _request!.count;
+  }
+
+  void _returnToMap() {
+    if (!mounted || _exitApproved) return;
+    // 先刷新 PopScope；完成态草稿删除后，页面可能尚未重建。
+    setState(() => _exitApproved = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.fromMap && context.canPop()) {
+        context.pop();
+      } else {
+        context.go(AppRoutes.mathAdventure);
+      }
+    });
+  }
+
+  Future<void> _leaveAdventure() async {
+    if (_leavingAdventure || _submitting || _isFinishing) return;
+    _leavingAdventure = true;
+    _draftTimer?.cancel();
+    try {
+      try {
+        _assertAdventure();
+      } on StateError {
+        // 已由新页面接管或恢复了数据，离开时不能再回写旧快照。
+        _draftDisabled = true;
+      }
+      await _saveDraft();
+      if (!mounted) return;
+      _returnToMap();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('练习暂未保存，请重试返回。')));
+      }
+    } finally {
+      _leavingAdventure = false;
     }
   }
 
@@ -184,6 +351,16 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     _request = MathPracticeRequest.fromJson(
       draft['request'] as Map<String, dynamic>,
     );
+    if (widget.adventureNode != null &&
+        (problems.length != _request!.count ||
+            problems.any(
+              (p) =>
+                  p.skillId != widget.adventureNode!.skillId ||
+                  p.grade != _request!.grade ||
+                  p.semester != _request!.semester,
+            ))) {
+      throw const FormatException('探险题组与节点不一致');
+    }
     _sessionBatchSize = _request!.count;
     _sessionProblems = problems;
     _draftIndex = index;
@@ -276,7 +453,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         _request == null) {
       return;
     }
-    await _drafts.save('math', {
+    _assertAdventure();
+    await _drafts.save(_draftKind, {
       'sessionId': _sessionId,
       'startedAt': _startTime.toIso8601String(),
       'completedAt': _completedAt?.toIso8601String(),
@@ -290,7 +468,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       'records': _problemRecords.map((r) => r.toJson()).toList(),
       'consecutiveCorrect': _consecutiveCorrect,
       'bestConsecutive': _bestConsecutive,
-    });
+    }, scope: _draftScope);
   }
 
   void _queueDraftSave() {
@@ -399,6 +577,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   @override
   void dispose() {
+    unawaited(_profileSubscription?.cancel());
     _draftTimer?.cancel();
     _clock.dispose();
     unawaited(
@@ -447,11 +626,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       problemsJson: jsonEncode(records.map((r) => r.toJson()).toList()),
     );
     // 恢复必须排空整个检查点，不能在会话与统计/错题之间截断。
-    await _drafts.guard(() async {
+    await _practiceGuard(() async {
       if (_completedAt == null) await sessions.save(session);
 
       // 增量更新用户统计（每题 +1），与其余练习页共用同一仓储写入路径。
       for (var i = 0; i < records.length; i++) {
+        _assertAdventure();
         await stats.recordMathAttempt(
           isCorrect: records[i].isCorrect,
           bestStreak: bestStreak,
@@ -459,6 +639,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         );
         final record = records[i];
         if (!record.isCorrect) {
+          _assertAdventure();
           final problem = sessionProblems[i];
           final judgement = _judgeRecordedAnswer(problem, record);
           await mistakes.recordWrong(
@@ -656,6 +837,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   }
 
   Future<void> _settleSession() async {
+    _assertAdventure();
+    if (widget.adventureNode != null &&
+        (_problemRecords.length != _request!.count ||
+            _sessionProblems.length != _request!.count)) {
+      throw StateError('完成整组练习后才能走向下一站');
+    }
     final grade = _request!.grade;
     final problems = ref.read(mathProblemsProvider);
     final correctCount = ref.read(mathCorrectCountProvider);
@@ -691,10 +878,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final statsRepo = ref.read(userStatsRepoProvider);
     final checkInRepo = ref.read(checkInRepoProvider);
     late final int levelBeforeReward;
+    List<Achievement>? adventureAchievements;
     // 关联结算共用一次登记；动画与导航留在屏障外。
-    await _drafts.guard(() async {
+    await _practiceGuard(() async {
       await _saveDraft();
+      _assertAdventure();
       await repo.save(session);
+      _assertAdventure();
       final activityId = 'math_practice:${session.id}';
       await activityRepo.record(
         id: activityId,
@@ -705,6 +895,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         durationSeconds: duration,
         completedAt: completedAt,
       );
+      _assertAdventure();
 
       // 做题数和连对数已在 _persistProgress() 中逐题更新，只需添加星星
       levelBeforeReward = statsRepo.get().level;
@@ -719,14 +910,50 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         addStars: stars,
         addDuration: duration,
       );
+      if (widget.adventureNode != null) {
+        // 成就也是结算的一部分；失败时仍保留完成态草稿供重试。
+        adventureAchievements = await checkAchievements(
+          ref,
+          latestSession: session,
+          mutation: _drafts,
+          ensureCurrent: _assertAdventure,
+        );
+      }
+      if (widget.adventureNode case final node?) {
+        final completion = await _adventure!.complete(
+          node: node,
+          difficulty: _request!.difficulty,
+          ensureCurrent: _assertAdventure,
+        );
+        final next = MathAdventureCatalog.current(
+          MathAdventureCatalog.route(
+            grade: node.grade,
+            semester: node.semester,
+            difficulty: _request!.difficulty,
+          ),
+          completion.progress.completedSkillIds,
+        );
+        _adventureFeedback = completion.newRegions.isNotEmpty
+            ? '收集到${completion.newRegions.map((id) => MathAdventureRegion.fromId(id)!.souvenir).join('、')}！'
+            : next == null
+            ? '本册小路已走完，新的发现都在纪念册里。'
+            : '${node.skill.label}已完成，下一站：${next.label}';
+      }
+      _assertAdventure();
       _draftDisabled = true;
       try {
-        await _drafts.remove('math', sessionId: _sessionId);
+        await _drafts.remove(
+          _draftKind,
+          scope: _draftScope,
+          sessionId: _sessionId,
+        );
       } catch (_) {
         _draftDisabled = false;
         rethrow;
       }
     });
+
+    _adventure?.assertCurrent();
 
     // addStars 会同步重算等级；页面仅负责展示升级反馈。
     final updatedStats = statsRepo.get();
@@ -744,11 +971,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     // 成就自动检查
     if (!mounted) return;
-    final newlyUnlocked = await checkAchievements(
-      ref,
-      latestSession: session,
-      mutation: _drafts,
-    );
+    final newlyUnlocked =
+        adventureAchievements ??
+        await checkAchievements(ref, latestSession: session, mutation: _drafts);
     if (!mounted) return;
 
     // 刷新首页统计 providers
@@ -786,12 +1011,21 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         durationSeconds: duration,
         starsEarned: stars,
         reviewLabel: '看本轮错题（${problems.length - correctCount}）',
+        adventureFeedback: _adventureFeedback,
       ),
     );
 
     if (!mounted) return;
 
     if (action == 'review') {
+      if (widget.adventureNode != null) {
+        await context.push(
+          '${AppRoutes.mathSessionDetail}?mistakesOnly=1',
+          extra: session,
+        );
+        if (mounted) _returnToMap();
+        return;
+      }
       context.pushReplacement(
         '${AppRoutes.mathSessionDetail}?mistakesOnly=1',
         extra: session,
@@ -799,6 +1033,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     } else if (action == 'retry') {
       _retrySession();
     } else {
+      if (widget.adventureNode != null) {
+        _returnToMap();
+        return;
+      }
       // 'home' 或 dismiss → 返回上一页。
       // 深链直达 /math/practice 时栈内没有上一页，pop 会断言失败（用户卡在
       // 结算后的空白页），此时直接回首页。
@@ -812,6 +1050,16 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   /// 重置答题状态并重新生成同类题目。
   void _retrySession() {
+    if (widget.adventureNode != null) {
+      try {
+        _prepareAdventureRequest();
+        _claimAdventure();
+      } catch (_) {
+        _returnToMap();
+        return;
+      }
+      _adventureFeedback = null;
+    }
     _answerController.clear();
     _problemRecords.clear();
     _consecutiveCorrect = 0;
@@ -829,6 +1077,18 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   @override
   Widget build(BuildContext context) {
+    final page = _buildPractice(context);
+    if (widget.adventureNode == null) return page;
+    return PopScope<Object?>(
+      canPop: _exitApproved || !_ready || _draftDisabled,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_leaveAdventure());
+      },
+      child: page,
+    );
+  }
+
+  Widget _buildPractice(BuildContext context) {
     final problems = ref.watch(mathProblemsProvider);
     final currentIndex = ref.watch(mathCurrentIndexProvider);
     final correctCount = ref.watch(mathCorrectCountProvider);
@@ -837,13 +1097,30 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     if (!_ready || problems.isEmpty || problem == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('口算练习')),
+        appBar: AppBar(
+          title: Text(widget.adventureNode == null ? '口算练习' : '数学探险'),
+          leading: widget.adventureNode == null
+              ? null
+              : BackButton(onPressed: _returnToMap),
+        ),
         body: Center(
           child: _generationError == null
               ? const CircularProgressIndicator()
               : Padding(
                   padding: const EdgeInsets.all(SpacingTokens.lg),
-                  child: Text(_generationError!),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_generationError!, textAlign: TextAlign.center),
+                      if (widget.adventureNode != null) ...[
+                        const SizedBox(height: SpacingTokens.md),
+                        FilledButton(
+                          onPressed: _returnToMap,
+                          child: const Text('回到探险地图'),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
         ),
       );
@@ -855,6 +1132,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         size.width > size.height;
     return Scaffold(
       appBar: AppBar(
+        leading: widget.adventureNode == null
+            ? null
+            : BackButton(onPressed: _leaveAdventure),
         title: Text('${currentIndex + 1} / ${problems.length}'),
         actions: [
           _buildAiExplainAction(context),

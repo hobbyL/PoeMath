@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,9 +9,16 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/features/home/textbook_resume_section.dart';
+import 'package:poemath/domain/math_adventure_catalog.dart';
+import 'package:poemath/features/math/math_practice_request.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
 
 final practiceDraftsProvider =
     StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) async* {
+      final profileChanges = ProfileScope.changes.listen(
+        (_) => ref.invalidateSelf(),
+      );
+      ref.onDispose(() => unawaited(profileChanges.cancel()));
       final drafts = PracticeDraftRepository();
       List<Map<String, dynamic>> read() {
         final result = <Map<String, dynamic>>[];
@@ -26,6 +35,38 @@ final practiceDraftsProvider =
             if (drafts.exists(kind)) {
               result.add({'kind': kind, 'invalid': true});
             }
+          }
+        }
+        for (final scope in drafts.scopes(MathAdventureNode.draftKind)) {
+          try {
+            final node = MathAdventureNode.fromScope(scope);
+            final draft = drafts.get(MathAdventureNode.draftKind, scope: scope);
+            if (draft == null) continue;
+            final request = MathPracticeRequest.fromJson(
+              draft['request'] as Map<String, dynamic>,
+            );
+            if (request.adventureNode?.scope != scope ||
+                request.adventureProfileId != draft['profileId'] ||
+                draft['problems'] is! List ||
+                draft['records'] is! List) {
+              throw const FormatException('探险草稿无法读取');
+            }
+            result.add({
+              ...draft,
+              'label': '${node.volumeLabel} · ${node.skill.label}',
+              'route': AppRoutes.mathAdventurePracticeOf(
+                node.grade,
+                node.semester,
+                node.skillId,
+                resume: true,
+              ),
+            });
+          } on Object {
+            result.add({
+              'kind': MathAdventureNode.draftKind,
+              'scope': scope,
+              'invalid': true,
+            });
           }
         }
         for (final kind in PracticeDraftRepository.poemKinds) {
@@ -72,6 +113,8 @@ class PracticeResumeSection extends ConsumerWidget {
     String? sessionId,
   }) async {
     final drafts = PracticeDraftRepository();
+    final profile = ProfileScope.currentId;
+    final revision = ProfileScope.revision;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -91,6 +134,10 @@ class PracticeResumeSection extends ConsumerWidget {
     );
     if (confirmed == true) {
       try {
+        if (profile != ProfileScope.currentId ||
+            revision != ProfileScope.revision) {
+          throw StateError('档案已切换，请重新选择要放弃的草稿');
+        }
         await drafts.remove(kind, scope: scope, sessionId: sessionId);
       } catch (_) {
         if (context.mounted) {
@@ -123,11 +170,15 @@ class PracticeResumeSection extends ConsumerWidget {
     final cards = <Widget>[
       for (final draft in drafts)
         AppTile(
-          icon: draft['kind'] == 'math'
+          icon: draft['kind'] == MathAdventureNode.draftKind
+              ? Icons.explore_outlined
+              : draft['kind'] == 'math'
               ? Icons.calculate_outlined
               : Icons.auto_awesome_outlined,
           iconColor: theme.colorScheme.primary,
-          title: PracticeDraftRepository.poemKinds.contains(draft['kind'])
+          title: draft['kind'] == MathAdventureNode.draftKind
+              ? '继续探险${draft['label'] == null ? '' : ' · ${draft['label']}'}'
+              : PracticeDraftRepository.poemKinds.contains(draft['kind'])
               ? '继续${draft['label'] ?? '诗词练习'}'
               : draft['kind'] == 'math'
               ? '继续上次口算'
@@ -140,7 +191,8 @@ class PracticeResumeSection extends ConsumerWidget {
           onTap: draft['invalid'] == true
               ? null
               : () => context.push(
-                  PracticeDraftRepository.poemKinds.contains(draft['kind'])
+                  PracticeDraftRepository.poemKinds.contains(draft['kind']) ||
+                          draft['kind'] == MathAdventureNode.draftKind
                       ? draft['route'] as String
                       : '${draft['kind'] == 'math' ? AppRoutes.mathPractice : AppRoutes.wordProblemPractice}?resume=1',
                 ),

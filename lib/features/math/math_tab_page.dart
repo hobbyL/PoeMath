@@ -20,6 +20,7 @@ import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/features/math/math_practice_request.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/practice_entry_card.dart';
+import 'package:poemath/features/math/adventure/math_adventure_page.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 class MathTabPage extends ConsumerWidget {
@@ -339,6 +340,8 @@ class MathTabPage extends ConsumerWidget {
                       ),
                     ),
                   ],
+                const SizedBox(height: SpacingTokens.md),
+                const MathAdventureEntry(),
               ],
             );
             return theme.appearance.storybook

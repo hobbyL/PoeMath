@@ -69,7 +69,7 @@ class PracticeDraftRepository {
 
   static const kinds = ['math', 'word'];
   static const poemKinds = ['poemQuiz', 'poemRecite', 'poemDictation'];
-  static const scopedKinds = [...poemKinds, 'mathTextbook'];
+  static const scopedKinds = [...poemKinds, 'mathTextbook', 'mathAdventure'];
   static const _prefix = 'practice_draft:';
   static final Map<String, Future<void>> _writes = {};
   static final Map<String, Object> _owners = {};
@@ -164,11 +164,23 @@ class PracticeDraftRepository {
 
   Future<void> remove(String kind, {String? sessionId, String? scope}) {
     final key = _key(kind, scope);
+    final profile = ProfileScope.currentId;
+    final revision = ProfileScope.revision;
+    final lease = _leases[key];
     return _enqueue(key, () async {
       assertCurrent();
+      // 指定的旧 session 已不存在时保持幂等 noop；有实际删除目标时再查 owner。
       if (sessionId != null &&
+          profile == ProfileScope.currentId &&
+          revision == ProfileScope.revision &&
           get(kind, scope: scope)?['sessionId'] != sessionId) {
         return;
+      }
+      if (scope != null &&
+          (profile != ProfileScope.currentId ||
+              revision != ProfileScope.revision ||
+              lease != null && _owners[key] != lease)) {
+        throw StateError('练习已切换，旧页面不能删除当前草稿');
       }
       await HiveBoxes.meta.delete(key);
       if (scope != null) _owners.remove(key);

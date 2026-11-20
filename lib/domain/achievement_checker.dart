@@ -160,8 +160,7 @@ class AchievementDefinitions {
       description: '掌握 10 首诗词',
       iconName: 'star',
       category: '诗词',
-      progressFn: (ctx) =>
-          (ctx.stats.poemsMastered / 10).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.poemsMastered / 10).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'poems_master_50',
@@ -169,8 +168,7 @@ class AchievementDefinitions {
       description: '掌握 50 首诗词',
       iconName: 'star',
       category: '诗词',
-      progressFn: (ctx) =>
-          (ctx.stats.poemsMastered / 50).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.poemsMastered / 50).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'poems_master_100',
@@ -178,8 +176,7 @@ class AchievementDefinitions {
       description: '掌握 100 首诗词',
       iconName: 'star',
       category: '诗词',
-      progressFn: (ctx) =>
-          (ctx.stats.poemsMastered / 100).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.poemsMastered / 100).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'poems_master_300',
@@ -187,8 +184,7 @@ class AchievementDefinitions {
       description: '掌握 300 首诗词',
       iconName: 'star',
       category: '诗词',
-      progressFn: (ctx) =>
-          (ctx.stats.poemsMastered / 300).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.poemsMastered / 300).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'poems_master_500',
@@ -196,8 +192,7 @@ class AchievementDefinitions {
       description: '掌握 500 首诗词',
       iconName: 'crown',
       category: '诗词',
-      progressFn: (ctx) =>
-          (ctx.stats.poemsMastered / 500).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.poemsMastered / 500).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'poems_master_1000',
@@ -205,8 +200,7 @@ class AchievementDefinitions {
       description: '掌握 1000 首诗词',
       iconName: 'crown',
       category: '诗词',
-      progressFn: (ctx) =>
-          (ctx.stats.poemsMastered / 1000).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.poemsMastered / 1000).clamp(0.0, 1.0),
     ),
 
     // ══════════════════════════════════════════════════════════
@@ -218,8 +212,7 @@ class AchievementDefinitions {
       description: '完成 5 轮艾宾浩斯复习',
       iconName: 'refresh',
       category: '复习',
-      progressFn: (ctx) =>
-          (ctx.completedReviewRounds / 5).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.completedReviewRounds / 5).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'review_complete_20',
@@ -227,8 +220,7 @@ class AchievementDefinitions {
       description: '完成 20 轮艾宾浩斯复习',
       iconName: 'refresh',
       category: '复习',
-      progressFn: (ctx) =>
-          (ctx.completedReviewRounds / 20).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.completedReviewRounds / 20).clamp(0.0, 1.0),
     ),
 
     // ══════════════════════════════════════════════════════════
@@ -240,8 +232,7 @@ class AchievementDefinitions {
       description: '完成 100 道口算题',
       iconName: 'calculator',
       category: '口算',
-      progressFn: (ctx) =>
-          (ctx.stats.mathTotalProblems / 100).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.mathTotalProblems / 100).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'math_500',
@@ -249,8 +240,7 @@ class AchievementDefinitions {
       description: '完成 500 道口算题',
       iconName: 'calculator',
       category: '口算',
-      progressFn: (ctx) =>
-          (ctx.stats.mathTotalProblems / 500).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.mathTotalProblems / 500).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'math_1000',
@@ -258,8 +248,7 @@ class AchievementDefinitions {
       description: '完成 1000 道口算题',
       iconName: 'calculator',
       category: '口算',
-      progressFn: (ctx) =>
-          (ctx.stats.mathTotalProblems / 1000).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.mathTotalProblems / 1000).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'math_5000',
@@ -267,8 +256,7 @@ class AchievementDefinitions {
       description: '完成 5000 道口算题',
       iconName: 'calculator',
       category: '口算',
-      progressFn: (ctx) =>
-          (ctx.stats.mathTotalProblems / 5000).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.mathTotalProblems / 5000).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'math_10000',
@@ -359,8 +347,7 @@ class AchievementDefinitions {
       description: '连续答对 30 题',
       iconName: 'bolt',
       category: '口算',
-      progressFn: (ctx) =>
-          (ctx.stats.mathBestStreak / 30).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.mathBestStreak / 30).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'math_combo_50',
@@ -368,8 +355,7 @@ class AchievementDefinitions {
       description: '连续答对 50 题',
       iconName: 'bolt',
       category: '口算',
-      progressFn: (ctx) =>
-          (ctx.stats.mathBestStreak / 50).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.mathBestStreak / 50).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'math_combo_100',
@@ -377,8 +363,7 @@ class AchievementDefinitions {
       description: '连续答对 100 题',
       iconName: 'crown',
       category: '口算',
-      progressFn: (ctx) =>
-          (ctx.stats.mathBestStreak / 100).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.mathBestStreak / 100).clamp(0.0, 1.0),
     ),
 
     // ══════════════════════════════════════════════════════════
@@ -403,8 +388,7 @@ class AchievementDefinitions {
       description: '困难模式累计完成 100 题',
       iconName: 'flame',
       category: '口算',
-      progressFn: (ctx) =>
-          (ctx.hardModeTotalProblems / 100).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.hardModeTotalProblems / 100).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'math_hard_500',
@@ -412,8 +396,7 @@ class AchievementDefinitions {
       description: '困难模式累计完成 500 题',
       iconName: 'crown',
       category: '口算',
-      progressFn: (ctx) =>
-          (ctx.hardModeTotalProblems / 500).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.hardModeTotalProblems / 500).clamp(0.0, 1.0),
     ),
 
     // ══════════════════════════════════════════════════════════
@@ -425,8 +408,7 @@ class AchievementDefinitions {
       description: '攻克 10 道错题',
       iconName: 'repair',
       category: '错题',
-      progressFn: (ctx) =>
-          (ctx.resolvedMistakes / 10).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.resolvedMistakes / 10).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'mistakes_resolve_50',
@@ -434,8 +416,7 @@ class AchievementDefinitions {
       description: '攻克 50 道错题',
       iconName: 'repair',
       category: '错题',
-      progressFn: (ctx) =>
-          (ctx.resolvedMistakes / 50).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.resolvedMistakes / 50).clamp(0.0, 1.0),
     ),
 
     // ══════════════════════════════════════════════════════════
@@ -447,8 +428,7 @@ class AchievementDefinitions {
       description: '收藏 10 条公式',
       iconName: 'function',
       category: '公式',
-      progressFn: (ctx) =>
-          (ctx.formulaFavorites / 10).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.formulaFavorites / 10).clamp(0.0, 1.0),
     ),
 
     // ══════════════════════════════════════════════════════════
@@ -460,8 +440,7 @@ class AchievementDefinitions {
       description: '累积 50 颗星星',
       iconName: 'star',
       category: '星星',
-      progressFn: (ctx) =>
-          (ctx.stats.totalStars / 50).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.totalStars / 50).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'stars_500',
@@ -469,8 +448,7 @@ class AchievementDefinitions {
       description: '累积 500 颗星星',
       iconName: 'star',
       category: '星星',
-      progressFn: (ctx) =>
-          (ctx.stats.totalStars / 500).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.totalStars / 500).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'stars_2000',
@@ -478,8 +456,7 @@ class AchievementDefinitions {
       description: '累积 2000 颗星星',
       iconName: 'star',
       category: '星星',
-      progressFn: (ctx) =>
-          (ctx.stats.totalStars / 2000).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.totalStars / 2000).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'level_3',
@@ -487,8 +464,7 @@ class AchievementDefinitions {
       description: '达到进士等级',
       iconName: 'medal',
       category: '星星',
-      progressFn: (ctx) =>
-          (ctx.stats.level / 3).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.level / 3).clamp(0.0, 1.0),
     ),
     AchievementDef(
       id: 'level_6',
@@ -496,8 +472,7 @@ class AchievementDefinitions {
       description: '达到状元等级',
       iconName: 'crown',
       category: '星星',
-      progressFn: (ctx) =>
-          (ctx.stats.level / 6).clamp(0.0, 1.0),
+      progressFn: (ctx) => (ctx.stats.level / 6).clamp(0.0, 1.0),
     ),
   ];
 
@@ -519,10 +494,14 @@ class AchievementChecker {
   /// 根据 [AchievementCheckContext] 检查所有成就，更新进度和解锁状态。
   ///
   /// 返回本次新解锁的成就列表（可用于弹出提示）。
-  Future<List<Achievement>> check(AchievementCheckContext ctx) async {
+  Future<List<Achievement>> check(
+    AchievementCheckContext ctx, {
+    void Function()? ensureCurrent,
+  }) async {
     final newlyUnlocked = <Achievement>[];
 
     for (final def in AchievementDefinitions.all) {
+      ensureCurrent?.call();
       final progress = def.progressFn(ctx);
 
       // 确保成就记录存在
@@ -537,6 +516,7 @@ class AchievementChecker {
           progress: progress,
         );
         await _repo.save(achievement);
+        ensureCurrent?.call();
       }
 
       // 已解锁的不再更新
@@ -544,6 +524,7 @@ class AchievementChecker {
 
       // 更新进度
       await _repo.updateProgress(def.id, progress);
+      ensureCurrent?.call();
 
       // 检查是否刚解锁
       final updated = _repo.getById(def.id);

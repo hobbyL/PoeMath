@@ -1,4 +1,5 @@
 import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/domain/math_adventure_catalog.dart';
 
 /// 一次练习固定使用的参数，与页面浏览筛选、长期偏好独立。
 class MathPracticeRequest {
@@ -10,6 +11,7 @@ class MathPracticeRequest {
     this.mode,
     this.skillId,
     this.verticalProcessOnly = false,
+    this.adventureProfileId,
   });
 
   final int grade;
@@ -19,16 +21,26 @@ class MathPracticeRequest {
   final ProblemMode? mode;
   final String? skillId;
   final bool verticalProcessOnly;
+  final String? adventureProfileId;
+  MathAdventureNode? get adventureNode => adventureProfileId == null
+      ? null
+      : MathAdventureNode(grade: grade, semester: semester, skillId: skillId!);
 
   Map<String, dynamic> toJson() => {
-        'grade': grade,
-        'semester': semester,
-        'count': count,
-        'difficulty': difficulty.name,
-        'mode': mode?.name,
-        'skillId': skillId,
-        'verticalProcessOnly': verticalProcessOnly,
-      };
+    'grade': grade,
+    'semester': semester,
+    'count': count,
+    'difficulty': difficulty.name,
+    'mode': mode?.name,
+    'skillId': skillId,
+    'verticalProcessOnly': verticalProcessOnly,
+    if (adventureProfileId != null)
+      'adventure': {
+        'v': 1,
+        'profileId': adventureProfileId,
+        'scope': adventureNode!.scope,
+      },
+  };
 
   factory MathPracticeRequest.fromJson(Map<String, dynamic> json) {
     final grade = json['grade'] as int;
@@ -41,6 +53,26 @@ class MathPracticeRequest {
         count > 100) {
       throw const FormatException('练习参数无效');
     }
+    final adventure = json['adventure'];
+    String? adventureProfileId;
+    if (adventure != null) {
+      if (adventure is! Map<String, dynamic> ||
+          adventure['v'] != 1 ||
+          adventure['profileId'] is! String ||
+          (adventure['profileId'] as String).trim().isEmpty ||
+          adventure['scope'] is! String ||
+          json['mode'] != null ||
+          json['verticalProcessOnly'] == true) {
+        throw const FormatException('探险练习来源无效');
+      }
+      final node = MathAdventureNode.fromScope(adventure['scope'] as String);
+      if (node.grade != grade ||
+          node.semester != semester ||
+          node.skillId != json['skillId']) {
+        throw const FormatException('探险练习与节点不一致');
+      }
+      adventureProfileId = adventure['profileId'] as String;
+    }
     return MathPracticeRequest(
       grade: grade,
       semester: semester,
@@ -51,6 +83,7 @@ class MathPracticeRequest {
           : ProblemMode.values.byName(json['mode'] as String),
       skillId: json['skillId'] as String?,
       verticalProcessOnly: json['verticalProcessOnly'] as bool? ?? false,
+      adventureProfileId: adventureProfileId,
     );
   }
 }

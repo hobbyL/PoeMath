@@ -79,6 +79,22 @@ class AppRoutes {
 
   // ============ 口算模块 ============
   static const String mathPractice = '/math/practice';
+  static const String mathAdventure = '/math/adventure';
+  static const String mathAdventureAlbum = '/math/adventure/album';
+  static const String mathAdventurePractice =
+      '/math/adventure/practice/:grade/:semester/:skillId';
+  static String mathAdventurePracticeOf(
+    int grade,
+    String semester,
+    String skillId, {
+    bool resume = false,
+    bool fromMap = false,
+  }) => Uri(
+    path: '/math/adventure/practice/$grade/$semester/$skillId',
+    queryParameters: resume || fromMap
+        ? {if (resume) 'resume': '1', if (fromMap) 'fromMap': '1'}
+        : null,
+  ).toString();
   static const String mathChallenge = '/math/challenge';
   static const String mathMistake = '/math/mistake';
   static const String mathHistory = '/math/history';

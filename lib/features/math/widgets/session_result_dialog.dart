@@ -14,6 +14,7 @@ class SessionResultDialog extends StatelessWidget {
     required this.durationSeconds,
     required this.starsEarned,
     this.reviewLabel = '查看错题',
+    this.adventureFeedback,
   });
 
   final int totalProblems;
@@ -21,6 +22,7 @@ class SessionResultDialog extends StatelessWidget {
   final int durationSeconds;
   final int starsEarned;
   final String reviewLabel;
+  final String? adventureFeedback;
 
   double get accuracy => totalProblems > 0 ? correctCount / totalProblems : 0.0;
 
@@ -64,7 +66,7 @@ class SessionResultDialog extends StatelessWidget {
                 Icon(_grade.icon, color: theme.colorScheme.primary, size: 28),
                 const SizedBox(height: SpacingTokens.sm),
                 Text(
-                  _grade.text,
+                  adventureFeedback == null ? _grade.text : '又走过了一站！',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -85,6 +87,10 @@ class SessionResultDialog extends StatelessWidget {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (adventureFeedback != null) ...[
+            Text(adventureFeedback!, textAlign: TextAlign.center),
+            const SizedBox(height: SpacingTokens.md),
+          ],
           // 星星
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -127,10 +133,20 @@ class SessionResultDialog extends StatelessWidget {
                   onPressed: () => Navigator.of(context).pop('review'),
                   child: Text(reviewLabel, textAlign: TextAlign.center),
                 ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop('retry'),
-                child: const Text('再练一组', textAlign: TextAlign.center),
-              ),
+              if (adventureFeedback != null) ...[
+                FilledButton.tonal(
+                  onPressed: () => Navigator.of(context).pop('retry'),
+                  child: const Text('重玩这一站'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop('map'),
+                  child: const Text('回到探险地图'),
+                ),
+              ] else
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop('retry'),
+                  child: const Text('再练一组', textAlign: TextAlign.center),
+                ),
             ],
           ),
         ],

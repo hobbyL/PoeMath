@@ -23,14 +23,21 @@ Future<List<Achievement>> checkAchievements(
   WidgetRef ref, {
   MathSession? latestSession,
   PracticeDraftRepository? mutation,
+  void Function()? ensureCurrent,
 }) => (mutation ?? PracticeDraftRepository()).guard(
-  () => _checkAchievements(ref, latestSession: latestSession),
+  () => _checkAchievements(
+    ref,
+    latestSession: latestSession,
+    ensureCurrent: ensureCurrent,
+  ),
 );
 
 Future<List<Achievement>> _checkAchievements(
   WidgetRef ref, {
   MathSession? latestSession,
+  void Function()? ensureCurrent,
 }) async {
+  ensureCurrent?.call();
   final achievementRepo = ref.read(achievementRepoProvider);
   final statsRepo = ref.read(userStatsRepoProvider);
   final mistakeRepo = ref.read(mathMistakeRepoProvider);
@@ -62,5 +69,6 @@ Future<List<Achievement>> _checkAchievements(
       formulaFavorites: formulaFavRepo.count,
       hardModeTotalProblems: hardModeTotal,
     ),
+    ensureCurrent: ensureCurrent,
   );
 }

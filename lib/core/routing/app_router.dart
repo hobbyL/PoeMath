@@ -36,6 +36,10 @@ import 'package:poemath/features/math/math_practice_page.dart';
 import 'package:poemath/features/math/math_mistake_detail_page.dart';
 import 'package:poemath/features/math/math_session_detail_page.dart';
 import 'package:poemath/features/math/math_home_page.dart';
+import 'package:poemath/domain/math_adventure_catalog.dart';
+import 'package:poemath/features/math/adventure/math_adventure_page.dart';
+import 'package:poemath/features/math/adventure/math_adventure_album_page.dart';
+import 'package:poemath/features/math/adventure/math_adventure_practice_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_generate_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_library_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_practice_page.dart';
@@ -526,6 +530,35 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.home}) {
         ),
       ),
       // ============ 口算练习（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.mathAdventure,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const MathAdventurePage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathAdventureAlbum,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const MathAdventureAlbumPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathAdventurePractice,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: MathAdventurePracticePage(
+            node: MathAdventureNode(
+              grade: int.tryParse(state.pathParameters['grade'] ?? '') ?? 0,
+              semester: state.pathParameters['semester'] ?? '',
+              skillId: state.pathParameters['skillId'] ?? '',
+            ),
+            resume: state.uri.queryParameters['resume'] == '1',
+            fromMap: state.uri.queryParameters['fromMap'] == '1',
+          ),
+        ),
+      ),
       GoRoute(
         path: AppRoutes.mathPractice,
         pageBuilder: (context, state) => fadeSlideTransitionPage(

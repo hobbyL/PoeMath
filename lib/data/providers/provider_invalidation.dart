@@ -9,6 +9,7 @@ import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/adventure/math_adventure_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 
@@ -27,6 +28,10 @@ void invalidateLearningBackground(void Function(ProviderOrFamily) invalidate) {
 
 /// 刷新所有从 Hive 读取的缓存 Provider，确保 UI 立即反映最新数据。
 void invalidateAllHiveProviders(void Function(ProviderOrFamily) invalidate) {
+  invalidate(mathAdventureRepositoryProvider);
+  invalidate(mathAdventureSettingsProvider);
+  invalidate(mathAdventureProgressProvider);
+  invalidate(mathAdventureReconcileProvider);
   // ---- 首页 / 个人中心 ----
   invalidate(todayCheckInProvider);
   invalidate(isCheckedInProvider);
