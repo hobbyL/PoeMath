@@ -158,7 +158,7 @@ lib/
 │   ├── widgets/       # 共享组件 (ColoredCard, AppTile, ConfettiOverlay, CelebrationDialog)
 │   ├── services/      # 教材、题图、语音、AI 生成/讲解、备份与应用更新服务
 │   └── prompts/       # AI 讲解默认提示词常量
-├── data/              # Hive 模型、仓储、Provider（19 个 Box）
+├── data/              # Hive 模型、仓储、Provider（21 个 Box）
 │   ├── models/        # 学习记录、教材、题库与服务配置模型
 │   └── repositories/  # 学习、教材、题库与设置仓储/账本
 ├── domain/            # 教材课程、识字书写、表达与学习结算等业务规则

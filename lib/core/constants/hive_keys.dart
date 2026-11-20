@@ -31,6 +31,7 @@ class HiveKeys {
 
   /// 口算练习会话 Box
   static const String mathSessionBox = 'math_sessions';
+  static const String mathAdventureProgressBox = 'math_adventure_progress';
 
   /// 公式收藏 Box
   static const String formulaFavoriteBox = 'formula_favorites';

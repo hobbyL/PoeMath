@@ -87,9 +87,9 @@ void main() {
   });
 
   Future<ResolvedCipher> resolve() => HiveEncryptionKeyResolver.resolve(
-        boxDir: dir.path,
-        credentialStore: store,
-      );
+    boxDir: dir.path,
+    credentialStore: store,
+  );
 
   group('全新安装', () {
     test('无密钥、无文件 → newInstall，生成密钥', () async {
@@ -133,8 +133,9 @@ void main() {
         base64Decode(store.values[HiveEncryptionKeyProvider.keyName]!),
         _key(2),
       );
-      final files =
-          Directory('${dir.path}/hive_recovery').listSync().whereType<File>();
+      final files = Directory('${dir.path}/hive_recovery')
+          .listSync()
+          .whereType<File>();
       expect(files, hasLength(1));
       expect(await files.single.readAsBytes(), before);
     });
@@ -297,9 +298,9 @@ void main() {
     test('备份阶段失败保留完整源文件，重试可迁移', () async {
       await _writeBox(dir, 'poems', {'p': 'original'});
       final original = await File('${dir.path}/poems.hive').readAsBytes();
-      final blocker =
-          await Directory('${dir.path}/poems.hive.plaintext.bak.pending')
-              .create();
+      final blocker = await Directory(
+        '${dir.path}/poems.hive.plaintext.bak.pending',
+      ).create();
       await expectLater(resolve(), throwsA(isA<HiveError>()));
       expect(await File('${dir.path}/poems.hive').readAsBytes(), original);
       final key = store.values[HiveEncryptionKeyProvider.keyName];
@@ -310,15 +311,20 @@ void main() {
   });
 
   group('allBoxNames', () {
-    test('覆盖 HiveBoxes 打开的全部 20 个 box', () {
+    test('覆盖 HiveBoxes 打开的全部 21 个 box', () {
       // 漏一个就是一处明文泄漏，因此数量与名单都要钉住。
-      expect(HiveEncryptionKeyResolver.allBoxNames, hasLength(20));
+      expect(HiveEncryptionKeyResolver.allBoxNames, hasLength(21));
       expect(
         HiveEncryptionKeyResolver.allBoxNames.toSet(),
-        hasLength(20),
+        hasLength(21),
         reason: '名单中不应有重复项',
       );
-      for (final required in ['poems', 'settings', 'meta']) {
+      for (final required in [
+        'poems',
+        'settings',
+        'meta',
+        'math_adventure_progress',
+      ]) {
         expect(HiveEncryptionKeyResolver.allBoxNames, contains(required));
       }
     });

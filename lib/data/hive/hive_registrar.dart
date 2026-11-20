@@ -17,6 +17,7 @@ import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/models/math_adventure_progress.dart';
 import 'package:poemath/data/models/formula_favorite.dart';
 import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/data/models/check_in.dart';
@@ -57,6 +58,7 @@ void registerHiveAdapters() {
   _register(ConversationAdapter()); // typeId: 17
   _register(MessageAdapter()); // typeId: 18
   _register(PictureStoryPracticeRecordAdapter()); // typeId: 21
+  _register(MathAdventureProgressAdapter()); // typeId: 22
 
   // 枚举 Adapter
   _register(LearningStatusAdapter()); // typeId: 20

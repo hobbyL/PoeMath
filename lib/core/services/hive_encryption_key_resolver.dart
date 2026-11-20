@@ -46,6 +46,7 @@ class HiveEncryptionKeyResolver {
     HiveKeys.reviewBox,
     HiveKeys.mistakeBox,
     HiveKeys.mathSessionBox,
+    HiveKeys.mathAdventureProgressBox,
     HiveKeys.formulaFavoriteBox,
     HiveKeys.achievementBox,
     HiveKeys.checkInBox,
@@ -72,8 +73,9 @@ class HiveEncryptionKeyResolver {
     final hasFiles = allBoxNames.any(
       (name) =>
           File('$boxDir/$name.hive').existsSync() ||
-          File('$boxDir/$name.hive${HiveEncryptionMigration.plaintextBackupSuffix}')
-              .existsSync(),
+          File(
+            '$boxDir/$name.hive${HiveEncryptionMigration.plaintextBackupSuffix}',
+          ).existsSync(),
     );
     if (!hasFiles) {
       return (
@@ -96,8 +98,8 @@ class HiveEncryptionKeyResolver {
     if (unreadable.isNotEmpty) {
       // Preserve undecodable files in a private recovery directory before reuse.
       // Never delete them or overwrite a valid stored key on probe failures.
-      final recovery =
-          await Directory('$boxDir/hive_recovery').create(recursive: true);
+      final recovery = await Directory('$boxDir/hive_recovery')
+          .create(recursive: true);
       for (final name in unreadable) {
         final source = File('$boxDir/$name.hive');
         final id = DateTime.now().microsecondsSinceEpoch;
@@ -107,8 +109,9 @@ class HiveEncryptionKeyResolver {
     }
     return (
       cipher: HiveAesCipher(existing.key),
-      status:
-          unreadable.isEmpty ? HiveKeyStatus.ok : HiveKeyStatus.recoveredEmpty,
+      status: unreadable.isEmpty
+          ? HiveKeyStatus.ok
+          : HiveKeyStatus.recoveredEmpty,
     );
   }
 

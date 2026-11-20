@@ -70,6 +70,7 @@ Future<void> drainHiveWritesForTesting(WidgetTester tester) async {
     HiveBoxes.reviewSchedules,
     HiveBoxes.mathMistakes,
     HiveBoxes.mathSessions,
+    HiveBoxes.mathAdventureProgress,
     HiveBoxes.formulaFavorites,
     HiveBoxes.achievements,
     HiveBoxes.checkIns,

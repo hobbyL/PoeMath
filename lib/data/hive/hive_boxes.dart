@@ -16,6 +16,7 @@ import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/models/math_adventure_progress.dart';
 import 'package:poemath/data/models/formula_favorite.dart';
 import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/data/models/check_in.dart';
@@ -41,6 +42,7 @@ class HiveBoxes {
   static late Box<ReviewSchedule> reviewSchedules;
   static late Box<MathMistake> mathMistakes;
   static late Box<MathSession> mathSessions;
+  static late Box<MathAdventureProgress> mathAdventureProgress;
   static late Box<FormulaFavorite> formulaFavorites;
   static late Box<Achievement> achievements;
   static late Box<CheckIn> checkIns;
@@ -107,6 +109,11 @@ class HiveBoxes {
     );
     mathSessions = await Hive.openBox<MathSession>(
       HiveKeys.mathSessionBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    mathAdventureProgress = await Hive.openBox<MathAdventureProgress>(
+      HiveKeys.mathAdventureProgressBox,
       crashRecovery: false,
       encryptionCipher: cipher,
     );
