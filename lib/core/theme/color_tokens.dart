@@ -53,22 +53,22 @@ class ColorTokens {
   static const Color inkOchre = Color(0xFF7C4028);
   static const Color inkOchreLight = Color(0xFFF0BE82);
 
-  // 松墨：青白素宣、松绿与冷墨；夜色保持青绿基调。
-  static const Color pinePaper = Color(0xFFEAF2EE);
-  static const Color pineSurface = Color(0xFFF4FBF7);
-  static const Color pineRaised = Color(0xFFDDE9E2);
-  static const Color pinePaperDeep = Color(0xFFD0DFD6);
-  static const Color pineInk = Color(0xFF1E3A33);
-  static const Color pineMutedInk = Color(0xFF4A5C56);
-  static const Color pineRule = Color(0xFFBBCDC2);
+  // 松墨：近白素宣、沉墨与松绿。绿只用于墨色，纸面保持低饱和。
+  static const Color pinePaper = Color(0xFFF5F7F6);
+  static const Color pineSurface = Color(0xFFFCFEFD);
+  static const Color pineRaised = Color(0xFFECF0ED);
+  static const Color pinePaperDeep = Color(0xFFE1E8E3);
+  static const Color pineInk = Color(0xFF263A32);
+  static const Color pineMutedInk = Color(0xFF58665F);
+  static const Color pineRule = Color(0xFFD7E0D9);
   static const Color pineAccent = Color(0xFF4E6273);
   static const Color pineAccentLight = Color(0xFFB5CDD9);
-  static const Color pineNight = Color(0xFF112B29);
-  static const Color pineNightSurface = Color(0xFF1D3934);
-  static const Color pineNightRaised = Color(0xFF2C493F);
+  static const Color pineNight = Color(0xFF151F1C);
+  static const Color pineNightSurface = Color(0xFF202D27);
+  static const Color pineNightRaised = Color(0xFF2D3D33);
   static const Color pineNightInk = Color(0xFFE4F2E9);
   static const Color pineNightMuted = Color(0xFFAFCCC1);
-  static const Color pineNightRule = Color(0xFF47675C);
+  static const Color pineNightRule = Color(0xFF3C5146);
 
   // 赭石：暖黄旧纸、棕墨与朱砂；夜色保持赤褐基调。
   static const Color ochrePaper = Color(0xFFEDD4AC);

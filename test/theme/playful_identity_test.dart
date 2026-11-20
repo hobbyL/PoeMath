@@ -21,7 +21,7 @@ void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForWidgetTesting);
 
-  for (final preset in [AppSubject.candy, AppSubject.space]) {
+  for (final preset in [AppSubject.poem, AppSubject.candy, AppSubject.space]) {
     for (final (width, scale, mode) in [
       (411.0, 1.0, ThemeMode.light),
       (411.0, 1.0, ThemeMode.dark),
@@ -55,7 +55,12 @@ void main() {
           expect(poem.top, math.top);
           expect(math.left, greaterThan(poem.right));
         } else {
-          expect(math.top, greaterThan(poem.bottom));
+          expect(
+            math.top,
+            preset == AppSubject.poem
+                ? closeTo(poem.bottom, .01)
+                : greaterThan(poem.bottom),
+          );
           expect(math.left, poem.left);
         }
 
@@ -78,10 +83,12 @@ void main() {
             tester.getCenter(navIcon).dy,
             closeTo(tester.getCenter(navLabel).dy, 1),
           );
-          expect(
-            tester.getRect(find.byType(NavigationBar)).left,
-            greaterThan(0),
-          );
+          if (preset == AppSubject.candy) {
+            expect(
+              tester.getRect(find.byType(NavigationBar)).left,
+              greaterThan(0),
+            );
+          }
         }
         final button = tester.widget<TextButton>(
           find.descendant(of: selected, matching: find.byType(TextButton)),
@@ -89,7 +96,10 @@ void main() {
         expect(
           contrastRatio(
             button.style!.foregroundColor!.resolve({})!,
-            button.style!.backgroundColor!.resolve({})!,
+            Color.alphaBlend(
+              button.style!.backgroundColor!.resolve({})!,
+              Theme.of(tester.element(selected)).colorScheme.surface,
+            ),
           ),
           greaterThanOrEqualTo(4.5),
         );
@@ -132,7 +142,7 @@ void main() {
         final entries = find.byType(PracticeEntryCard);
         final first = tester.getRect(entries.at(0));
         final second = tester.getRect(entries.at(1));
-        if (preset == AppSubject.candy && scale == 1) {
+        if (preset != AppSubject.space && scale == 1) {
           expect(first.top, second.top);
           expect(second.left, greaterThan(first.right));
         } else {

@@ -3,9 +3,9 @@ import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 
-enum AppCardStyle { paper, soft, outlined }
+enum AppCardStyle { paper, sheet, soft, outlined }
 
-enum AppVisualStyle { ink, storybook, space }
+enum AppVisualStyle { ink, pine, storybook, space }
 
 /// 颜色以外的外观差异，随主题切换一起过渡。
 class AppAppearance extends ThemeExtension<AppAppearance> {
@@ -25,7 +25,8 @@ class AppAppearance extends ThemeExtension<AppAppearance> {
   final double controlRadius;
   final double navigationRadius;
 
-  bool get playful => visualStyle != AppVisualStyle.ink;
+  bool get pine => visualStyle == AppVisualStyle.pine;
+  bool get playful => storybook || space;
   bool get storybook => visualStyle == AppVisualStyle.storybook;
   bool get space => visualStyle == AppVisualStyle.space;
 

@@ -24,7 +24,7 @@ class AppThemeBuilder {
       AppVisualStyle.space => BeveledRectangleBorder(
         borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
       ),
-      AppVisualStyle.ink => shape,
+      AppVisualStyle.ink || AppVisualStyle.pine => shape,
     };
     final fieldBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(appearance.controlRadius),
@@ -133,7 +133,11 @@ class AppThemeBuilder {
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return text.labelMedium!.copyWith(
-            color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+            color: selected
+                ? appearance.pine
+                      ? scheme.primary
+                      : scheme.onPrimary
+                : scheme.onSurfaceVariant,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
           );
         }),

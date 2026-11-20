@@ -313,6 +313,20 @@ class _MainShellState extends ConsumerState<MainShell>
                 ),
               ),
             )
+          : theme.appearance.pine
+          ? ColoredCard(
+              color: theme.colorScheme.surface,
+              backgroundOpacity: 1,
+              borderRadius: BorderRadius.zero,
+              padding: EdgeInsets.zero,
+              border: Border(
+                top: BorderSide(
+                  color: theme.colorScheme.outlineVariant,
+                  width: .5,
+                ),
+              ),
+              child: navigation,
+            )
           : navigation,
     );
   }
@@ -346,7 +360,7 @@ class _NavigationTab extends StatelessWidget {
               ? theme.colorScheme.onPrimary
               : theme.colorScheme.onSurfaceVariant,
         );
-    final labelStyle = theme.appearance.space
+    final labelStyle = theme.appearance.space || theme.appearance.pine
         ? defaultLabelStyle.copyWith(
             color: selected
                 ? theme.colorScheme.primary
@@ -377,7 +391,7 @@ class _NavigationTab extends StatelessWidget {
                   onPressed: onTap,
                   style: TextButton.styleFrom(
                     foregroundColor: labelStyle.color,
-                    backgroundColor: selected
+                    backgroundColor: selected && !theme.appearance.pine
                         ? theme.appearance.space
                               ? theme.colorScheme.primaryContainer
                               : theme.colorScheme.primary
@@ -399,7 +413,34 @@ class _NavigationTab extends StatelessWidget {
                         ? Duration.zero
                         : const Duration(milliseconds: 200),
                   ),
-                  child: theme.appearance.space
+                  child: theme.appearance.pine
+                      ? Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                glyph,
+                                const SizedBox(width: SpacingTokens.xs),
+                                labelWidget,
+                              ],
+                            ),
+                            if (selected)
+                              Positioned(
+                                bottom: -SpacingTokens.sm,
+                                child: SizedBox(
+                                  width: SpacingTokens.md,
+                                  height: SpacingTokens.xs / 2,
+                                  child: ColoredBox(
+                                    color: theme.colorScheme.secondary,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        )
+                      : theme.appearance.space
                       ? Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [

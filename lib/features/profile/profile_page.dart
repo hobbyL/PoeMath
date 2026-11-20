@@ -181,6 +181,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       value: pageStyle,
       child: Scaffold(
         body: Stack(
+          // 短内容也铺满正文视口，下拉时才能使用底部空白而不被提前裁切。
+          fit: StackFit.expand,
           children: [
             ScrollConfiguration(
               behavior: ScrollConfiguration.of(context)
@@ -403,7 +405,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           style: theme.textTheme.bodyMedium?.copyWith(
             fontSize: TypographyTokens.fsHeadline,
             fontWeight: FontWeight.bold,
-            color: color,
+            color: theme.appearance.pine ? theme.colorScheme.onSurface : color,
           ),
         ),
         const SizedBox(height: SpacingTokens.xs),

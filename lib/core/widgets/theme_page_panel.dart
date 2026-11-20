@@ -39,9 +39,13 @@ class ThemePagePanel extends StatelessWidget {
               : null,
           child: Padding(
             padding: EdgeInsets.fromLTRB(
-              storybook ? SpacingTokens.xl : SpacingTokens.md,
-              SpacingTokens.md,
-              SpacingTokens.md,
+              storybook
+                  ? SpacingTokens.xl
+                  : theme.appearance.pine
+                  ? SpacingTokens.lg
+                  : SpacingTokens.md,
+              theme.appearance.pine ? SpacingTokens.lg : SpacingTokens.md,
+              theme.appearance.pine ? SpacingTokens.lg : SpacingTokens.md,
               SpacingTokens.md,
             ),
             child: child,

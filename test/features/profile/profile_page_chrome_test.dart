@@ -37,6 +37,7 @@ import 'package:poemath/features/profile/providers/profile_nickname_providers.da
 
 import '../../helpers/day_key_override.dart';
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/theme_contrast.dart';
 
 Future<void> _pump(
   WidgetTester tester, {
@@ -248,6 +249,36 @@ void main() {
     }
   }
 
+  for (final subject in AppSubject.values) {
+    testWidgets('个人页下拉使用底部空白，周报完整保留在可点击区域：$subject', (tester) async {
+      const size = Size(411, 1100);
+      await _pump(tester, subject: subject, size: size);
+      await drainHiveWritesForTesting(tester);
+      final viewport = find.byType(SingleChildScrollView);
+      final report = find.ancestor(
+        of: find.text('本周学习周报'),
+        matching: find.byType(AppTile),
+      );
+      final before = tester.getRect(report);
+      expect(tester.getRect(viewport).bottom, closeTo(size.height, .01));
+      final gesture = await tester.startGesture(const Offset(40, 80));
+      for (var step = 0; step < 4; step++) {
+        await gesture.moveBy(const Offset(0, 80));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final after = tester.getRect(report);
+      expect(after.top, greaterThan(before.top + 30));
+      expect(after.bottom, lessThan(size.height));
+      expect(report.hitTestable(at: const Alignment(0, .95)), findsOneWidget);
+      await gesture.up();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(tester.getRect(report).top, closeTo(before.top, .01));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final subject in [AppSubject.candy, AppSubject.space]) {
     testWidgets('童趣个人页连续下拉后回弹：$subject', (tester) async {
       await _pump(tester, subject: subject);
@@ -310,7 +341,8 @@ void main() {
         );
         expect(tester.getTopLeft(background), Offset.zero);
         final headerIcons =
-            brightness == Brightness.light && subject == AppSubject.candy
+            brightness == Brightness.light &&
+                (subject == AppSubject.candy || subject == AppSubject.poem)
             ? Brightness.dark
             : Brightness.light;
         expectStatusBar(headerIcons);
@@ -434,6 +466,7 @@ void main() {
         tester,
         reduceMotion: reduceMotion,
         accessibleNavigation: true,
+        subject: AppSubject.math,
       );
       final background = find.byKey(
         const ValueKey('profile-header-background'),
@@ -516,22 +549,33 @@ void main() {
 
   for (final subject in AppSubject.values) {
     for (final brightness in Brightness.values) {
-      testWidgets('个人页星光完整周期保持文字对比度：$subject/$brightness', (tester) async {
+      testWidgets('个人页背景完整周期与徽章文字保持对比度：$subject/$brightness', (tester) async {
         await _pump(tester, subject: subject, brightness: brightness);
-        final foreground = tester
-            .widget<Text>(find.text('12345 颗星星'))
-            .style!
-            .color!
-            .computeLuminance();
+        final foreground = DefaultTextStyle.of(
+          tester.element(find.byKey(const ValueKey('profile-nickname-label'))),
+        ).style.color!.computeLuminance();
+        if (subject == AppSubject.poem) {
+          final stars = find.text('12345 颗星星');
+          expect(
+            contrastRatio(
+              tester.widget<Text>(stars).style!.color!,
+              solidBackgroundOf(tester.element(stars)),
+            ),
+            greaterThanOrEqualTo(4.5),
+          );
+        }
         final boundary = tester.renderObject<RenderRepaintBoundary>(
           find.byKey(const ValueKey('profile-header-background')),
         );
         final orbitFinder = find.byKey(const ValueKey('hero-avatar-orbits'));
         expect(
           orbitFinder,
-          subject == AppSubject.candy ? findsNothing : findsOneWidget,
+          subject == AppSubject.candy || subject == AppSubject.poem
+              ? findsNothing
+              : findsOneWidget,
         );
-        final orbitBoundary = subject == AppSubject.candy
+        final orbitBoundary =
+            subject == AppSubject.candy || subject == AppSubject.poem
             ? null
             : tester.renderObject<RenderRepaintBoundary>(orbitFinder);
         final orbitOffset = orbitBoundary == null

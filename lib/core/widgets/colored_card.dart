@@ -97,6 +97,10 @@ class ColoredCard extends StatelessWidget {
         backgroundOpacity > 0 &&
         backgroundOpacity < 1;
     final tint = color?.withValues(alpha: backgroundOpacity);
+    // 素宣的默认表面不重复染绿；显式强调、透明遮罩仍使用调用方的强度。
+    final sheetTint = appearance.pine && backgroundOpacity == .02
+        ? color?.withValues(alpha: .006)
+        : tint;
     final cutCorners =
         paper && appearance.space && borderRadius == null && border == null;
     final cutShape = BeveledRectangleBorder(
@@ -105,13 +109,20 @@ class ColoredCard extends StatelessWidget {
     );
     final decoration = BoxDecoration(
       color: gradient == null
-          ? (paper ? Color.alphaBlend(tint!, scheme.surface) : tint)
+          ? (paper ? Color.alphaBlend(sheetTint!, scheme.surface) : tint)
           : null,
       gradient: gradient,
       boxShadow:
           boxShadow ??
           (paper
               ? switch (appearance.cardStyle) {
+                  AppCardStyle.sheet => [
+                    BoxShadow(
+                      color: scheme.onSurface.withValues(alpha: .045),
+                      offset: const Offset(0, SpacingTokens.xs / 2),
+                      blurRadius: SpacingTokens.sm,
+                    ),
+                  ],
                   AppCardStyle.paper => [
                     BoxShadow(
                       color: scheme.outlineVariant.withValues(alpha: .45),
@@ -131,6 +142,7 @@ class ColoredCard extends StatelessWidget {
           border ??
           (paper
               ? switch (appearance.cardStyle) {
+                  AppCardStyle.sheet => null,
                   AppCardStyle.paper => Border.all(
                     color: scheme.outlineVariant,
                     strokeAlign: BorderSide.strokeAlignOutside,

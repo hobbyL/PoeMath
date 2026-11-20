@@ -73,8 +73,14 @@ class InkTheme {
         ink,
         headingFontFamily: TypographyTokens.inkFontFamily,
         headingFallback: TypographyTokens.serifFallback,
+        headingWeight: ochre ? FontWeight.w600 : FontWeight.w500,
       ),
       appearance: AppAppearance(
+        visualStyle: ochre ? AppVisualStyle.ink : AppVisualStyle.pine,
+        cardStyle: ochre ? AppCardStyle.paper : AppCardStyle.sheet,
+        controlRadius: ochre
+            ? SpacingTokens.radiusSmall
+            : SpacingTokens.radiusCompact,
         heroImage: ochre
             ? 'assets/images/ink_study_overlay.png'
             : 'assets/images/ink_landscape_overlay.png',

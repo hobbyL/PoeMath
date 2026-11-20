@@ -136,7 +136,9 @@ void main() {
               matching: find.byType(ColoredCard),
             ),
           );
-          for (final color in card.gradient!.colors) {
+          for (final color
+              in card.gradient?.colors ??
+                  [solidBackgroundOf(tester.element(find.text('成长徽章')))]) {
             expect(
               contrastRatio(foreground, color),
               greaterThanOrEqualTo(4.5),

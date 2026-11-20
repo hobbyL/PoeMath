@@ -96,7 +96,7 @@ void main() {
         final colors = Theme.of(labelContext).colorScheme;
         expect(
           style.color,
-          selected ? colors.onPrimary : colors.onSurfaceVariant,
+          selected ? colors.primary : colors.onSurfaceVariant,
         );
         expect(style.fontWeight, selected ? FontWeight.w700 : FontWeight.w400);
         expect(
@@ -109,10 +109,7 @@ void main() {
           matching: find.byType(TextButton),
         );
         final button = tester.widget<TextButton>(buttonFinder);
-        expect(
-          button.style!.backgroundColor!.resolve({}),
-          selected ? colors.primary : Colors.transparent,
-        );
+        expect(button.style!.backgroundColor!.resolve({}), Colors.transparent);
         final bounds = tester.getRect(buttonFinder);
         final labelBounds = tester.getRect(_bottomBarItem(label));
         final icon = find.descendant(of: tab, matching: find.byType(Icon));

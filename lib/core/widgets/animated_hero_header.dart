@@ -25,6 +25,14 @@ class AnimatedHeroColors {
     final dark = theme.brightness == Brightness.dark;
     final starlight = style == AnimatedHeroStyle.starlight;
     final scheme = theme.colorScheme;
+    if (theme.appearance.pine) {
+      return AnimatedHeroColors._(
+        foreground: scheme.onSurface,
+        base: theme.scaffoldBackgroundColor,
+        depth: scheme.surfaceContainerHigh,
+        glow: scheme.surface,
+      );
+    }
     if (theme.appearance.space) {
       return const AnimatedHeroColors._(
         foreground: ColorTokens.spaceNightInk,
@@ -284,9 +292,10 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                             colors.foreground,
                                                         motion: _motion,
                                                       )
-                                                    : widget.style ==
-                                                          AnimatedHeroStyle
-                                                              .starlight
+                                                    : !theme.appearance.pine &&
+                                                          widget.style ==
+                                                              AnimatedHeroStyle
+                                                                  .starlight
                                                     ? HeroStarlightPainter(
                                                         base: colors.base,
                                                         depth: colors.depth,
@@ -308,6 +317,9 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                         pull:
                                                             stretch /
                                                             (height + stretch),
+                                                        ink: theme
+                                                            .appearance
+                                                            .pine,
                                                       ),
                                               )
                                               .animatePage(context)
@@ -351,6 +363,16 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                   ),
                                                 ),
                                               ),
+                                            )
+                                          else if (theme.appearance.pine)
+                                            _PineLandscape(
+                                              image: theme.appearance.heroImage,
+                                              ink: colors.foreground,
+                                              paper: colors.base,
+                                              actionInset: actionInset,
+                                              dark:
+                                                  theme.brightness ==
+                                                  Brightness.dark,
                                             )
                                           else
                                             RepaintBoundary(
@@ -451,7 +473,8 @@ class HeroAvatarHalo extends StatelessWidget {
           : SpacingTokens.lg,
       vertical: SpacingTokens.xs,
     );
-    if (Theme.of(context).appearance.storybook) {
+    if (Theme.of(context).appearance.storybook ||
+        Theme.of(context).appearance.pine) {
       return Padding(padding: padding, child: child);
     }
     final colors = AnimatedHeroColors(
@@ -535,6 +558,42 @@ class HeroStatusTag extends StatelessWidget {
       style: AnimatedHeroStyle.starlight,
     );
     final motion = context.dependOnInheritedWidgetOfExactType<_HeroMotion>()!;
+    if (theme.appearance.pine) {
+      final stars = icon == Icons.star_rounded;
+      final accent = Color.lerp(
+        stars ? theme.colorScheme.secondary : theme.colorScheme.primary,
+        stars ? theme.colorScheme.primary : theme.colorScheme.secondary,
+        style.emphasis,
+      )!;
+      return RepaintBoundary(
+        child: ColoredCard(
+          color: accent,
+          backgroundOpacity: .06,
+          boxShadow: const [],
+          borderRadius: BorderRadius.circular(SpacingTokens.radiusCompact),
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.sm + SpacingTokens.xs,
+            vertical: SpacingTokens.sm,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ExcludeSemantics(
+                child: Icon(icon, size: SpacingTokens.md, color: accent),
+              ),
+              const SizedBox(width: SpacingTokens.xs),
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelMedium?.copyWith(color: accent),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final decoration = theme.appearance.playful
         ? HeroTagStyle(
             accent: Color.lerp(
@@ -801,6 +860,7 @@ class _HeroAuroraPainter extends CustomPainter {
     required this.glow,
     required this.pull,
     required this.motion,
+    this.ink = false,
   }) : super(repaint: motion);
 
   final Color base;
@@ -809,6 +869,7 @@ class _HeroAuroraPainter extends CustomPainter {
   final Color glow;
   final double pull;
   final Animation<double> motion;
+  final bool ink;
   static const _minimumContrast = 6.5;
 
   // 背景很矮，固定网格足以平滑插值；复用缓冲区，避免逐帧创建点列表。
@@ -830,8 +891,10 @@ class _HeroAuroraPainter extends CustomPainter {
   final _colors = Int32List(_vertexCount);
   Size? _meshSize;
 
-  late final _mist = _readable(Color.lerp(base, glow, .65)!);
-  late final _crest = _readable(Color.lerp(base, foreground, .3)!);
+  late final _mist = _readable(Color.lerp(base, glow, ink ? .35 : .65)!);
+  late final _crest = _readable(
+    ink ? Color.lerp(base, depth, .35)! : Color.lerp(base, foreground, .3)!,
+  );
 
   // 在调色时留足余量，色雾与亮纹交融也不会把文字下方叠成浅色。
   Color _readable(Color candidate) {
@@ -913,7 +976,7 @@ class _HeroAuroraPainter extends CustomPainter {
     mesh.dispose();
 
     // 亮纹铺满整个背景，左侧也保留清晰的线条，右端柔和淡出。
-    for (var line = 0; line < 3; line++) {
+    for (var line = 0; line < (ink ? 0 : 3); line++) {
       final path = Path();
       for (var sample = 0; sample <= 64; sample++) {
         final x = sample / 64;
@@ -950,5 +1013,72 @@ class _HeroAuroraPainter extends CustomPainter {
       oldDelegate.foreground != foreground ||
       oldDelegate.glow != glow ||
       oldDelegate.pull != pull ||
+      oldDelegate.ink != ink ||
       oldDelegate.motion != motion;
+}
+
+/// 山水沿纸面铺开，底部锚定保留亭子与近岸；纸边淡出衔接正文。
+class _PineLandscape extends StatelessWidget {
+  const _PineLandscape({
+    required this.image,
+    required this.ink,
+    required this.paper,
+    required this.actionInset,
+    required this.dark,
+  });
+
+  final String image;
+  final Color ink;
+  final Color paper;
+  final double actionInset;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final landscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final art = Image.asset(
+      image,
+      fit: landscape ? BoxFit.contain : BoxFit.cover,
+      alignment: Alignment.bottomRight,
+      cacheWidth: 960,
+      color: ink,
+      opacity: AlwaysStoppedAnimation(dark ? .14 : .32),
+      excludeFromSemantics: true,
+    );
+    return RepaintBoundary(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            right: landscape
+                ? actionInset + MediaQuery.paddingOf(context).right
+                : 0,
+            // 横屏山水在操作区前收笔，淡出图片右缘而不遮住背景。
+            child: landscape
+                ? ShaderMask(
+                    blendMode: BlendMode.dstIn,
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Colors.white, Colors.white, Colors.transparent],
+                      stops: [0, .92, 1],
+                    ).createShader(bounds),
+                    child: art,
+                  )
+                : art,
+          ),
+          // 水墨在纸边淡出，避免页头成为一个独立的实色横幅。
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [paper.withValues(alpha: 0), paper],
+                stops: const [.72, 1],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
