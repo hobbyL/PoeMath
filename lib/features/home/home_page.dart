@@ -25,6 +25,7 @@ import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/home/home_check_in_header.dart';
+import 'package:poemath/features/home/playful_check_in_content.dart';
 import 'package:poemath/features/home/practice_resume_section.dart';
 import 'package:poemath/features/home/today_plan_section.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
@@ -142,6 +143,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                 HomeCheckInHeader(
                   scrollController: _scroll,
                   pending: !isCheckedIn,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: SpacingTokens.lg,
+                    vertical: !theme.appearance.playful
+                        ? SpacingTokens.lg
+                        : media.orientation == Orientation.landscape
+                        ? SpacingTokens.sm
+                        : SpacingTokens.md,
+                  ),
                   child: _buildStreakCard(
                     context,
                     streak,
@@ -154,10 +163,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 // 覆盖背景时也覆盖它的状态栏样式，避免浅底仍显示白图标。
                 AnnotatedRegion<SystemUiOverlayStyle>(
                   value: pageOverlayStyle,
-                  child: ColoredCard(
-                    color: theme.scaffoldBackgroundColor,
-                    backgroundOpacity: 1,
-                    borderRadius: BorderRadius.zero,
+                  child: ThemePagePanel(
                     child: SafeArea(
                       top: false,
                       child: Column(
@@ -195,10 +201,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     final theme = Theme.of(context);
     final colors = HomeCheckInColors(theme);
     final selectedGoals = ref.watch(dailyGoalTypesProvider);
-    final pendingGoal = [
+    final goals = [
       for (final type in DailyGoalActivity.values)
         if (selectedGoals.contains(type)) _dailyGoalStatus(ref, type),
-    ].where((goal) => !goal.isComplete).firstOrNull;
+    ];
+    final pendingGoal = goals.where((goal) => !goal.isComplete).firstOrNull;
     final action = isCheckedIn
         ? Icon(
             Icons.check_circle_rounded,
@@ -289,10 +296,14 @@ class _HomePageState extends ConsumerState<HomePage> {
               }
             },
             style: FilledButton.styleFrom(
-              backgroundColor: theme.appearance.playful
+              backgroundColor: theme.appearance.space
+                  ? ColorTokens.spaceSecondaryLight
+                  : theme.appearance.playful
                   ? theme.colorScheme.primary
                   : colors.foreground,
-              foregroundColor: theme.appearance.playful
+              foregroundColor: theme.appearance.space
+                  ? ColorTokens.spaceNight
+                  : theme.appearance.playful
                   ? theme.colorScheme.onPrimary
                   : colors.base,
             ),
@@ -301,10 +312,15 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     final summary = Column(
       key: const ValueKey('home-check-in-summary'),
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: theme.appearance.playful
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Wrap(
+          alignment: theme.appearance.playful
+              ? WrapAlignment.center
+              : WrapAlignment.start,
           spacing: SpacingTokens.sm,
           runSpacing: SpacingTokens.xs,
           crossAxisAlignment: WrapCrossAlignment.center,
@@ -320,6 +336,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         const SizedBox(height: SpacingTokens.sm),
         Wrap(
+          alignment: theme.appearance.playful
+              ? WrapAlignment.center
+              : WrapAlignment.start,
           spacing: SpacingTokens.xs,
           crossAxisAlignment: WrapCrossAlignment.end,
           children: [
@@ -349,6 +368,16 @@ class _HomePageState extends ConsumerState<HomePage> {
     final media = MediaQuery.of(context);
     final contentWidth =
         media.size.width - media.padding.horizontal - SpacingTokens.lg * 2;
+    if (theme.appearance.playful) {
+      return PlayfulCheckInContent(
+        key: const ValueKey('home-check-in-content'),
+        contentWidth: contentWidth,
+        summary: summary,
+        action: reminder,
+        completedGoals: goals.where((goal) => goal.isComplete).length,
+        totalGoals: goals.length,
+      );
+    }
     final textScale = media.textScaler.scale(16) / 16;
     final effectiveWidth = contentWidth / textScale;
     if (!theme.appearance.playful &&
@@ -572,11 +601,20 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         const SizedBox(height: SpacingTokens.sm),
         ResponsiveCardGrid(
+          preferredTileWidth: theme.appearance.storybook ? 144 : null,
           children: [
             for (final goal in goals)
               AppTile(
+                flat: theme.appearance.storybook,
+                layout: theme.appearance.storybook
+                    ? AppTileLayout.poster
+                    : AppTileLayout.row,
                 icon: goal.isComplete ? Icons.check_circle_outline : goal.icon,
-                iconColor: theme.colorScheme.primary,
+                iconColor:
+                    theme.appearance.storybook &&
+                        goal.type == DailyGoalActivity.math
+                    ? theme.colorScheme.secondary
+                    : theme.colorScheme.primary,
                 title: goal.title,
                 subtitle: goal.isComplete
                     ? '目标已完成'

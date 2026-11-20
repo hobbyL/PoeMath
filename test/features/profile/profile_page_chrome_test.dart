@@ -48,6 +48,7 @@ Future<void> _pump(
   AppSubject subject = AppSubject.poem,
   String nickname = '小小学习家',
   UserStats? stats,
+  EdgeInsets safeInsets = const EdgeInsets.only(top: 32),
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -65,8 +66,8 @@ Future<void> _pump(
         theme: AppTheme.resolve(subject: subject, brightness: brightness),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            padding: const EdgeInsets.only(top: 32),
-            viewPadding: const EdgeInsets.only(top: 32),
+            padding: safeInsets,
+            viewPadding: safeInsets,
             textScaler: TextScaler.linear(textScale),
             disableAnimations: reduceMotion,
             accessibleNavigation: accessibleNavigation,
@@ -99,6 +100,97 @@ void main() {
   });
 
   for (final subject in AppSubject.values) {
+    for (final (size, scale) in [
+      (const Size(914, 411), 1.0),
+      (const Size(640, 320), 2.0),
+    ]) {
+      testWidgets('个人页横屏紧凑横排且编辑入口可用：$subject/$scale', (tester) async {
+        await _pump(
+          tester,
+          subject: subject,
+          size: size,
+          textScale: scale,
+          safeInsets: const EdgeInsets.only(left: 32, right: 24, top: 24),
+        );
+        await drainHiveWritesForTesting(tester);
+        final background = tester.getRect(
+          find.byKey(const ValueKey('profile-header-background')),
+        );
+        expect(background.height, lessThanOrEqualTo(200));
+        final avatar = tester.getRect(find.byType(CircleAvatar));
+        final name = tester.getRect(
+          find.byKey(const ValueKey('profile-nickname-label')),
+        );
+        final settings = tester.getRect(find.byTooltip('设置'));
+        expect(name.left, greaterThan(avatar.right));
+        expect(name.right, lessThan(settings.left));
+        // 两侧安全区为 32/24，中心比屏幕中心右移 4dp。
+        expect(name.center.dx, closeTo(background.center.dx + 4, 1));
+        final firstStat = tester.getRect(
+          find
+              .ancestor(
+                of: find.text('已学诗词'),
+                matching: find.byType(ColoredCard),
+              )
+              .first,
+        );
+        expect(firstStat.top, lessThan(size.height - 80));
+        for (final key in ['profile-avatar-change', 'profile-nickname-edit']) {
+          final target = find.byKey(ValueKey(key));
+          expect(target.hitTestable(), findsOneWidget);
+          expect(tester.getSize(target).height, greaterThanOrEqualTo(44));
+        }
+        expect(find.byTooltip('设置').hitTestable(), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('profile-nickname-edit')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(
+          find.byKey(const ValueKey('profile-nickname-input')),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('取消'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final subject in [AppSubject.candy, AppSubject.space]) {
+    testWidgets('童趣个人页连续下拉后回弹：$subject', (tester) async {
+      await _pump(tester, subject: subject);
+      await drainHiveWritesForTesting(tester);
+      final background = find.byKey(
+        const ValueKey('profile-header-background'),
+      );
+      final before = tester.getRect(background);
+      for (final target in [
+        find.byType(CircleAvatar),
+        find.byKey(const ValueKey('profile-nickname-label')),
+        find.byKey(const ValueKey('profile-user-tags')),
+      ]) {
+        expect(tester.getCenter(target).dx, closeTo(before.center.dx, 1));
+      }
+      final scroll = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
+      final gesture = await tester.startGesture(const Offset(40, 80));
+      for (var step = 0; step < 4; step++) {
+        await gesture.moveBy(const Offset(0, 40));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(scroll.position.pixels, lessThan(-30));
+      expect(tester.getRect(background).top, closeTo(0, .01));
+      await gesture.up();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(tester.getRect(background), before);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final subject in AppSubject.values) {
     for (final brightness in Brightness.values) {
       testWidgets('个人页状态栏透明衔接星空，滚动后图标适配正文：$subject/$brightness', (
         tester,
@@ -126,8 +218,7 @@ void main() {
         );
         expect(tester.getTopLeft(background), Offset.zero);
         final headerIcons =
-            brightness == Brightness.light &&
-                (subject == AppSubject.candy || subject == AppSubject.space)
+            brightness == Brightness.light && subject == AppSubject.candy
             ? Brightness.dark
             : Brightness.light;
         expectStatusBar(headerIcons);
@@ -343,20 +434,26 @@ void main() {
         final boundary = tester.renderObject<RenderRepaintBoundary>(
           find.byKey(const ValueKey('profile-header-background')),
         );
-        final orbitBoundary = tester.renderObject<RenderRepaintBoundary>(
-          find.byKey(const ValueKey('hero-avatar-orbits')),
+        final orbitFinder = find.byKey(const ValueKey('hero-avatar-orbits'));
+        expect(
+          orbitFinder,
+          subject == AppSubject.candy ? findsNothing : findsOneWidget,
         );
-        final orbitOffset =
-            orbitBoundary.localToGlobal(Offset.zero) -
-            boundary.localToGlobal(Offset.zero);
+        final orbitBoundary = subject == AppSubject.candy
+            ? null
+            : tester.renderObject<RenderRepaintBoundary>(orbitFinder);
+        final orbitOffset = orbitBoundary == null
+            ? Offset.zero
+            : orbitBoundary.localToGlobal(Offset.zero) -
+                  boundary.localToGlobal(Offset.zero);
         for (var step = 0; step < 9; step++) {
           final pixels = (await tester.runAsync(() async {
             final background = await boundary.toImage();
-            final orbits = await orbitBoundary.toImage();
+            final orbits = await orbitBoundary?.toImage();
             final recorder = ui.PictureRecorder();
-            Canvas(recorder)
-              ..drawImage(background, Offset.zero, Paint())
-              ..drawImage(orbits, orbitOffset, Paint());
+            final canvas = Canvas(recorder)
+              ..drawImage(background, Offset.zero, Paint());
+            if (orbits != null) canvas.drawImage(orbits, orbitOffset, Paint());
             final picture = recorder.endRecording();
             final image = await picture.toImage(
               background.width,
@@ -367,7 +464,7 @@ void main() {
             } finally {
               image.dispose();
               picture.dispose();
-              orbits.dispose();
+              orbits?.dispose();
               background.dispose();
             }
           }))!;
@@ -398,7 +495,7 @@ void main() {
     }
   }
 
-  testWidgets('头像下方等级和星星标签居中并排，窄屏大字号自动换行', (tester) async {
+  testWidgets('个人信息竖屏居中、横屏横排，长昵称与大字号保留完整内容', (tester) async {
     for (final (size, scale, brightness) in [
       (const Size(411, 914), 1.0, Brightness.light),
       (const Size(320, 640), 2.0, Brightness.light),
@@ -419,20 +516,27 @@ void main() {
       final identity = tester.getRect(
         find.byKey(const ValueKey('profile-user-info')),
       );
-      expect(identity.center.dx, closeTo(background.center.dx, .01));
+      final landscape = size.width > size.height;
+      if (!landscape) {
+        expect(identity.center.dx, closeTo(background.center.dx, .01));
+      }
       final avatar = tester.getRect(find.byType(CircleAvatar));
-      expect(avatar.center.dx, closeTo(background.center.dx, .01));
       final nickname = tester.getRect(
         find.byKey(const ValueKey('profile-nickname-label')),
       );
-      expect(nickname.center.dx, closeTo(avatar.center.dx, .01));
-      expect(nickname.top, greaterThan(avatar.bottom));
+      if (landscape) {
+        expect(nickname.left, greaterThan(avatar.right));
+      } else {
+        expect(avatar.center.dx, closeTo(background.center.dx, .01));
+        expect(nickname.center.dx, closeTo(avatar.center.dx, .01));
+        expect(nickname.top, greaterThan(avatar.bottom));
+      }
       expect(background.contains(nickname.topLeft), isTrue);
       expect(background.contains(nickname.bottomRight), isTrue);
       final tags = tester.getRect(
         find.byKey(const ValueKey('profile-user-tags')),
       );
-      expect(tags.center.dx, closeTo(avatar.center.dx, .01));
+      expect(tags.center.dx, closeTo(nickname.center.dx, .01));
       expect(tags.top, greaterThan(nickname.bottom));
       final level = tester.getRect(
         find.byKey(const ValueKey('profile-level-tag')),
@@ -450,7 +554,7 @@ void main() {
       }
       for (final label in ['诗仙', '12345 颗星星']) {
         final bounds = tester.getRect(find.text(label));
-        expect(bounds.top, greaterThan(avatar.bottom));
+        if (!landscape) expect(bounds.top, greaterThan(avatar.bottom));
         expect(background.contains(bounds.topLeft), isTrue);
         expect(background.contains(bounds.bottomRight), isTrue);
         expect(tags.contains(bounds.topLeft), isTrue);

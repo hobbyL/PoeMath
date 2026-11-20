@@ -67,6 +67,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       (_) => _updateSettingsContrast(),
     );
     final reduceMotion = media.disableAnimations;
+    final landscape = media.orientation == Orientation.landscape;
     final colors = AnimatedHeroColors(
       theme,
       style: AnimatedHeroStyle.starlight,
@@ -85,61 +86,91 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       const SizedBox(height: SpacingTokens.md),
 
       // 学习报告 + 学习日历 + 成就勋章（一行三个卡片）
-      Row(
-        children: [
-          Expanded(
-            child: ColoredCard(
-              color: theme.colorScheme.primary,
-              onTap: () => context.push(AppRoutes.learningStats),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.bar_chart_rounded,
-                    size: 32,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(height: SpacingTokens.sm),
-                  Text(
-                    '学习报告',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
+      if (theme.appearance.playful)
+        ResponsiveCardGrid(
+          preferredTileWidth: theme.appearance.storybook ? 144 : null,
+          children: [
+            for (final (icon, label, route) in [
+              (Icons.bar_chart_rounded, '学习报告', AppRoutes.learningStats),
+              (
+                Icons.calendar_month_rounded,
+                '学习日历',
+                AppRoutes.learningCalendar,
+              ),
+              (Icons.emoji_events_rounded, '成就勋章', AppRoutes.achievements),
+            ])
+              AppTile(
+                flat: theme.appearance.storybook,
+                layout: theme.appearance.storybook
+                    ? AppTileLayout.poster
+                    : AppTileLayout.row,
+                icon: icon,
+                iconColor: theme.colorScheme.primary,
+                title: label,
+                subtitle: '',
+                onTap: () => context.push(route),
+              ),
+          ],
+        )
+      else
+        Row(
+          children: [
+            Expanded(
+              child: ColoredCard(
+                color: theme.colorScheme.primary,
+                onTap: () => context.push(AppRoutes.learningStats),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.bar_chart_rounded,
+                      size: 32,
+                      color: theme.colorScheme.primary,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: SpacingTokens.sm),
+                    Text(
+                      '学习报告',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: SpacingTokens.sm),
-          Expanded(
-            child: ColoredCard(
-              color: theme.colorScheme.primary,
-              onTap: () => context.push(AppRoutes.learningCalendar),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.calendar_month_rounded,
-                    size: 32,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(height: SpacingTokens.sm),
-                  Text(
-                    '学习日历',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
+            const SizedBox(width: SpacingTokens.sm),
+            Expanded(
+              child: ColoredCard(
+                color: theme.colorScheme.primary,
+                onTap: () => context.push(AppRoutes.learningCalendar),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.calendar_month_rounded,
+                      size: 32,
+                      color: theme.colorScheme.primary,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: SpacingTokens.sm),
+                    Text(
+                      '学习日历',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: SpacingTokens.sm),
-          Expanded(child: _buildAchievementCard(context, theme, unlockedCount)),
-        ],
-      ),
+            const SizedBox(width: SpacingTokens.sm),
+            Expanded(
+              child: _buildAchievementCard(context, theme, unlockedCount),
+            ),
+          ],
+        ),
       const SizedBox(height: SpacingTokens.sm),
 
       // 本周学习周报
       AppTile(
+        flat: theme.appearance.storybook,
         icon: Icons.insert_chart_outlined,
         iconColor: theme.colorScheme.primary,
         title: '本周学习周报',
@@ -171,6 +202,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       key: _headerKey,
                       style: AnimatedHeroStyle.starlight,
                       scrollController: _scroll,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: SpacingTokens.lg,
+                        vertical: landscape
+                            ? SpacingTokens.sm
+                            : SpacingTokens.lg,
+                      ),
                       backgroundKey: const ValueKey(
                         'profile-header-background',
                       ),
@@ -188,15 +225,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             ),
                             const SizedBox(height: SpacingTokens.md),
                           ],
-                          Center(
+                          _ProfileThemeCover(
+                            contentWidth:
+                                media.size.width -
+                                media.padding.horizontal -
+                                SpacingTokens.lg * 2,
+                            avatar: HeroAvatarHalo(
+                              key: const ValueKey('profile-avatar-halo'),
+                              child: ProfileAvatarButton(colors: colors),
+                            ),
                             child: Column(
-                              key: const ValueKey('profile-user-info'),
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                HeroAvatarHalo(
-                                  key: const ValueKey('profile-avatar-halo'),
-                                  child: ProfileAvatarButton(colors: colors),
-                                ),
                                 ProfileNicknameButton(
                                   foreground: colors.foreground,
                                 ),
@@ -234,10 +274,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     ),
                     AnnotatedRegion<SystemUiOverlayStyle>(
                       value: pageStyle,
-                      child: ColoredCard(
-                        color: theme.scaffoldBackgroundColor,
-                        backgroundOpacity: 1,
-                        borderRadius: BorderRadius.zero,
+                      child: ThemePagePanel(
                         child: SafeArea(
                           top: false,
                           child: Column(
@@ -292,6 +329,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     return ColoredCard(
       color: theme.colorScheme.primary,
+      backgroundOpacity: theme.appearance.storybook ? 0 : .02,
       child: Column(
         children: [
           Row(
@@ -410,6 +448,98 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 绘本的个人页像手账扉页，探索主题像有舷窗的个人舱。
+class _ProfileThemeCover extends StatelessWidget {
+  const _ProfileThemeCover({
+    required this.contentWidth,
+    required this.avatar,
+    required this.child,
+  });
+
+  final double contentWidth;
+  final Widget avatar;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final media = MediaQuery.of(context);
+    final scale = media.textScaler.scale(16) / 16;
+    final colors = AnimatedHeroColors(theme);
+    final title = Text(
+      theme.appearance.storybook ? '我的成长手账' : '探索员档案',
+      key: const ValueKey('profile-theme-title'),
+      textAlign: TextAlign.center,
+      style: theme.textTheme.headlineSmall?.copyWith(
+        color: colors.foreground,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+    const flankWidth = SpacingTokens.xl * 2;
+    if (media.orientation == Orientation.landscape) {
+      // 头像与设置侧等宽，昵称和徽章仍以内容区中心为轴。
+      return Row(
+        key: const ValueKey('profile-user-info'),
+        children: [
+          SizedBox(width: flankWidth, child: avatar),
+          const SizedBox(width: SpacingTokens.sm),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (theme.appearance.playful && scale <= 1.25) ...[
+                  title,
+                  const SizedBox(height: SpacingTokens.xs),
+                ],
+                child,
+              ],
+            ),
+          ),
+          const SizedBox(width: SpacingTokens.sm),
+          const SizedBox(width: flankWidth),
+        ],
+      );
+    }
+    final identity = Column(
+      key: const ValueKey('profile-user-info'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            Center(child: avatar),
+            if (theme.appearance.playful && contentWidth / scale >= 340)
+              const Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: ThemeCharacterArt(
+                    size: SpacingTokens.xxl + SpacingTokens.lg,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        child,
+      ],
+    );
+    if (!theme.appearance.playful) return Center(child: identity);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.xxl),
+          child: title,
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        identity,
+      ],
     );
   }
 }

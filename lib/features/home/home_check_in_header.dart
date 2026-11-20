@@ -11,6 +11,7 @@ class HomeCheckInHeader extends AnimatedHeroHeader {
     super.key,
     required super.scrollController,
     required super.child,
+    super.contentPadding,
     bool pending = true,
   }) : super(
          animate: pending,

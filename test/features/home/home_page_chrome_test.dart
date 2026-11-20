@@ -75,6 +75,130 @@ void main() {
     await tearDownHiveForTesting();
   });
 
+  for (final preset in [AppSubject.candy, AppSubject.space]) {
+    for (final (size, scale) in [
+      (const Size(411, 914), 1.0),
+      (const Size(320, 640), 1.0),
+      (const Size(914, 411), 1.0),
+      (const Size(640, 320), 1.0),
+      (const Size(914, 411), 2.0),
+      (const Size(640, 320), 2.0),
+    ]) {
+      testWidgets('童趣页头紧凑并露出目标：$preset/$size/$scale', (tester) async {
+        final landscape = size.width > size.height;
+        await _pump(
+          tester,
+          size: size,
+          textScale: scale,
+          safeInsets: landscape
+              ? const EdgeInsets.only(left: 32, right: 24)
+              : const EdgeInsets.only(top: 32),
+          streak: 3650,
+          theme: AppTheme.resolve(
+            subject: preset,
+            brightness: Brightness.light,
+          ),
+        );
+        expect(tester.takeException(), isNull);
+        final header = tester.getRect(_background);
+        expect(header.height, lessThanOrEqualTo(landscape ? 200 : 280));
+        if (landscape) {
+          final content = find.byKey(
+            ValueKey(
+              preset == AppSubject.space
+                  ? 'space-check-in'
+                  : 'storybook-check-in',
+            ),
+          );
+          expect(
+            tester.getCenter(content).dx,
+            closeTo(header.center.dx + 4, 1),
+          );
+        } else {
+          final summary = find.byKey(const ValueKey('home-check-in-summary'));
+          for (final row
+              in find
+                  .descendant(of: summary, matching: find.byType(Wrap))
+                  .evaluate()) {
+            expect(
+              tester.getCenter(find.byWidget(row.widget)).dx,
+              closeTo(header.center.dx, 1),
+            );
+          }
+          expect(
+            tester.getCenter(find.byType(FilledButton)).dx,
+            closeTo(header.center.dx, 1),
+          );
+        }
+        final goalTitle = tester.getRect(find.text('今日学习目标 · 完成后可打卡'));
+        // 预留底部导航后仍能看见目标区域；大字号标题允许自然换行。
+        expect(
+          goalTitle.top + (scale > 1 ? 54 : goalTitle.height),
+          lessThan(size.height - 80),
+          reason:
+              '页头 $header，目标 $goalTitle，打卡摘要 '
+              '${tester.getRect(find.byKey(const ValueKey('home-check-in-summary')))}',
+        );
+        final button = find.byType(FilledButton);
+        expect(button.hitTestable(), findsOneWidget);
+        expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
+        expect(find.text('3650'), findsOneWidget);
+      });
+    }
+    for (final landscape in [false, true]) {
+      for (final reduced in [false, true]) {
+        testWidgets('童趣首页连续下拉回弹并可向上滚动：$preset/$landscape/$reduced', (
+          tester,
+        ) async {
+          await _pump(
+            tester,
+            size: landscape ? const Size(914, 411) : const Size(411, 914),
+            safeInsets: landscape
+                ? EdgeInsets.zero
+                : const EdgeInsets.only(top: 32),
+            reduceMotion: reduced,
+            theme: AppTheme.resolve(
+              subject: preset,
+              brightness: Brightness.light,
+            ),
+          );
+          final before = tester.getRect(_background);
+          final scroll = tester.state<ScrollableState>(
+            find.byType(Scrollable).first,
+          );
+          final buttonSize = tester.getSize(find.byType(FilledButton));
+          final gesture = await tester.startGesture(const Offset(100, 90));
+          for (var step = 0; step < 4; step++) {
+            await gesture.moveBy(const Offset(0, 40));
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+          if (reduced) {
+            expect(scroll.position.pixels, 0);
+            expect(tester.getRect(_background), before);
+          } else {
+            expect(scroll.position.pixels, lessThan(-30));
+            expect(
+              tester.getRect(_background).height,
+              greaterThan(before.height + 30),
+            );
+            expect(tester.getRect(_background).top, closeTo(0, .01));
+          }
+          expect(tester.getSize(find.byType(FilledButton)), buttonSize);
+          await gesture.up();
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 2));
+          await tester.pump();
+          expect(scroll.position.pixels, closeTo(0, .01));
+          expect(tester.getRect(_background), before);
+          await tester.dragFrom(const Offset(100, 180), const Offset(0, -150));
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(scroll.position.pixels, greaterThan(30));
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  }
+
   for (final subject in AppSubject.values) {
     for (final brightness in Brightness.values) {
       testWidgets('首页状态栏透明衔接卡片，滚动后图标适配正文：$subject/$brightness', (tester) async {
@@ -97,8 +221,7 @@ void main() {
 
         expect(tester.getTopLeft(_background), Offset.zero);
         final headerIcons =
-            brightness == Brightness.light &&
-                (subject == AppSubject.candy || subject == AppSubject.space)
+            brightness == Brightness.light && subject == AppSubject.candy
             ? Brightness.dark
             : Brightness.light;
         expectStatusBar(headerIcons);

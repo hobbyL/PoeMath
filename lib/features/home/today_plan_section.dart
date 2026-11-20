@@ -89,6 +89,7 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                   children: [
                     for (final task in plan.tasks)
                       AppTile(
+                        flat: theme.appearance.storybook,
                         icon: task.completed
                             ? Icons.check_circle_outline
                             : _icon(task.kind),

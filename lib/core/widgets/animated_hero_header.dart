@@ -10,6 +10,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/hero_starlight_painter.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
+import 'package:poemath/core/widgets/playful_hero_painter.dart';
 
 enum AnimatedHeroStyle { aurora, starlight }
 
@@ -23,6 +24,14 @@ class AnimatedHeroColors {
     final dark = theme.brightness == Brightness.dark;
     final starlight = style == AnimatedHeroStyle.starlight;
     final scheme = theme.colorScheme;
+    if (theme.appearance.space) {
+      return const AnimatedHeroColors._(
+        foreground: ColorTokens.spaceNightInk,
+        base: ColorTokens.spaceNight,
+        depth: ColorTokens.spaceNight,
+        glow: ColorTokens.spaceSecondaryLight,
+      );
+    }
     if (theme.appearance.playful) {
       return AnimatedHeroColors._(
         foreground: scheme.onSurface,
@@ -81,6 +90,7 @@ class AnimatedHeroHeader extends StatefulWidget {
     this.animate = true,
     this.style = AnimatedHeroStyle.aurora,
     this.backgroundKey = const ValueKey('animated-hero-background'),
+    this.contentPadding = const EdgeInsets.all(SpacingTokens.lg),
   });
 
   final ScrollController scrollController;
@@ -88,6 +98,7 @@ class AnimatedHeroHeader extends StatefulWidget {
   final bool animate;
   final AnimatedHeroStyle style;
   final Key backgroundKey;
+  final EdgeInsetsGeometry contentPadding;
 
   @override
   State<AnimatedHeroHeader> createState() => _AnimatedHeroHeaderState();
@@ -249,10 +260,20 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                         children: [
                                           CustomPaint(
                                                 painter:
-                                                    !theme.appearance.playful &&
-                                                        widget.style ==
-                                                            AnimatedHeroStyle
-                                                                .starlight
+                                                    theme.appearance.playful
+                                                    ? PlayfulHeroPainter(
+                                                        space: theme
+                                                            .appearance
+                                                            .space,
+                                                        base: colors.base,
+                                                        depth: colors.depth,
+                                                        foreground:
+                                                            colors.foreground,
+                                                        motion: _motion,
+                                                      )
+                                                    : widget.style ==
+                                                          AnimatedHeroStyle
+                                                              .starlight
                                                     ? HeroStarlightPainter(
                                                         base: colors.base,
                                                         depth: colors.depth,
@@ -271,12 +292,6 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                             colors.foreground,
                                                         glow: colors.glow,
                                                         motion: _motion,
-                                                        minimumContrast:
-                                                            theme
-                                                                .appearance
-                                                                .playful
-                                                            ? 12
-                                                            : 6.5,
                                                         pull:
                                                             stretch /
                                                             (height + stretch),
@@ -288,25 +303,27 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                   milliseconds: 300,
                                                 ),
                                               ),
-                                          RepaintBoundary(
-                                            child: Image.asset(
-                                              theme.appearance.heroImage,
-                                              fit: BoxFit.cover,
-                                              alignment: Alignment.centerRight,
-                                              cacheWidth: 640,
-                                              color: theme.appearance.playful
-                                                  ? null
-                                                  : colors.foreground,
-                                              opacity: AlwaysStoppedAnimation(
-                                                theme.appearance.playful &&
-                                                        theme.brightness ==
-                                                            Brightness.light
-                                                    ? .4
-                                                    : .14,
+                                          if (!theme.appearance.playful)
+                                            RepaintBoundary(
+                                              child: Image.asset(
+                                                theme.appearance.heroImage,
+                                                fit: BoxFit.cover,
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                cacheWidth: 640,
+                                                color: theme.appearance.playful
+                                                    ? null
+                                                    : colors.foreground,
+                                                opacity: AlwaysStoppedAnimation(
+                                                  theme.appearance.storybook &&
+                                                          theme.brightness ==
+                                                              Brightness.light
+                                                      ? .4
+                                                      : .14,
+                                                ),
+                                                excludeFromSemantics: true,
                                               ),
-                                              excludeFromSemantics: true,
                                             ),
-                                          ),
                                         ],
                                       ),
                                     ),
@@ -338,10 +355,7 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SpacingTokens.lg,
-                      vertical: SpacingTokens.lg,
-                    ),
+                    padding: widget.contentPadding,
                     child: RepaintBoundary(child: widget.child)
                         .animatePage(context)
                         .fadeIn(duration: const Duration(milliseconds: 300))
@@ -387,6 +401,15 @@ class HeroAvatarHalo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final motion = context.dependOnInheritedWidgetOfExactType<_HeroMotion>()!;
+    final padding = EdgeInsets.symmetric(
+      horizontal: MediaQuery.orientationOf(context) == Orientation.landscape
+          ? 0
+          : SpacingTokens.lg,
+      vertical: SpacingTokens.xs,
+    );
+    if (Theme.of(context).appearance.storybook) {
+      return Padding(padding: padding, child: child);
+    }
     final colors = AnimatedHeroColors(
       Theme.of(context),
       style: AnimatedHeroStyle.starlight,
@@ -419,13 +442,7 @@ class HeroAvatarHalo extends StatelessWidget {
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: SpacingTokens.lg,
-            vertical: SpacingTokens.xs,
-          ),
-          child: child,
-        ),
+        Padding(padding: padding, child: child),
       ],
     );
   }
@@ -477,11 +494,17 @@ class HeroStatusTag extends StatelessWidget {
     final decoration = theme.appearance.playful
         ? HeroTagStyle(
             accent: Color.lerp(
-              theme.colorScheme.primary,
-              theme.colorScheme.tertiary,
+              theme.appearance.space
+                  ? ColorTokens.spacePrimaryLight
+                  : theme.colorScheme.primary,
+              theme.appearance.space
+                  ? ColorTokens.spaceTertiaryLight
+                  : theme.colorScheme.tertiary,
               style.emphasis,
             )!,
-            secondaryAccent: theme.colorScheme.secondary,
+            secondaryAccent: theme.appearance.space
+                ? ColorTokens.spaceSecondaryLight
+                : theme.colorScheme.secondary,
             emphasis: style.emphasis,
             trailCount: style.trailCount,
             sparkleCount: style.sparkleCount,
@@ -489,12 +512,14 @@ class HeroStatusTag extends StatelessWidget {
         : style;
     return RepaintBoundary(
       child: CustomPaint(
-        foregroundPainter: _HeroTagEdgePainter(
-          style: decoration,
-          foreground: colors.foreground,
-          motion: motion.animation,
-          phaseOffset: phaseOffset,
-        ),
+        foregroundPainter: theme.appearance.storybook
+            ? null
+            : _HeroTagEdgePainter(
+                style: decoration,
+                foreground: colors.foreground,
+                motion: motion.animation,
+                phaseOffset: phaseOffset,
+              ),
         child: ColoredCard(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -732,7 +757,6 @@ class _HeroAuroraPainter extends CustomPainter {
     required this.glow,
     required this.pull,
     required this.motion,
-    this.minimumContrast = 6.5,
   }) : super(repaint: motion);
 
   final Color base;
@@ -741,7 +765,7 @@ class _HeroAuroraPainter extends CustomPainter {
   final Color glow;
   final double pull;
   final Animation<double> motion;
-  final double minimumContrast;
+  static const _minimumContrast = 6.5;
 
   // 背景很矮，固定网格足以平滑插值；复用缓冲区，避免逐帧创建点列表。
   static const _columns = 40;
@@ -773,12 +797,12 @@ class _HeroAuroraPainter extends CustomPainter {
       return (math.max(front, back) + .05) / (math.min(front, back) + .05);
     }
 
-    if (contrast(candidate) >= minimumContrast) return candidate;
+    if (contrast(candidate) >= _minimumContrast) return candidate;
     var low = 0.0;
     var high = 1.0;
     for (var step = 0; step < 12; step++) {
       final mix = (low + high) / 2;
-      if (contrast(Color.lerp(depth, candidate, mix)!) >= minimumContrast) {
+      if (contrast(Color.lerp(depth, candidate, mix)!) >= _minimumContrast) {
         low = mix;
       } else {
         high = mix;
@@ -882,6 +906,5 @@ class _HeroAuroraPainter extends CustomPainter {
       oldDelegate.foreground != foreground ||
       oldDelegate.glow != glow ||
       oldDelegate.pull != pull ||
-      oldDelegate.minimumContrast != minimumContrast ||
       oldDelegate.motion != motion;
 }
