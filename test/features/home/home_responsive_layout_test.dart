@@ -7,6 +7,7 @@ import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/domain/today_plan.dart';
 import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/home/practice_resume_section.dart';
@@ -36,6 +37,7 @@ void main() {
         },
     ];
     final draftState = StateProvider((ref) => drafts);
+    final goalTypes = StateProvider((ref) => DailyGoalActivity.defaults);
     final readingState = StateProvider<({Textbook book, int page})?>(
       (ref) => (book: book, page: 2),
     );
@@ -43,6 +45,7 @@ void main() {
       overrides: [
         staticDayKeyOverride(),
         isCheckedInProvider.overrideWithValue(true),
+        dailyGoalTypesProvider.overrideWith((ref) => ref.watch(goalTypes)),
         dailyPoemGoalProvider.overrideWithValue(2),
         dailyMathGoalProvider.overrideWithValue(10),
         todayPoemCountProvider.overrideWithValue(0),
@@ -92,7 +95,7 @@ void main() {
 
     Future<void> pumpHome(double contentWidth, double scale) async {
       tester.view.physicalSize = Size(
-        contentWidth + SpacingTokens.md * 2,
+        contentWidth + SpacingTokens.lg * 2,
         1000,
       );
       await tester.pumpWidget(
@@ -119,24 +122,62 @@ void main() {
       find.ancestor(of: find.text(title), matching: find.byType(AppTile)),
     );
 
-    void checkGrid(List<String> titles, double width, int maxColumns) {
+    void checkGrid(
+      List<String> titles,
+      double width,
+      int maxColumns, {
+      double gap = SpacingTokens.sm,
+    }) {
       final columns = math.min(maxColumns, titles.length);
-      final cardWidth = (width - SpacingTokens.sm * (columns - 1)) / columns;
+      final cardWidth = (width - gap * (columns - 1)) / columns;
       final cards = titles.map(cardRect).toList();
+      final referenceTile = find.ancestor(
+        of: find.text('诗词 0/2 首'),
+        matching: find.byType(AppTile),
+      );
+      final referenceArrow = find.descendant(
+        of: referenceTile,
+        matching: find.byIcon(Icons.chevron_right),
+      );
+      final arrowInset =
+          tester.getRect(referenceTile).right -
+          tester.getCenter(referenceArrow).dx;
       for (var i = 0; i < cards.length; i++) {
+        final tile = find.ancestor(
+          of: find.text(titles[i]),
+          matching: find.byType(AppTile),
+        );
+        final leading = find.descendant(
+          of: tile,
+          matching: find.byIcon(tester.widget<AppTile>(tile).icon!),
+        );
+        expect(
+          tester.getCenter(leading).dy,
+          closeTo(cards[i].center.dy, .01),
+          reason: '${titles[i]} 的左侧图标应在整行内垂直居中',
+        );
+        final arrow = find.descendant(
+          of: tile,
+          matching: find.byIcon(Icons.chevron_right),
+        );
+        if (arrow.evaluate().isNotEmpty) {
+          expect(
+            cards[i].right - tester.getCenter(arrow).dx,
+            closeTo(arrowInset, .01),
+            reason: '${titles[i]} 的箭头应与目标、续练、续读使用同一个右边距',
+          );
+          expect(tester.getCenter(arrow).dy, closeTo(cards[i].center.dy, .01));
+        }
         expect(cards[i].width, closeTo(cardWidth, .01));
         if (i < columns) {
           expect(cards[i].top, closeTo(cards.first.top, .01));
           expect(
             cards[i].left,
-            closeTo(SpacingTokens.md + i * (cardWidth + SpacingTokens.sm), .01),
+            closeTo(SpacingTokens.lg + i * (cardWidth + gap), .01),
           );
         }
         if (columns == 1 && i > 0) {
-          expect(
-            cards[i].top - cards[i - 1].bottom,
-            closeTo(SpacingTokens.sm, .01),
-          );
+          expect(cards[i].top - cards[i - 1].bottom, closeTo(gap, .01));
         }
         for (var j = 0; j < i; j++) {
           expect(cards[i].overlaps(cards[j]), isFalse);
@@ -157,16 +198,37 @@ void main() {
     ]) {
       await pumpHome(width, scale);
       if (width == 320) await drainHiveWritesForTesting(tester);
-      checkGrid(goals, width, columns);
-      checkGrid(['继续上次口算', '继续上次应用题', readingTitle], width, columns);
-      checkGrid(tasks, width, columns);
+      checkGrid(goals, width, columns, gap: 0);
+      checkGrid(['继续上次口算', '继续上次应用题', readingTitle], width, columns, gap: 0);
+      checkGrid(tasks, width, columns, gap: 0);
       expect(tester.takeException(), isNull);
     }
+
+    // 五种目标会出现不足整行的末行，大字号下仍按顺序排列且互不遮挡。
+    container.read(goalTypes.notifier).state = DailyGoalActivity.values.toSet();
+    const allGoals = [...goals, '认一认 0/1 次', '写一写 0/1 次', '看图表达 0/1 次'];
+    for (final (width, columns, scale) in [
+      (320.0, 1, 2.0),
+      (600.0, 2, 1.0),
+      (900.0, 3, 2.0),
+    ]) {
+      await pumpHome(width, scale);
+      checkGrid(allGoals, width, columns, gap: 0);
+      final cards = allGoals.map(cardRect).toList();
+      for (var row = 0; row < cards.length; row += columns) {
+        for (final card in cards.skip(row).take(columns)) {
+          expect(card.top, closeTo(cards[row].top, .01));
+          expect(card.bottom, closeTo(cards[row].bottom, .01));
+        }
+      }
+      expect(tester.takeException(), isNull);
+    }
+    container.read(goalTypes.notifier).state = DailyGoalActivity.defaults;
 
     await pumpHome(900, 1);
     container.read(draftState.notifier).state = [drafts.first];
     await tester.pumpAndSettle();
-    checkGrid(['继续上次口算', readingTitle], 900, 3);
+    checkGrid(['继续上次口算', readingTitle], 900, 3, gap: 0);
 
     container.read(readingState.notifier).state = null;
     await tester.pumpAndSettle();

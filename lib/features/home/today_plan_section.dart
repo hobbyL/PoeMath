@@ -12,6 +12,7 @@ import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/today_plan.dart';
+import 'package:poemath/features/home/home_section.dart';
 import 'package:poemath/features/home/providers/home_providers.dart' as home;
 import 'package:poemath/features/home/providers/today_plan_providers.dart';
 import 'package:poemath/features/home/today_plan_editor.dart';
@@ -57,6 +58,7 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
             icon: Icons.refresh,
             iconColor: theme.colorScheme.error,
             title: '今日任务暂未读取成功',
+            titleMaxLines: 1,
             subtitle: '点此重试，已生成的任务不会替换',
             onTap: () => ref.invalidate(todayPlanProvider),
           ),
@@ -66,11 +68,8 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
+                    child: HomeSectionHeading(
                       '今日练习清单 ${plan.completedCount}/${plan.tasks.length}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
                     ),
                   ),
                   const SizedBox(width: SpacingTokens.sm),
@@ -79,25 +78,32 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
               ),
               const SizedBox(height: SpacingTokens.sm),
               if (plan.tasks.isEmpty)
-                const AppEmptyState(
+                AppEmptyState(
                   icon: Icons.event_note_outlined,
                   title: '今天没有待安排的任务',
                   description: '可按自己的节奏学习。',
+                  padding: EdgeInsets.all(
+                    theme.appearance.pine ? SpacingTokens.md : SpacingTokens.xl,
+                  ),
                 ),
               if (plan.tasks.isNotEmpty) ...[
-                ResponsiveCardGrid(
+                HomeEntryGroup(
                   children: [
                     for (final task in plan.tasks)
                       AppTile(
-                        flat: theme.appearance.storybook,
+                        flat:
+                            theme.appearance.storybook || theme.appearance.pine,
                         icon: task.completed
                             ? Icons.check_circle_outline
                             : _icon(task.kind),
                         iconColor: task.completed
                             ? theme.semantic.success
                             : theme.colorScheme.primary,
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: theme.appearance.pine
+                            ? CrossAxisAlignment.center
+                            : CrossAxisAlignment.start,
                         title: '${task.kind.label} · ${task.title}',
+                        titleMaxLines: 1,
                         subtitle: task.completed
                             ? '今日已完成'
                             : _available(task)

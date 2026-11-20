@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
@@ -51,9 +52,11 @@ class TextbookResumeCard extends ConsumerWidget {
       ),
     );
     return AppTile(
+      flat: theme.appearance.pine,
       icon: Icons.menu_book_outlined,
       iconColor: theme.colorScheme.primary,
       title: '继续读《${book.title}》',
+      titleMaxLines: 1,
       subtitle: '$pageLabel · ${book.volumeLabel}$status',
       onTap: () async {
         if (path.hasError) {

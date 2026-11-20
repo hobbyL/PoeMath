@@ -8,6 +8,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
+import 'package:poemath/features/home/home_section.dart';
 import 'package:poemath/features/home/textbook_resume_section.dart';
 import 'package:poemath/domain/math_adventure_catalog.dart';
 import 'package:poemath/features/math/math_practice_request.dart';
@@ -160,9 +161,11 @@ class PracticeResumeSection extends ConsumerWidget {
       }
     } on Object {
       readingCard = AppTile(
+        flat: theme.appearance.pine,
         icon: Icons.refresh,
         iconColor: theme.colorScheme.error,
         title: '最近阅读暂时无法读取',
+        titleMaxLines: 1,
         subtitle: '点击重试',
         onTap: () => ref.invalidate(recentTextbookProvider),
       );
@@ -170,6 +173,7 @@ class PracticeResumeSection extends ConsumerWidget {
     final cards = <Widget>[
       for (final draft in drafts)
         AppTile(
+          flat: theme.appearance.pine,
           icon: draft['kind'] == MathAdventureNode.draftKind
               ? Icons.explore_outlined
               : draft['kind'] == 'math'
@@ -183,6 +187,7 @@ class PracticeResumeSection extends ConsumerWidget {
               : draft['kind'] == 'math'
               ? '继续上次口算'
               : '继续上次应用题',
+          titleMaxLines: 1,
           subtitle: draft['invalid'] == true
               ? '草稿无法读取，可放弃后重新练习'
               : PracticeDraftRepository.poemKinds.contains(draft['kind'])
@@ -196,35 +201,23 @@ class PracticeResumeSection extends ConsumerWidget {
                       ? draft['route'] as String
                       : '${draft['kind'] == 'math' ? AppRoutes.mathPractice : AppRoutes.wordProblemPractice}?resume=1',
                 ),
-          allowTapWithTrailing: true,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(width: SpacingTokens.sm),
-              TextButton(
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(
-                    SpacingTokens.minTapTarget,
-                    SpacingTokens.minTapTarget,
-                  ),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: theme.textTheme.bodySmall?.copyWith(height: 1.2),
-                ),
-                onPressed: () => _discard(
-                  context,
-                  draft['kind'] as String,
-                  scope: draft['scope'] as String?,
-                  sessionId: draft['sessionId'] as String?,
-                ),
-                child: const Text('放弃草稿', maxLines: 1, softWrap: false),
+          trailingPrefix: TextButton(
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(
+                SpacingTokens.minTapTarget,
+                SpacingTokens.minTapTarget,
               ),
-              const SizedBox(width: SpacingTokens.sm),
-              Icon(
-                Icons.chevron_right,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: theme.textTheme.bodySmall?.copyWith(height: 1.2),
+            ),
+            onPressed: () => _discard(
+              context,
+              draft['kind'] as String,
+              scope: draft['scope'] as String?,
+              sessionId: draft['sessionId'] as String?,
+            ),
+            child: const Text('放弃草稿', maxLines: 1, softWrap: false),
           ),
         ),
       if (readingCard != null) readingCard,
@@ -233,14 +226,9 @@ class PracticeResumeSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '继续练习',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        const HomeSectionHeading('继续练习'),
         const SizedBox(height: SpacingTokens.sm),
-        ResponsiveCardGrid(children: cards),
+        HomeEntryGroup(children: cards),
         const SizedBox(height: SpacingTokens.lg),
       ],
     );

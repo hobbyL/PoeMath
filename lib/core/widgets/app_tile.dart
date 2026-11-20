@@ -45,6 +45,7 @@ class AppTile extends StatelessWidget {
     this.onTap,
     this.allowTapWithTrailing = false,
     this.trailing,
+    this.trailingPrefix,
     this.trailingText,
     this.trailingTextMaxLines = 1,
     this.trailingAction,
@@ -60,6 +61,7 @@ class AppTile extends StatelessWidget {
     this.crossAxisAlignment = CrossAxisAlignment.center,
     this.layout = AppTileLayout.row,
   }) : assert(trailing == null || trailingAction == null),
+       assert(trailing == null || trailingPrefix == null),
        assert(
          onTrailingTap == null || (trailing == null && trailingAction == null),
        ),
@@ -115,6 +117,10 @@ class AppTile extends StatelessWidget {
   /// 尾部组件。为 null 时显示 chevron 箭头。
   final Widget? trailing;
 
+  /// 默认箭头左侧的独立操作；保留统一箭头占位和整行点击。
+  /// 如“放弃草稿”按钮。不能与替换整段尾部的 [trailing] 同时使用。
+  final Widget? trailingPrefix;
+
   /// 箭头前靠右显示的状态文字；保留整行点击，长文字省略。
   final String? trailingText;
 
@@ -159,7 +165,9 @@ class AppTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final titleStyle = theme.textTheme.titleSmall?.copyWith(
-      fontFamily: flat ? null : theme.textTheme.titleLarge?.fontFamily,
+      fontFamily: flat || theme.appearance.pine
+          ? null
+          : theme.textTheme.titleLarge?.fontFamily,
       fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
       color: selected ? theme.colorScheme.onPrimaryContainer : null,
     );
@@ -241,8 +249,16 @@ class AppTile extends StatelessWidget {
                   if (trailingAction != null) trailingAction!,
                 ],
               ));
-    final trailingWidget = flat
-        ? flatTrailingEdgeAligned
+    final trailingSlot = flat
+        ? trailing != null || trailingAction != null
+              ? ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: SpacingTokens.minTapTarget,
+                    minHeight: SpacingTokens.minTapTarget,
+                  ),
+                  child: trailingContent,
+                )
+              : flatTrailingEdgeAligned
               ? SizedBox(
                   height: SpacingTokens.minTapTarget,
                   child: Align(
@@ -253,9 +269,27 @@ class AppTile extends StatelessWidget {
                 )
               : SizedBox.square(
                   dimension: SpacingTokens.minTapTarget,
-                  child: Align(child: trailingContent),
+                  child: Align(
+                    alignment: switch (crossAxisAlignment) {
+                      CrossAxisAlignment.start => Alignment.topCenter,
+                      CrossAxisAlignment.end => Alignment.bottomCenter,
+                      _ => Alignment.center,
+                    },
+                    child: trailingContent,
+                  ),
                 )
         : trailingContent;
+    final trailingWidget = trailingPrefix == null
+        ? trailingSlot
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(width: SpacingTokens.sm),
+              trailingPrefix!,
+              const SizedBox(width: SpacingTokens.sm),
+              trailingSlot,
+            ],
+          );
     final hasTitleRow =
         title.isNotEmpty || titleSuffix != null || trailingInTitle;
     Widget buildContent(double maxTrailingWidth) {

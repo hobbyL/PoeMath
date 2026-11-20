@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
@@ -10,6 +10,7 @@ class ResponsiveCardGrid extends StatelessWidget {
     super.key,
     required this.children,
     this.preferredTileWidth,
+    this.divided = false,
   }) : assert(preferredTileWidth == null || preferredTileWidth > 0);
 
   final List<Widget> children;
@@ -17,12 +18,15 @@ class ResponsiveCardGrid extends StatelessWidget {
   /// 海报式入口可缩小目标列宽；随文字缩放降低列数。
   final double? preferredTileWidth;
 
+  /// 同一纸面内的功能组使用等高行与分隔线；独立卡片仍按自然高度排布。
+  final bool divided;
+
   @override
   Widget build(BuildContext context) {
     if (children.isEmpty) return const SizedBox.shrink();
     return LayoutBuilder(
-      builder: (context, constraints) => MasonryLayout(
-        columnCount:
+      builder: (context, constraints) {
+        final columns =
             (preferredTileWidth == null
                     ? ResponsiveLayout.columns(constraints.maxWidth)
                     : (constraints.maxWidth /
@@ -31,10 +35,39 @@ class ResponsiveCardGrid extends StatelessWidget {
                                       16)))
                           .floor()
                           .clamp(1, 3))
-                .clamp(1, children.length),
-        gap: SpacingTokens.sm,
-        children: children,
-      ),
+                .clamp(1, children.length);
+        if (divided) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var row = 0; row < children.length; row += columns) ...[
+                if (row > 0) const Divider(height: 0),
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var column = 0; column < columns; column++) ...[
+                        if (column > 0) const VerticalDivider(width: 0),
+                        Expanded(
+                          child: row + column < children.length
+                              ? children[row + column]
+                              : const SizedBox.shrink(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          );
+        }
+        return MasonryLayout(
+          columnCount: columns,
+          gap: SpacingTokens.sm,
+          children: children,
+        );
+      },
     );
   }
 }

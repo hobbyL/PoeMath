@@ -226,7 +226,8 @@ void main() {
 
         expect(tester.getTopLeft(_background), Offset.zero);
         final headerIcons =
-            brightness == Brightness.light && subject == AppSubject.candy
+            brightness == Brightness.light &&
+                (subject == AppSubject.candy || subject == AppSubject.poem)
             ? Brightness.dark
             : Brightness.light;
         expectStatusBar(headerIcons);

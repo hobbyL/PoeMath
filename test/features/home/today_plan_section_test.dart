@@ -156,6 +156,7 @@ void main() {
                     const TodayPlanSection(),
                     AppTile(
                       key: const ValueKey('baseline'),
+                      flat: true,
                       icon: Icons.menu_book_outlined,
                       iconColor: Theme.of(context).colorScheme.primary,
                       title: '标准任务卡片',
@@ -195,9 +196,8 @@ void main() {
               brightness: Brightness.light,
             ),
             builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(scale)),
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
               child: child!,
             ),
           ),
@@ -209,7 +209,7 @@ void main() {
       expect(find.textContaining('每天首次生成后固定'), findsNothing);
       final taskCard = find.ancestor(
         of: find.text('新学 · 静夜思'),
-        matching: find.byType(ColoredCard),
+        matching: find.byType(AppTile),
       );
       final arrow = find.descendant(
         of: taskCard,
@@ -219,7 +219,18 @@ void main() {
       final cardRect = tester.getRect(taskCard);
       final arrowRect = tester.getRect(arrow);
       final adjustRect = tester.getRect(adjust);
-      expect(arrowRect.top, tester.getTopLeft(find.text('新学 · 静夜思')).dy);
+      expect(arrowRect.center.dy, closeTo(cardRect.center.dy, .01));
+      expect(
+        tester
+            .getCenter(
+              find.descendant(
+                of: taskCard,
+                matching: find.byIcon(Icons.menu_book_outlined),
+              ),
+            )
+            .dy,
+        closeTo(cardRect.center.dy, .01),
+      );
       expect(arrowRect.left, greaterThan(cardRect.center.dx));
       expect(adjustRect.bottom, lessThan(cardRect.top));
       expect(adjustRect.height, greaterThanOrEqualTo(44));

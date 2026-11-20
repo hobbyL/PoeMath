@@ -85,9 +85,7 @@ void main() {
     });
     await tester.pumpWidget(
       const ProviderScope(
-        child: MaterialApp(
-          home: Scaffold(body: PracticeResumeSection()),
-        ),
+        child: MaterialApp(home: Scaffold(body: PracticeResumeSection())),
       ),
     );
     await tester.pumpAndSettle();
@@ -152,21 +150,21 @@ void main() {
       await tester.pumpAndSettle();
       final mathCard = find.ancestor(
         of: find.text('继续上次口算'),
-        matching: find.byType(ColoredCard),
+        matching: find.byType(AppTile),
       );
       final wordCard = find.ancestor(
         of: find.text('继续上次应用题'),
-        matching: find.byType(ColoredCard),
+        matching: find.byType(AppTile),
       );
       final mathRect = tester.getRect(mathCard);
       final wordRect = tester.getRect(wordCard);
       if (horizontal) {
         expect(wordRect.top, mathRect.top);
-        expect(wordRect.left, mathRect.right + SpacingTokens.sm);
+        expect(wordRect.left, mathRect.right);
         expect(wordRect.size, mathRect.size);
-        expect(mathRect.width + wordRect.width + SpacingTokens.sm, width);
+        expect(mathRect.width + wordRect.width, width);
       } else {
-        expect(wordRect.top, mathRect.bottom + SpacingTokens.sm);
+        expect(wordRect.top, mathRect.bottom);
         expect(mathRect.width, width);
         expect(wordRect.width, width);
       }
@@ -184,7 +182,9 @@ void main() {
           closeTo(tester.getCenter(arrow).dy, .01),
         );
         expect(
-          tester.getTopRight(discard).dx + SpacingTokens.sm,
+          tester.getTopRight(discard).dx +
+              SpacingTokens.sm +
+              (SpacingTokens.minTapTarget - tester.getSize(arrow).width) / 2,
           closeTo(tester.getTopLeft(arrow).dx, .01),
         );
         expect(
@@ -250,6 +250,7 @@ void main() {
                       const PracticeResumeSection(),
                       AppTile(
                         key: const ValueKey('baseline'),
+                        flat: kind == 'word',
                         icon: Icons.play_circle_outline,
                         iconColor: Theme.of(context).colorScheme.secondary,
                         title: title,
@@ -300,7 +301,7 @@ void main() {
         );
         final card = find.ancestor(
           of: resumeTitle,
-          matching: find.byType(ColoredCard),
+          matching: find.byType(AppTile),
         );
         final arrow = find.descendant(
           of: card,
@@ -323,7 +324,11 @@ void main() {
         expect(arrowRect.center.dy, closeTo(cardRect.center.dy, .01));
         expect(discardRect.center.dy, closeTo(arrowRect.center.dy, .01));
         expect(
-          discardRect.right + SpacingTokens.sm,
+          discardRect.right +
+              SpacingTokens.sm +
+              (kind == 'word'
+                  ? (SpacingTokens.minTapTarget - arrowRect.width) / 2
+                  : 0),
           closeTo(arrowRect.left, .01),
         );
         expect(discardRect.center.dx, greaterThan(cardRect.center.dx));

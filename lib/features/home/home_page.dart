@@ -25,6 +25,7 @@ import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/home/home_check_in_header.dart';
+import 'package:poemath/features/home/home_section.dart';
 import 'package:poemath/features/home/practice_resume_section.dart';
 import 'package:poemath/features/home/today_plan_section.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
@@ -65,12 +66,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       const PracticeResumeSection(),
       const TodayPlanSection(),
 
-      Text(
-        '累计进步',
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      const HomeSectionHeading('累计进步'),
       const SizedBox(height: SpacingTokens.sm),
       StatOverviewCard(
         items: [
@@ -81,24 +77,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
       const SizedBox(height: SpacingTokens.lg),
 
-      Text(
-        '快捷入口',
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      const HomeSectionHeading('快捷入口'),
       const SizedBox(height: SpacingTokens.sm),
       _buildQuickActions(context, mistakeCount),
       const SizedBox(height: SpacingTokens.lg),
 
       // 今日推荐
       if (recommendedPoem != null) ...[
-        Text(
-          '今日推荐',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        const HomeSectionHeading('今日推荐'),
         const SizedBox(height: SpacingTokens.sm),
         _buildDailyRecommendation(context, recommendedPoem),
         const SizedBox(height: SpacingTokens.lg),
@@ -146,6 +132,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                     horizontal: SpacingTokens.lg,
                     vertical: media.orientation == Orientation.landscape
                         ? SpacingTokens.sm
+                        : theme.appearance.pine &&
+                              media.textScaler.scale(16) <= 20
+                        ? SpacingTokens.xl
                         : SpacingTokens.lg,
                   ),
                   child: _buildStreakCard(
@@ -295,12 +284,12 @@ class _HomePageState extends ConsumerState<HomePage> {
             style: FilledButton.styleFrom(
               backgroundColor: theme.appearance.space
                   ? ColorTokens.spaceSecondaryLight
-                  : theme.appearance.playful
+                  : theme.appearance.playful || theme.appearance.pine
                   ? theme.colorScheme.primary
                   : colors.foreground,
               foregroundColor: theme.appearance.space
                   ? ColorTokens.spaceNight
-                  : theme.appearance.playful
+                  : theme.appearance.playful || theme.appearance.pine
                   ? theme.colorScheme.onPrimary
                   : colors.base,
             ),
@@ -319,9 +308,11 @@ class _HomePageState extends ConsumerState<HomePage> {
           children: [
             Text(
               isCheckedIn ? '今日已打卡 ✓' : '今日待打卡',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colors.foreground,
-              ),
+              style:
+                  (theme.appearance.pine
+                          ? theme.textTheme.titleLarge
+                          : theme.textTheme.bodyMedium)
+                      ?.copyWith(color: colors.foreground),
             ),
             _LevelBadge(levelName: stats.levelName, colors: colors),
           ],
@@ -335,7 +326,9 @@ class _HomePageState extends ConsumerState<HomePage> {
               '$streak',
               style: theme.textTheme.displaySmall?.copyWith(
                 color: colors.foreground,
-                fontWeight: FontWeight.bold,
+                fontWeight: theme.appearance.pine
+                    ? FontWeight.w500
+                    : FontWeight.bold,
               ),
             ),
             Padding(
@@ -565,39 +558,37 @@ class _HomePageState extends ConsumerState<HomePage> {
         if (selectedGoals.contains(type)) _dailyGoalStatus(ref, type),
     ];
 
+    final goalGroup = HomeEntryGroup(
+      preferredTileWidth: theme.appearance.storybook ? 144 : null,
+      children: [
+        for (final goal in goals)
+          AppTile(
+            flat: theme.appearance.storybook || theme.appearance.pine,
+            layout: theme.appearance.storybook
+                ? AppTileLayout.poster
+                : AppTileLayout.row,
+            icon: goal.isComplete ? Icons.check_circle_outline : goal.icon,
+            iconColor:
+                theme.appearance.storybook &&
+                    goal.type == DailyGoalActivity.math
+                ? theme.colorScheme.secondary
+                : theme.colorScheme.primary,
+            title: goal.title,
+            titleMaxLines: 1,
+            subtitle: goal.isComplete
+                ? '目标已完成'
+                : '还差 ${goal.goal - goal.count} ${goal.unit} · ${goal.action}',
+            onTap: () => context.go(goal.route),
+          ),
+      ],
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '今日学习目标 · 完成后可打卡',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        const HomeSectionHeading('今日学习目标 · 完成后可打卡'),
         const SizedBox(height: SpacingTokens.sm),
-        ResponsiveCardGrid(
-          preferredTileWidth: theme.appearance.storybook ? 144 : null,
-          children: [
-            for (final goal in goals)
-              AppTile(
-                flat: theme.appearance.storybook,
-                layout: theme.appearance.storybook
-                    ? AppTileLayout.poster
-                    : AppTileLayout.row,
-                icon: goal.isComplete ? Icons.check_circle_outline : goal.icon,
-                iconColor:
-                    theme.appearance.storybook &&
-                        goal.type == DailyGoalActivity.math
-                    ? theme.colorScheme.secondary
-                    : theme.colorScheme.primary,
-                title: goal.title,
-                subtitle: goal.isComplete
-                    ? '目标已完成'
-                    : '还差 ${goal.goal - goal.count} ${goal.unit} · ${goal.action}',
-                onTap: () => context.go(goal.route),
-              ),
-          ],
-        ),
+        goalGroup,
         Padding(
           padding: const EdgeInsets.only(top: SpacingTokens.xs),
           child: Text(
@@ -701,6 +692,24 @@ class _LevelBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (theme.appearance.pine) {
+      return ColoredCard(
+        color: theme.colorScheme.secondary,
+        backgroundOpacity: 1,
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusCompact),
+        padding: const EdgeInsets.symmetric(
+          horizontal: SpacingTokens.sm,
+          vertical: SpacingTokens.xs,
+        ),
+        child: Text(
+          levelName,
+          style: theme.textTheme.labelSmall?.copyWith(
+            fontFamily: TypographyTokens.inkFontFamily,
+            color: theme.colorScheme.onSecondary,
+          ),
+        ),
+      );
+    }
     final foreground = theme.appearance.playful
         ? theme.colorScheme.onPrimaryContainer
         : colors.base;
