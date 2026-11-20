@@ -1,10 +1,10 @@
 // lib/shared/widgets/app_scaffold.dart
 //
 // 层级：shared/widgets
-// 职责：可选的统一 Scaffold 包装，方便后续给业务页统一施加背景、SafeArea、错误边界等。
-//       Phase 0 保留最基础实现，Phase 4+ 按需扩展。
+// 职责：兼容早期 title/padding 接口，页面背景统一委托 core/AppScaffold。
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/widgets/app_scaffold.dart' as core;
 
 class AppScaffold extends StatelessWidget {
   const AppScaffold({
@@ -24,11 +24,13 @@ class AppScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return core.AppScaffold(
       appBar: title == null
           ? null
           : AppBar(title: Text(title!), actions: actions),
-      body: SafeArea(child: Padding(padding: padding, child: body)),
+      body: SafeArea(
+        child: Padding(padding: padding, child: body),
+      ),
       floatingActionButton: floatingActionButton,
     );
   }

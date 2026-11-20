@@ -67,30 +67,34 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
       body: SafeArea(
         top: false,
         bottom: false,
-        child: CustomScrollView(
-          key: PageStorageKey('textbook-list-${widget.subject.name}-$volume'),
-          slivers: [
-            if (books.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: AppEmptyState(
-                  icon: Icons.menu_book_outlined,
-                  title:
-                      '暂无$volume${widget.subject == TextbookSubject.math ? '数学' : ''}课本',
-                  description: '请家长在“设置 → 学习与内容 → 书籍管理”中添加。',
-                  actions: const [
-                    ContentPreparationActions(
-                      managementRoute: AppRoutes.textbookManagement,
-                    ),
-                  ],
+        child: PineInkSurface(
+          scene: PineInkScene.study,
+          page: true,
+          child: CustomScrollView(
+            key: PageStorageKey('textbook-list-${widget.subject.name}-$volume'),
+            slivers: [
+              if (books.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: AppEmptyState(
+                    icon: Icons.menu_book_outlined,
+                    title:
+                        '暂无$volume${widget.subject == TextbookSubject.math ? '数学' : ''}课本',
+                    description: '请家长在“设置 → 学习与内容 → 书籍管理”中添加。',
+                    actions: const [
+                      ContentPreparationActions(
+                        managementRoute: AppRoutes.textbookManagement,
+                      ),
+                    ],
+                  ),
+                )
+              else
+                TextbookCoverGrid(
+                  itemCount: books.length,
+                  itemBuilder: (context, index) => _bookCard(books[index]),
                 ),
-              )
-            else
-              TextbookCoverGrid(
-                itemCount: books.length,
-                itemBuilder: (context, index) => _bookCard(books[index]),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

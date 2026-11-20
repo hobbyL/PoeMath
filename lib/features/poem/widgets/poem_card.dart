@@ -3,6 +3,7 @@ import 'package:poemath/core/theme/poem_theme.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
+import 'package:poemath/core/widgets/pine_ink_surface.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 
@@ -54,88 +55,107 @@ class PoemCard extends StatelessWidget {
       width: double.infinity,
       color: theme.colorScheme.primary,
       onTap: onTap,
-      padding: const EdgeInsets.all(SpacingTokens.lg),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text.rich(
-            TextSpan(
-              children: [
-                if (isFavorite)
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: SpacingTokens.xs),
-                      child: Icon(
-                        Icons.favorite,
-                        semanticLabel: '已收藏',
-                        color: theme.semantic.secondaryForeground,
-                        size: theme.textTheme.titleMedium?.fontSize,
+      padding: EdgeInsets.zero,
+      clipBehavior: theme.appearance.pine ? Clip.antiAlias : Clip.none,
+      child: PineInkSurface(
+        scene: PineInkScene.branch,
+        child: Padding(
+          padding: const EdgeInsets.all(SpacingTokens.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text.rich(
+                TextSpan(
+                  children: [
+                    if (isFavorite)
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            right: SpacingTokens.xs,
+                          ),
+                          child: Icon(
+                            Icons.favorite,
+                            semanticLabel: '已收藏',
+                            color: theme.semantic.secondaryForeground,
+                            size: theme.textTheme.titleMedium?.fontSize,
+                          ),
+                        ),
                       ),
+                    TextSpan(text: poem.title),
+                  ],
+                ),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.xs),
+              Text(
+                '${poem.dynasty} · ${poem.author}',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              if (theme.appearance.pine)
+                Center(
+                  child: SizedBox(
+                    width: SpacingTokens.xl,
+                    child: Divider(
+                      color: theme.colorScheme.secondary.withValues(alpha: .4),
                     ),
                   ),
-                TextSpan(text: poem.title),
-              ],
-            ),
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            '${poem.dynasty} · ${poem.author}',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-          Divider(color: theme.colorScheme.outlineVariant),
-          const SizedBox(height: SpacingTokens.sm),
-          Text(
-            poem.content.split('\n').take(2).join('\n'),
-            textAlign: TextAlign.center,
-            style:
-                (theme.extension<PoemThemeExt>()?.poemContent ??
-                        TypographyTokens.poemContentStyle(
-                          color: theme.colorScheme.onSurface,
-                        ))
-                    .copyWith(
-                      fontSize: TypographyTokens.fsTitle,
-                      letterSpacing: 0,
-                    ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: SpacingTokens.md),
-          Wrap(
-            spacing: SpacingTokens.xs,
-            runSpacing: SpacingTokens.xs,
-            alignment: WrapAlignment.center,
-            children: [
-              _tag(
-                context,
-                poem.layerLabel,
-                color: layerColor,
-                foreground: poem.layer == 'core'
-                    ? theme.semantic.secondaryForeground
-                    : layerColor,
+                )
+              else
+                Divider(color: theme.colorScheme.outlineVariant),
+              const SizedBox(height: SpacingTokens.sm),
+              Text(
+                poem.content.split('\n').take(2).join('\n'),
+                textAlign: TextAlign.center,
+                style:
+                    (theme.extension<PoemThemeExt>()?.poemContent ??
+                            TypographyTokens.poemContentStyle(
+                              color: theme.colorScheme.onSurface,
+                            ))
+                        .copyWith(
+                          fontSize: TypographyTokens.fsTitle,
+                          letterSpacing: theme.appearance.pine ? .5 : 0,
+                        ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              for (final tag in poem.tags.take(3))
-                _tag(context, tag, color: theme.colorScheme.primary),
-              if (status != null)
-                _tag(
-                  context,
-                  status,
-                  color: statusColor,
-                  foreground: statusForeground,
-                  filled: true,
-                ),
+              const SizedBox(height: SpacingTokens.md),
+              Wrap(
+                spacing: SpacingTokens.xs,
+                runSpacing: SpacingTokens.xs,
+                alignment: WrapAlignment.center,
+                children: [
+                  _tag(
+                    context,
+                    poem.layerLabel,
+                    color: layerColor,
+                    foreground: poem.layer == 'core'
+                        ? theme.semantic.secondaryForeground
+                        : layerColor,
+                  ),
+                  for (final tag in poem.tags.take(3))
+                    _tag(context, tag, color: theme.colorScheme.primary),
+                  if (status != null)
+                    _tag(
+                      context,
+                      status,
+                      color: statusColor,
+                      foreground: statusForeground,
+                      filled: true,
+                    ),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -158,10 +178,17 @@ class PoemCard extends StatelessWidget {
       padding: EdgeInsets.zero,
       labelPadding: const EdgeInsets.symmetric(horizontal: SpacingTokens.xs),
       visualDensity: VisualDensity.compact,
-      side: filled
+      side: filled || theme.appearance.pine
           ? BorderSide.none
           : BorderSide(color: color.withValues(alpha: .3)),
-      backgroundColor: filled ? color : theme.colorScheme.surface,
+      backgroundColor: filled
+          ? color
+          : theme.appearance.pine
+          ? Color.alphaBlend(
+              color.withValues(alpha: .05),
+              theme.colorScheme.surface,
+            )
+          : theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(
           theme.appearance.playful

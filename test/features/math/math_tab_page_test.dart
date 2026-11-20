@@ -170,8 +170,12 @@ void main() {
     }
   }
 
-  for (final large in [false, true]) {
-    testWidgets('数学导航按钮直接打开原工具，课本切换后恢复（大字号：$large）', (tester) async {
+  for (final (size, textScale) in [
+    (const Size(360, 800), 1.0),
+    (const Size(320, 820), 2.0),
+    (const Size(640, 320), 2.0),
+  ]) {
+    testWidgets('数学导航按钮直接打开原工具，课本切换后恢复（$size/$textScale）', (tester) async {
       final container = ProviderContainer(
         overrides: [
           mistakeCountProvider.overrideWith((ref) => 3),
@@ -185,8 +189,8 @@ void main() {
           tester,
           container: container,
           home: true,
-          size: large ? const Size(320, 820) : const Size(360, 800),
-          textScale: large ? 2 : 1,
+          size: size,
+          textScale: textScale,
         );
         expect(find.byType(AppBar), findsOneWidget);
         final switcher = find.byType(SegmentedButton<MathSection>);

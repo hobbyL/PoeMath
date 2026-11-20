@@ -12,6 +12,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
+import 'package:poemath/core/widgets/pine_ink_surface.dart';
 
 /// 单项统计数据：大号数值 + 说明文字。
 class StatOverviewItem {
@@ -40,28 +41,34 @@ class StatOverviewCard extends StatelessWidget {
           // 自带 margin 会与页面 padding **叠加**，让本卡比同页其他卡
           // 左右各多缩进 16（口算练习页顶部统计卡与下方练习卡的错位即此）。
           // 需要留白的调用方自行包 Padding。
-          padding: const EdgeInsets.all(SpacingTokens.md),
+          padding: EdgeInsets.zero,
+          clipBehavior: theme.appearance.pine ? Clip.antiAlias : Clip.none,
           color: theme.colorScheme.primary,
           backgroundOpacity: theme.appearance.storybook ? 0 : .02,
-          child: Row(
-            children: [
-              for (var i = 0; i < items.length; i++) ...[
-                if (i > 0)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SpacingTokens.sm,
-                    ),
-                    child: Container(
-                      width: 1,
-                      height: 30,
-                      color: theme.colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.2,
+          child: PineInkSurface(
+            child: Padding(
+              padding: const EdgeInsets.all(SpacingTokens.md),
+              child: Row(
+                children: [
+                  for (var i = 0; i < items.length; i++) ...[
+                    if (i > 0)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SpacingTokens.sm,
+                        ),
+                        child: Container(
+                          width: 1,
+                          height: 30,
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.2,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                Expanded(child: _buildStat(theme, items[i])),
-              ],
-            ],
+                    Expanded(child: _buildStat(theme, items[i])),
+                  ],
+                ],
+              ),
+            ),
           ),
         )
         .animatePage(context)

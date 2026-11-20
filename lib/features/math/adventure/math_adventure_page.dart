@@ -14,7 +14,7 @@ import 'package:poemath/features/math/adventure/adventure_region_scene.dart';
 import 'package:poemath/features/math/adventure/math_adventure_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
-Widget adventureReadError(WidgetRef ref) => Scaffold(
+Widget adventureReadError(WidgetRef ref) => AppScaffold(
   appBar: AppBar(title: const Text('数学探险')),
   body: Center(
     child: Padding(
@@ -62,9 +62,19 @@ class MathAdventureEntry extends ConsumerWidget {
             children: [
               Positioned.fill(
                 child: Image.asset(
-                  MathAdventureRegion.forest.asset,
-                  alignment: Alignment.centerRight,
+                  theme.appearance.pine
+                      ? theme.appearance.heroImage
+                      : MathAdventureRegion.forest.asset,
+                  alignment: theme.appearance.pine
+                      ? Alignment.bottomRight
+                      : Alignment.centerRight,
                   fit: BoxFit.cover,
+                  color: theme.appearance.pine ? scheme.onSurface : null,
+                  opacity: theme.appearance.pine
+                      ? AlwaysStoppedAnimation(
+                          theme.brightness == Brightness.dark ? .3 : .6,
+                        )
+                      : null,
                   cacheWidth: 1024,
                 ),
               ),
@@ -313,7 +323,7 @@ class _MathAdventurePageState extends ConsumerState<MathAdventurePage> {
             ),
           )
         : null;
-    return Scaffold(
+    return AppScaffold(
       extendBodyBehindAppBar: true,
       appBar: navigation,
       body: Center(

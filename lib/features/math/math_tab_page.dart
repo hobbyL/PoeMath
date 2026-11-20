@@ -187,6 +187,7 @@ class MathTabPage extends ConsumerWidget {
     final titleStyle = theme.textTheme.titleLarge!;
     final titleScale =
         textScaler.scale(titleStyle.fontSize!) / titleStyle.fontSize!;
+    final expandedTools = isWide && titleScale <= 1.3;
     final stackedTitle = navigationTitle == null && !isWide && titleScale > 1.3;
     // 按枚举声明顺序渲染卡片，与 MathEntryKind 的文档约定一致。
     final visible = MathEntryKind.values.where(kinds.contains).toList();
@@ -219,12 +220,14 @@ class MathTabPage extends ConsumerWidget {
                     style: stackedTitle ? theme.textTheme.titleMedium : null,
                   ),
               automaticallyImplyLeading: false,
-              leadingWidth: mistakeCount > 0 ? (isWide ? 160.0 : 96.0) : null,
+              leadingWidth: mistakeCount > 0
+                  ? (expandedTools ? 160.0 : 96.0)
+                  : null,
               leading: mistakeCount > 0
                   ? Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (isWide)
+                        if (expandedTools)
                           TextButton.icon(
                             onPressed: () =>
                                 context.push(AppRoutes.mathMistake),
