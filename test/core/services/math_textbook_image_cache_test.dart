@@ -55,9 +55,72 @@ void main() {
     render: load,
   );
   setUp(() async {
+    TextbookContentCache.clearMathImageMemory();
     root = await Directory.systemTemp.createTemp('math-image-cache-');
   });
-  tearDown(() => root.delete(recursive: true));
+  tearDown(() async {
+    TextbookContentCache.clearMathImageMemory();
+    await root.delete(recursive: true);
+  });
+
+  test('同一书籍直接复用已解码位图，释放预览不释放缓存，清理后从磁盘解码', () async {
+    final cache = reopen();
+    final first = await loadImage(cache, render);
+    final key = mathTextbookImageCacheKey(
+      cache: cache,
+      source: region,
+      workedExample: false,
+    );
+    final warm = cache.takeMathImage(key)!;
+    expect(warm.isCloneOf(first), isTrue, reason: '复用同一份已解码像素，不只验证没有渲染 PDF');
+    first.dispose();
+    final again = await loadImage(cache, () => throw StateError('不应渲染'));
+    expect(again.isCloneOf(warm), isTrue);
+    again.dispose();
+    expect(warm.debugDisposed, isFalse);
+    expect(TextbookContentCache.mathImageMemoryUsage.bytes, 12 * 16 * 4);
+    TextbookContentCache.clearMathImageMemory();
+    expect(cache.takeMathImage(key), isNull);
+    expect(TextbookContentCache.mathImageMemoryUsage.bytes, 0);
+    final disk = await loadImage(cache, () => throw StateError('磁盘缓存仍在'));
+    expect(disk.isCloneOf(warm), isFalse);
+    expect((disk.width, disk.height), (warm.width, warm.height));
+    disk.dispose();
+    warm.dispose();
+    await cache.clearExtracted();
+    expect(cache.takeMathImage(key), isNull);
+    expect(await cachedFiles(), isEmpty);
+  });
+
+  test('位图缓存限制总数量，淘汰只释放缓存引用；在途解码不回填已清理内存', () async {
+    final cache = reopen();
+    final original = await render();
+    final generation = cache.revision;
+    final memoryGeneration = TextbookContentCache.mathImageMemoryRevision;
+    for (var i = 0; i < 13; i++) {
+      cache.rememberMathImage(
+        '$i',
+        original,
+        generation: generation,
+        memoryGeneration: memoryGeneration,
+      );
+    }
+    expect(TextbookContentCache.mathImageMemoryUsage.entries, 12);
+    expect(cache.takeMathImage('0'), isNull);
+    expect(original.debugDisposed, isFalse);
+    final last = cache.takeMathImage('12')!;
+    expect(last.isCloneOf(original), isTrue);
+    last.dispose();
+    TextbookContentCache.clearMathImageMemory();
+    cache.rememberMathImage(
+      'late',
+      original,
+      generation: generation,
+      memoryGeneration: memoryGeneration,
+    );
+    expect(cache.takeMathImage('late'), isNull);
+    original.dispose();
+  });
 
   test('定位和PNG落在本书目录，重建缓存实例后不再提取或渲染，像素保持一致', () async {
     var extractions = 0, renders = 0;

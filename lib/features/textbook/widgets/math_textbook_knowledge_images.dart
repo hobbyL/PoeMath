@@ -68,35 +68,32 @@ class _MathTextbookKnowledgeImagesState
   Future<void> _load() async {
     _token?.cancel();
     final token = _token = TextbookDraftToken();
+    final book = widget.book, point = widget.point;
+    final blocks = widget.blocks;
+    final files = ref.read(textbookFileServiceProvider);
+    final cache = files.contentCache(book);
+    final revision = cache.revision;
+    final key = mathTextbookKnowledgeCacheKey(point, blocks);
+    final remembered = cache.cachedMathKnowledgeRegions(key);
     setState(() {
-      _regions = null;
+      _regions = remembered;
       _error = null;
     });
-    final files = ref.read(textbookFileServiceProvider);
     final loader = ref.read(mathTextbookKnowledgeImageLoaderProvider);
-    final cache = files.contentCache(widget.book);
-    final revision = cache.revision;
     try {
-      final path = await files.installedPath(widget.book);
+      final path = await files.installedPath(book);
       token.check();
       if (cache.revision != revision) {
         throw const FormatException('原书已变化，请重新加载配图');
       }
       if (path == null) throw const FormatException('本地原书已移除，请重新导入后查看配图');
-      final regions = await cache.mathKnowledgeRegions(
-        mathTextbookKnowledgeCacheKey(widget.point, widget.blocks),
-        () async {
-          token.check();
-          final regions = await loader(
-            path,
-            widget.point,
-            widget.blocks,
-            token,
-          );
-          token.check();
-          return regions;
-        },
-      );
+      if (remembered != null) return;
+      final regions = await cache.mathKnowledgeRegions(key, () async {
+        token.check();
+        final regions = await loader(path, point, blocks, token);
+        token.check();
+        return regions;
+      });
       token.check();
       if (cache.revision != revision) {
         throw const FormatException('原书已变化，请重新加载配图');

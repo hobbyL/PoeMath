@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:poemath/core/services/cache_file_storage.dart';
 import 'package:poemath/core/services/textbook_cover_cache.dart';
@@ -37,6 +38,10 @@ class TextbookContentCache {
   static const _maxMemoryLayouts = 4;
   static const _maxMathImageBytes = 16 * 1024 * 1024;
   static const _maxMathDataBytes = 32 * 1024 * 1024;
+  static const _maxMathMemoryBytes = 32 * 1024 * 1024;
+  static const _maxMathMemoryImages = 12;
+  static final _mathImages = <(TextbookContentCache, String), ui.Image>{};
+  static int _mathMemoryRevision = 0;
   final Textbook book;
   final Future<Directory> Function() _directoryProvider;
   final _texts = <int, String>{};
@@ -45,6 +50,7 @@ class TextbookContentCache {
   final _pendingLayouts = <int, Future<TextbookPageText>>{};
   final _pendingNumbers = <int, Future<int?>>{};
   final _pendingMathData = <String, Future<Object>>{};
+  final _mathRegions = <String, List<MathTextbookRegion>>{};
   Future<TextbookPageNumbers>? _numberRead;
   TextbookPageNumbers? _pageNumbers;
   int _characters = 0;
@@ -53,6 +59,51 @@ class TextbookContentCache {
   TextbookTocResult? _toc;
 
   int get revision => _generation;
+  static int get mathImageMemoryRevision => _mathMemoryRevision;
+  static CacheUsage get mathImageMemoryUsage => CacheUsage(
+    bytes: _mathImages.values.fold(
+      0,
+      (bytes, image) => bytes + image.width * image.height * 4,
+    ),
+    entries: _mathImages.length,
+  );
+
+  /// Each caller owns a clone. Releasing a preview must not release the cache.
+  ui.Image? takeMathImage(String key) {
+    final identity = (this, key);
+    final image = _mathImages.remove(identity);
+    if (image == null) return null;
+    _mathImages[identity] = image;
+    return image.clone();
+  }
+
+  void rememberMathImage(
+    String key,
+    ui.Image image, {
+    required int generation,
+    required int memoryGeneration,
+  }) {
+    if (generation != revision ||
+        memoryGeneration != _mathMemoryRevision ||
+        image.width * image.height * 4 > _maxMathMemoryBytes) {
+      return;
+    }
+    _mathImages.remove((this, key))?.dispose();
+    _mathImages[(this, key)] = image.clone();
+    while (_mathImages.length > _maxMathMemoryImages ||
+        mathImageMemoryUsage.bytes > _maxMathMemoryBytes) {
+      _mathImages.remove(_mathImages.keys.first)?.dispose();
+    }
+  }
+
+  static void clearMathImageMemory() {
+    _mathMemoryRevision++;
+    for (final image in _mathImages.values) {
+      image.dispose();
+    }
+    _mathImages.clear();
+  }
+
   TextbookPageNumbers get pageNumbers =>
       _pageNumbers ?? TextbookPageNumbers(pageCount: book.pageCount);
 
@@ -201,11 +252,25 @@ class TextbookContentCache {
 
   /// Persist both empty and non-empty completed diagram selections. A cache
   /// clear invalidates the entire operation, including work still extracting.
+  List<MathTextbookRegion>? cachedMathKnowledgeRegions(String key) =>
+      _mathRegions[key];
+
+  void _rememberMathRegions(String key, List<MathTextbookRegion> regions) {
+    if (regions.length > 64) return;
+    _mathRegions.remove(key);
+    _mathRegions[key] = List.unmodifiable(regions);
+    while (_mathRegions.length > _maxMathMemoryImages) {
+      _mathRegions.remove(_mathRegions.keys.first);
+    }
+  }
+
   Future<List<MathTextbookRegion>> mathKnowledgeRegions(
     String key,
     Future<List<MathTextbookRegion>> Function() load,
   ) async {
     if (!Textbook.isValidId(key)) throw ArgumentError.value(key, 'key');
+    final remembered = cachedMathKnowledgeRegions(key);
+    if (remembered != null) return remembered;
     final generation = revision;
     void check() {
       if (generation != revision) throw StateError('原书缓存已失效');
@@ -216,7 +281,10 @@ class TextbookContentCache {
     if (raw is List && raw.length <= 4000) {
       try {
         final regions = raw.map(MathTextbookRegion.fromJson).toList();
-        if (regions.every((r) => r.page <= book.pageCount)) return regions;
+        if (regions.every((r) => r.page <= book.pageCount)) {
+          _rememberMathRegions(key, regions);
+          return regions;
+        }
       } on Object {
         // Invalid cached coordinates are rebuilt from the original page.
       }
@@ -229,6 +297,7 @@ class TextbookContentCache {
       generation,
     );
     check();
+    _rememberMathRegions(key, regions);
     return regions;
   }
 
@@ -472,6 +541,11 @@ class TextbookContentCache {
     _pendingLayouts.clear();
     _pendingNumbers.clear();
     _pendingMathData.clear();
+    _mathRegions.clear();
+    for (final key
+        in _mathImages.keys.where((key) => identical(key.$1, this)).toList()) {
+      _mathImages.remove(key)?.dispose();
+    }
     _numberRead = null;
     _pageNumbers = null;
     _characters = 0;

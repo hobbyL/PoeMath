@@ -193,32 +193,44 @@ class _MathTextbookSourcePreviewState
     _token?.cancel();
     final token = MathTextbookRenderToken();
     _token = token;
+    final book = widget.book, source = widget.source;
+    final workedExample = widget.workedExample;
+    final files = ref.read(textbookFileServiceProvider);
+    final cache = files.contentCache(book);
+    final revision = cache.revision;
+    final remembered = cache.takeMathImage(
+      mathTextbookImageCacheKey(
+        cache: cache,
+        source: source,
+        workedExample: workedExample,
+      ),
+    );
     _image?.dispose();
     setState(() {
-      _image = null;
+      _image = remembered;
       _error = null;
     });
-    final files = ref.read(textbookFileServiceProvider);
     final render = ref.read(
-      widget.workedExample
+      workedExample
           ? mathTextbookExampleRendererProvider
           : mathTextbookRegionRendererProvider,
     );
-    final cache = files.contentCache(widget.book);
-    final revision = cache.revision;
     try {
-      final path = await files.installedPath(widget.book);
+      final path = await files.installedPath(book);
       token.check();
       if (revision != cache.revision) {
         throw const FormatException('原书缓存已变化，请重新加载');
       }
       if (path == null) throw const FormatException('本地原书已移除，请重新导入同一 PDF 后对照');
+      // The warm preview is already on the first frame; this await only checks
+      // that the source is still installed, without re-reading/decoding PNG.
+      if (remembered != null) return;
       final image = await cachedMathTextbookImage(
         cache: cache,
-        source: widget.source,
-        workedExample: widget.workedExample,
+        source: source,
+        workedExample: workedExample,
         checkAvailable: token.check,
-        render: () => render(path, widget.source, token),
+        render: () => render(path, source, token),
       );
       if (!mounted || token.cancelled || revision != cache.revision) {
         image.dispose();

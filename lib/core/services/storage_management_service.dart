@@ -8,6 +8,7 @@ import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/picture_story_editor_service.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/services/textbook_cover_cache.dart';
+import 'package:poemath/core/services/textbook_content_cache.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/utils/logger.dart';
@@ -40,7 +41,7 @@ class StorageCacheEntry {
 
 class StorageCacheSnapshot {
   StorageCacheSnapshot(Iterable<StorageCacheEntry> entries)
-      : entries = List.unmodifiable(entries);
+    : entries = List.unmodifiable(entries);
 
   final List<StorageCacheEntry> entries;
 
@@ -64,17 +65,18 @@ class StorageManagementService {
     ImageCache? imageCache,
     void Function()? authorize,
     Future<void> Function()? preparePickerCleanup,
-  })  : _pictureStoryImages = pictureStoryImages ??
-            PictureStoryImageService(
-              directoryProvider: supportDirectoryProvider,
-            ),
-        _supportDirectory =
-            supportDirectoryProvider ?? getApplicationSupportDirectory,
-        _temporaryDirectory =
-            temporaryDirectoryProvider ?? getTemporaryDirectory,
-        _imageCache = imageCache ?? PaintingBinding.instance.imageCache,
-        _authorize = authorize ?? ParentAccessService.instance.assertAllowed,
-        _preparePickerCleanup = preparePickerCleanup ?? _recoverPendingImage;
+  }) : _pictureStoryImages =
+           pictureStoryImages ??
+           PictureStoryImageService(
+             directoryProvider: supportDirectoryProvider,
+           ),
+       _supportDirectory =
+           supportDirectoryProvider ?? getApplicationSupportDirectory,
+       _temporaryDirectory =
+           temporaryDirectoryProvider ?? getTemporaryDirectory,
+       _imageCache = imageCache ?? PaintingBinding.instance.imageCache,
+       _authorize = authorize ?? ParentAccessService.instance.assertAllowed,
+       _preparePickerCleanup = preparePickerCleanup ?? _recoverPendingImage;
 
   final TextbookFileService _textbooks;
   final TtsService _tts;
@@ -136,6 +138,7 @@ class StorageManagementService {
         return _tts.cloudCacheUsage;
       case StorageCacheKind.images:
         return TextbookCoverCache.memoryUsage +
+            TextbookContentCache.mathImageMemoryUsage +
             CacheUsage(
               bytes: _imageCache.currentSizeBytes,
               entries: _imageCache.currentSize,
@@ -172,6 +175,7 @@ class StorageManagementService {
         _tts.clearCloudCache();
       case StorageCacheKind.images:
         TextbookCoverCache.clearMemory();
+        TextbookContentCache.clearMathImageMemory();
         _imageCache.clear();
       case StorageCacheKind.pictureStoryImages:
         throw UnsupportedError('题图只能随题目删除，存储管理不提供清理');
@@ -215,16 +219,18 @@ class StorageManagementService {
       final name = entity.path.split(Platform.pathSeparator).last;
       final matches = switch (kind) {
         StorageCacheKind.updates => name == 'poemath_update',
-        StorageCacheKind.pickers => name == 'file_picker' ||
-            entity is Directory && _uuid.hasMatch(name) ||
-            entity is File &&
-                (name.startsWith('scaled_') ||
-                    name.startsWith('IMAGE_') ||
-                    _cameraImage.hasMatch(name)),
-        StorageCacheKind.sharing => name == 'share_plus' ||
-            entity is File &&
-                (RegExp(r'^poemath_backup_.+\.json$').hasMatch(name) ||
-                    RegExp(r'^poemath_diagnostics_.+\.txt$').hasMatch(name)),
+        StorageCacheKind.pickers =>
+          name == 'file_picker' ||
+              entity is Directory && _uuid.hasMatch(name) ||
+              entity is File &&
+                  (name.startsWith('scaled_') ||
+                      name.startsWith('IMAGE_') ||
+                      _cameraImage.hasMatch(name)),
+        StorageCacheKind.sharing =>
+          name == 'share_plus' ||
+              entity is File &&
+                  (RegExp(r'^poemath_backup_.+\.json$').hasMatch(name) ||
+                      RegExp(r'^poemath_diagnostics_.+\.txt$').hasMatch(name)),
         StorageCacheKind.systemTts => name == 'textbook-tts-pending',
         _ => false,
       };

@@ -14,6 +14,18 @@ String mathTextbookKnowledgeCacheKey(
   'blocks': blocks.map((b) => b.toJson()).toList(),
 });
 
+String mathTextbookImageCacheKey({
+  required TextbookContentCache cache,
+  required MathTextbookRegion source,
+  required bool workedExample,
+}) => textbookContentDigest({
+  'version': 1,
+  'source': source.toJson(),
+  'workedExample': workedExample,
+  'pageCount': cache.book.pageCount,
+  'pdfSize': cache.book.fileSize,
+});
+
 /// Both learning illustrations and practice previews share the book's cache
 /// owner/write queue. Return a separately owned image on every read.
 Future<ui.Image> cachedMathTextbookImage({
@@ -24,19 +36,26 @@ Future<ui.Image> cachedMathTextbookImage({
   required Future<ui.Image> Function() render,
 }) async {
   final generation = cache.revision;
+  final memoryGeneration = TextbookContentCache.mathImageMemoryRevision;
   void check() {
     checkAvailable();
     if (cache.revision != generation) throw StateError('原书缓存已失效');
   }
 
-  final key = textbookContentDigest({
-    'version': 1,
-    'source': source.toJson(),
-    'workedExample': workedExample,
-    'pageCount': cache.book.pageCount,
-    'pdfSize': cache.book.fileSize,
-  });
+  final key = mathTextbookImageCacheKey(
+    cache: cache,
+    source: source,
+    workedExample: workedExample,
+  );
   check();
+  final remembered = cache.takeMathImage(key);
+  if (remembered != null) return remembered;
+  void remember(ui.Image image) => cache.rememberMathImage(
+    key,
+    image,
+    generation: generation,
+    memoryGeneration: memoryGeneration,
+  );
   final bytes = await cache.readMathImage(key);
   check();
   ui.Image? image;
@@ -53,7 +72,10 @@ Future<ui.Image> cachedMathTextbookImage({
         // A corrupt PNG is a cache miss, not an unavailable textbook.
       }
       check();
-      if (image != null) return image;
+      if (image != null) {
+        remember(image);
+        return image;
+      }
     }
     image = await render();
     check();
@@ -67,6 +89,7 @@ Future<ui.Image> cachedMathTextbookImage({
       );
     }
     check();
+    remember(image);
     return image;
   } on Object {
     image?.dispose();

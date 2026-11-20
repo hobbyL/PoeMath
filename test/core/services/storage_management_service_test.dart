@@ -10,6 +10,7 @@ import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/storage_management_service.dart';
 import 'package:poemath/core/services/textbook_cover_cache.dart';
+import 'package:poemath/core/services/textbook_content_cache.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/services/tts/narration_audio_cache.dart';
 import 'package:poemath/core/services/tts_service.dart';
@@ -47,16 +48,15 @@ void main() {
     void Function()? authorize,
     Future<Directory> Function()? temporaryDirectory,
     Future<void> Function()? preparePickerCleanup,
-  }) =>
-      StorageManagementService(
-        textbooks: textbooks,
-        tts: tts,
-        supportDirectoryProvider: () async => support,
-        temporaryDirectoryProvider: temporaryDirectory ?? () async => temporary,
-        imageCache: ImageCache(),
-        authorize: authorize ?? () {},
-        preparePickerCleanup: preparePickerCleanup ?? () async {},
-      );
+  }) => StorageManagementService(
+    textbooks: textbooks,
+    tts: tts,
+    supportDirectoryProvider: () async => support,
+    temporaryDirectoryProvider: temporaryDirectory ?? () async => temporary,
+    imageCache: ImageCache(),
+    authorize: authorize ?? () {},
+    preparePickerCleanup: preparePickerCleanup ?? () async {},
+  );
 
   Future<void> seed() async {
     await write(support, 'textbooks/cache/${book.pdfSha256}/cover-v1.png', 3);
@@ -99,9 +99,9 @@ void main() {
   }
 
   Future<Map<StorageCacheKind, int>> bytes() async => {
-        for (final entry in (await service.scan()).entries)
-          entry.kind: entry.usage!.bytes,
-      };
+    for (final entry in (await service.scan()).entries)
+      entry.kind: entry.usage!.bytes,
+  };
 
   setUp(() async {
     root = await Directory.systemTemp.createTemp('poemath-storage-management-');
@@ -110,15 +110,18 @@ void main() {
     tts = TtsService(NarrationSettings(), flutterTts: NarrationEngine());
     textbooks = TextbookFileService(
       directoryProvider: () async => support,
-      narrationAudioCache:
-          NarrationAudioCache(directoryProvider: () async => temporary),
+      narrationAudioCache: NarrationAudioCache(
+        directoryProvider: () async => temporary,
+      ),
     );
     TextbookCoverCache.clearMemory();
+    TextbookContentCache.clearMathImageMemory();
     service = create();
   });
 
   tearDown(() async {
     TextbookCoverCache.clearMemory();
+    TextbookContentCache.clearMathImageMemory();
     tts.dispose();
     await root.delete(recursive: true);
   });
@@ -127,8 +130,9 @@ void main() {
     final snapshot = await service.scan();
     expect(
       snapshot.entries.map((entry) => entry.kind),
-      StorageCacheKind.values
-          .where((kind) => kind != StorageCacheKind.legacySpeechModels),
+      StorageCacheKind.values.where(
+        (kind) => kind != StorageCacheKind.legacySpeechModels,
+      ),
     );
     expect(snapshot.hasErrors, isFalse);
     expect(snapshot.diskBytes, 0);
@@ -165,8 +169,9 @@ void main() {
     );
   });
 
-  for (final kind in StorageCacheKind.values
-      .where((kind) => !kind.isMemory && kind.canClear)) {
+  for (final kind in StorageCacheKind.values.where(
+    (kind) => !kind.isMemory && kind.canClear,
+  )) {
     test('单独清理 ${kind.name}，保留其他缓存和正式文件', () async {
       await seed();
       final before = await bytes();
@@ -225,10 +230,19 @@ void main() {
     final image = await picture.toImage(2, 3);
     picture.dispose();
     addTearDown(image.dispose);
-    const TextbookCoverCache()
-        .remember('${support.path}/textbooks/${book.pdfSha256}.pdf', image);
+    const TextbookCoverCache().remember(
+      '${support.path}/textbooks/${book.pdfSha256}.pdf',
+      image,
+    );
+    final content = textbooks.contentCache(book);
+    content.rememberMathImage(
+      'a' * 64,
+      image,
+      generation: content.revision,
+      memoryGeneration: TextbookContentCache.mathImageMemoryRevision,
+    );
     final snapshot = await service.scan();
-    expect(snapshot.memoryBytes, 24);
+    expect(snapshot.memoryBytes, 48);
     expect(snapshot.diskBytes, 1159);
     await service.clear(StorageCacheKind.images);
     expect((await service.scan()).memoryBytes, 0);
@@ -242,9 +256,7 @@ void main() {
     expect(snapshot.hasErrors, isTrue);
     expect(
       snapshot.entries
-          .singleWhere(
-            (entry) => entry.kind == StorageCacheKind.textbookCovers,
-          )
+          .singleWhere((entry) => entry.kind == StorageCacheKind.textbookCovers)
           .usage,
       isNull,
     );
@@ -272,8 +284,8 @@ void main() {
     );
     await write(support, 'picture_story/images/unknown.png', 17);
     final entry = (await service.scan()).entries.singleWhere(
-          (entry) => entry.kind == StorageCacheKind.pictureStoryImages,
-        );
+      (entry) => entry.kind == StorageCacheKind.pictureStoryImages,
+    );
     expect(entry.usage!.entries, 2);
     expect(entry.usage!.bytes, 14);
     expect(entry.kind.isMemory, isFalse);
@@ -300,8 +312,7 @@ void main() {
     final cache = await Directory('${temporary.path}/file_picker').create();
     await Link('${cache.path}/outside').create(original.parent.path);
     expect(
-      (await service.scan())
-          .entries
+      (await service.scan()).entries
           .singleWhere((entry) => entry.kind == StorageCacheKind.pickers)
           .usage!
           .entries,
@@ -404,19 +415,17 @@ void main() {
         for (final key in HiveBoxes.settings.keys)
           key: HiveBoxes.settings.get(key),
       };
-      for (final kind
-          in StorageCacheKind.values.where((kind) => kind.canClear)) {
+      for (final kind in StorageCacheKind.values.where(
+        (kind) => kind.canClear,
+      )) {
         await service.clear(kind);
       }
       await HiveBoxes.close();
       await HiveBoxes.init();
-      expect(
-        {
-          for (final key in HiveBoxes.settings.keys)
-            key: HiveBoxes.settings.get(key),
-        },
-        before,
-      );
+      expect({
+        for (final key in HiveBoxes.settings.keys)
+          key: HiveBoxes.settings.get(key),
+      }, before);
       expect(
         TextbookRepository().find(book.pdfSha256)!.toJson(),
         book.toJson(),

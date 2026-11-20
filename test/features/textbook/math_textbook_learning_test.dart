@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
+import 'package:poemath/core/services/textbook_content_cache.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -166,6 +167,7 @@ void defineMathTextbookLearningTests({
   });
 
   tearDown(() async {
+    TextbookContentCache.clearMathImageMemory();
     router?.dispose();
     router = null;
     lockParentForTesting();
