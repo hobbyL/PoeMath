@@ -85,10 +85,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       _buildStatsPanel(context, stats, streak),
       const SizedBox(height: SpacingTokens.md),
 
-      // 学习报告 + 学习日历 + 成就勋章（一行三个卡片）
-      if (theme.appearance.playful)
+      // 学习报告、学习日历、成就勋章：奶糖和宣纸沿用一行三个卡片。
+      if (theme.appearance.space)
         ResponsiveCardGrid(
-          preferredTileWidth: theme.appearance.storybook ? 144 : null,
           children: [
             for (final (icon, label, route) in [
               (Icons.bar_chart_rounded, '学习报告', AppRoutes.learningStats),
@@ -100,10 +99,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               (Icons.emoji_events_rounded, '成就勋章', AppRoutes.achievements),
             ])
               AppTile(
-                flat: theme.appearance.storybook,
-                layout: theme.appearance.storybook
-                    ? AppTileLayout.poster
-                    : AppTileLayout.row,
                 icon: icon,
                 iconColor: theme.colorScheme.primary,
                 title: label,
@@ -129,6 +124,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     const SizedBox(height: SpacingTokens.sm),
                     Text(
                       '学习报告',
+                      textAlign: TextAlign.center,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -152,6 +148,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     const SizedBox(height: SpacingTokens.sm),
                     Text(
                       '学习日历',
+                      textAlign: TextAlign.center,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -438,6 +435,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           const SizedBox(height: SpacingTokens.sm),
           Text(
             '成就勋章',
+            textAlign: TextAlign.center,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
             ),

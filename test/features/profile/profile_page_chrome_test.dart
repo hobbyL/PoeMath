@@ -99,6 +99,90 @@ void main() {
     await tearDownHiveForTesting();
   });
 
+  for (final (size, scale) in [
+    (const Size(411, 914), 1.0),
+    (const Size(320, 640), 1.0),
+    (const Size(320, 640), 2.0),
+    (const Size(914, 411), 1.0),
+    (const Size(640, 320), 2.0),
+  ]) {
+    testWidgets('奶糖三个学习入口始终同一行：$size/$scale', (tester) async {
+      await _pump(
+        tester,
+        subject: AppSubject.candy,
+        size: size,
+        textScale: scale,
+      );
+      await drainHiveWritesForTesting(tester);
+      final cards = [
+        for (final title in ['学习报告', '学习日历', '成就勋章'])
+          tester.getRect(
+            find
+                .ancestor(
+                  of: find.text(title),
+                  matching: find.byType(ColoredCard),
+                )
+                .first,
+          ),
+      ];
+      for (final card in cards) {
+        expect(card.top, closeTo(cards.first.top, .01));
+        expect(card.bottom, closeTo(cards.first.bottom, .01));
+        expect(card.width, closeTo(cards.first.width, .01));
+        expect(card.width, greaterThanOrEqualTo(44));
+      }
+      expect(cards[1].left, greaterThan(cards[0].right));
+      expect(cards[2].left, greaterThan(cards[1].right));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('奶糖三个学习入口可分别进入对应页面', (tester) async {
+    const entries = [
+      ('学习报告', AppRoutes.learningStats),
+      ('学习日历', AppRoutes.learningCalendar),
+      ('成就勋章', AppRoutes.achievements),
+    ];
+    final router = GoRouter(
+      routes: [
+        GoRoute(path: '/', builder: (_, __) => const ProfilePage()),
+        for (final (label, route) in entries)
+          GoRoute(
+            path: route,
+            builder: (_, __) => Scaffold(body: Text('打开：$label')),
+          ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [staticDayKeyOverride()],
+        child: MaterialApp.router(
+          theme: AppTheme.resolve(
+            subject: AppSubject.candy,
+            brightness: Brightness.light,
+          ),
+          routerConfig: router,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: child!,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await drainHiveWritesForTesting(tester);
+    for (final (label, _) in entries) {
+      await tester.ensureVisible(find.text(label));
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+      expect(find.text('打开：$label'), findsOneWidget);
+      router.pop();
+      await tester.pumpAndSettle();
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   for (final subject in AppSubject.values) {
     for (final (size, scale) in [
       (const Size(914, 411), 1.0),
