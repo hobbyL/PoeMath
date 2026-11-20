@@ -47,6 +47,7 @@ import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
+import 'package:poemath/data/models/math_adventure_progress.dart';
 import 'package:poemath/data/repositories/today_plan_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/domain/poem_practice_details.dart';
@@ -244,6 +245,7 @@ class BackupService {
       'reviewSchedules': '复习计划',
       'mathMistakes': '错题',
       'mathSessions': '数学练习',
+      'mathAdventureProgress': '数学探险路线',
       'formulaFavorites': '公式收藏',
       'achievements': '成就',
       'checkIns': '每日记录',
@@ -336,6 +338,10 @@ class BackupService {
       'reviewSchedules': _exportReviewSchedules(),
       'mathMistakes': _exportMathMistakes(),
       'mathSessions': _exportMathSessions(),
+      'mathAdventureProgress': [
+        for (final progress in HiveBoxes.mathAdventureProgress.values)
+          progress.toJson(),
+      ],
       'formulaFavorites': _exportFormulaFavorites(),
       'achievements': _exportAchievements(),
       'checkIns': _exportCheckIns(),
@@ -1145,6 +1151,19 @@ class BackupService {
     count += await _restoreMathSessions(
       data['mathSessions'] as List<dynamic>? ?? [],
     );
+    if (data.containsKey('mathAdventureProgress')) {
+      final progress = (data['mathAdventureProgress'] as List<dynamic>)
+          .map(
+            (item) =>
+                MathAdventureProgress.fromJson(item as Map<String, dynamic>),
+          )
+          .toList();
+      await HiveBoxes.mathAdventureProgress.clear();
+      await HiveBoxes.mathAdventureProgress.putAll({
+        for (final p in progress) p.key: p,
+      });
+      count += progress.length;
+    }
     count += await _restoreFormulaFavorites(
       data['formulaFavorites'] as List<dynamic>? ?? [],
     );
@@ -2235,6 +2254,11 @@ class BackupService {
     _validateList(data, 'reviewSchedules', _validateReviewSchedule);
     _validateList(data, 'mathMistakes', _validateMathMistake);
     _validateList(data, 'mathSessions', _validateMathSession);
+    final adventureKeys = <String>{};
+    _validateList(data, 'mathAdventureProgress', (item, path) {
+      final progress = MathAdventureProgress.fromJson(item);
+      if (!adventureKeys.add(progress.key)) _invalidField(path, '探险路线重复');
+    });
     _validateList(data, 'formulaFavorites', _validateFormulaFavorite);
     _validateList(data, 'achievements', _validateAchievement);
     _validateList(data, 'checkIns', _validateCheckIn);
