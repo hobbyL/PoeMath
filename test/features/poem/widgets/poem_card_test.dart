@@ -3,8 +3,10 @@
 // PoemCard 组件 Widget 测试。
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/core/widgets/responsive_card_grid.dart';
@@ -109,14 +111,60 @@ void main() {
       expect(find.text('唐 · 杜甫'), findsOneWidget);
     });
 
-    testWidgets('显示首句', (tester) async {
-      final poem = _makePoem(content: '白日依山尽，\n黄河入海流。\n欲穷千里目，\n更上一层楼。');
-      await tester.pumpWidget(buildApp(poem: poem));
-
-      // _firstLine 返回前两行
-      expect(find.textContaining('白日依山尽'), findsOneWidget);
-      expect(find.textContaining('黄河入海流'), findsOneWidget);
-    });
+    for (final subject in AppSubject.values) {
+      for (final width in [411.0, 914.0]) {
+        testWidgets('$subject/$width：预览诗句每行均在卡片内左右居中', (tester) async {
+          tester.view.physicalSize = Size(width, 914);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          const preview = '春眠不觉晓，处处闻啼鸟。\n夜来风雨声。';
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: AppTheme.resolve(
+                subject: subject,
+                brightness: Brightness.light,
+              ),
+              home: Scaffold(
+                body: CustomScrollView(
+                  slivers: [
+                    SliverCardGrid(
+                      columnCount: width >= 600 ? 2 : 1,
+                      itemCount: 1,
+                      itemBuilder: (_, __) => PoemCard(
+                        poem: _makePoem(content: '$preview\n花落知多少。'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+          final card = tester.getRect(find.byType(PoemCard));
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(
+              of: find.text(preview),
+              matching: find.byType(RichText),
+            ),
+          );
+          var offset = 0;
+          for (final line in preview.split('\n')) {
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(
+                baseOffset: offset,
+                extentOffset: offset + line.length,
+              ),
+            );
+            expect(boxes, hasLength(1));
+            final center = paragraph.localToGlobal(
+              boxes.single.toRect().center,
+            );
+            expect(center.dx, closeTo(card.center.dx, 1), reason: line);
+            offset += line.length + 1;
+          }
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
 
     testWidgets('点击回调触发', (tester) async {
       var tapped = false;

@@ -57,7 +57,7 @@ class PoemCard extends StatelessWidget {
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text.rich(
             TextSpan(
@@ -78,6 +78,7 @@ class PoemCard extends StatelessWidget {
                 TextSpan(text: poem.title),
               ],
             ),
+            textAlign: TextAlign.center,
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -85,6 +86,7 @@ class PoemCard extends StatelessWidget {
           const SizedBox(height: SpacingTokens.xs),
           Text(
             '${poem.dynasty} · ${poem.author}',
+            textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -94,6 +96,7 @@ class PoemCard extends StatelessWidget {
           const SizedBox(height: SpacingTokens.sm),
           Text(
             poem.content.split('\n').take(2).join('\n'),
+            textAlign: TextAlign.center,
             style:
                 (theme.extension<PoemThemeExt>()?.poemContent ??
                         TypographyTokens.poemContentStyle(
@@ -110,7 +113,7 @@ class PoemCard extends StatelessWidget {
           Wrap(
             spacing: SpacingTokens.xs,
             runSpacing: SpacingTokens.xs,
-            alignment: WrapAlignment.start,
+            alignment: WrapAlignment.center,
             children: [
               _tag(
                 context,
