@@ -225,11 +225,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             ),
                             const SizedBox(height: SpacingTokens.md),
                           ],
-                          _ProfileThemeCover(
-                            contentWidth:
-                                media.size.width -
-                                media.padding.horizontal -
-                                SpacingTokens.lg * 2,
+                          _ProfileHeaderContent(
                             avatar: HeroAvatarHalo(
                               key: const ValueKey('profile-avatar-halo'),
                               child: ProfileAvatarButton(colors: colors),
@@ -452,93 +448,36 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 }
 
-/// 绘本的个人页像手账扉页，探索主题像有舷窗的个人舱。
-class _ProfileThemeCover extends StatelessWidget {
-  const _ProfileThemeCover({
-    required this.contentWidth,
-    required this.avatar,
-    required this.child,
-  });
+/// 四主题共用宣纸的个人信息布局，方向变化只调整头像与信息的排列。
+class _ProfileHeaderContent extends StatelessWidget {
+  const _ProfileHeaderContent({required this.avatar, required this.child});
 
-  final double contentWidth;
   final Widget avatar;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final media = MediaQuery.of(context);
-    final scale = media.textScaler.scale(16) / 16;
-    final colors = AnimatedHeroColors(theme);
-    final title = Text(
-      theme.appearance.storybook ? '我的成长手账' : '探索员档案',
-      key: const ValueKey('profile-theme-title'),
-      textAlign: TextAlign.center,
-      style: theme.textTheme.headlineSmall?.copyWith(
-        color: colors.foreground,
-        fontWeight: FontWeight.w800,
-      ),
-    );
     const flankWidth = SpacingTokens.xl * 2;
-    if (media.orientation == Orientation.landscape) {
+    if (MediaQuery.orientationOf(context) == Orientation.landscape) {
       // 头像与设置侧等宽，昵称和徽章仍以内容区中心为轴。
       return Row(
         key: const ValueKey('profile-user-info'),
         children: [
           SizedBox(width: flankWidth, child: avatar),
           const SizedBox(width: SpacingTokens.sm),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (theme.appearance.playful && scale <= 1.25) ...[
-                  title,
-                  const SizedBox(height: SpacingTokens.xs),
-                ],
-                child,
-              ],
-            ),
-          ),
+          Expanded(child: child),
           const SizedBox(width: SpacingTokens.sm),
           const SizedBox(width: flankWidth),
         ],
       );
     }
-    final identity = Column(
+    return Column(
       key: const ValueKey('profile-user-info'),
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            Center(child: avatar),
-            if (theme.appearance.playful && contentWidth / scale >= 340)
-              const Positioned(
-                right: 0,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: ThemeCharacterArt(
-                    size: SpacingTokens.xxl + SpacingTokens.lg,
-                  ),
-                ),
-              ),
-          ],
-        ),
+        Center(child: avatar),
         child,
-      ],
-    );
-    if (!theme.appearance.playful) return Center(child: identity);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.xxl),
-          child: title,
-        ),
-        const SizedBox(height: SpacingTokens.sm),
-        identity,
       ],
     );
   }

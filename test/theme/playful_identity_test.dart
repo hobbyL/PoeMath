@@ -10,7 +10,6 @@ import 'package:poemath/core/widgets/app_tile.dart';
 import 'package:poemath/features/math/math_tab_page.dart';
 import 'package:poemath/features/math/widgets/practice_entry_card.dart';
 import 'package:poemath/features/math/word_problem/word_problem_library_page.dart';
-import 'package:poemath/features/home/playful_check_in_content.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/domain/daily_goal_activity.dart';
 
@@ -165,7 +164,7 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(seconds: 1));
         expect(
-          find.text(preset == AppSubject.candy ? '我的成长手账' : '探索员档案'),
+          find.byKey(const ValueKey('profile-nickname-edit')),
           findsOneWidget,
         );
         expect(find.byTooltip('设置').hitTestable(), findsOneWidget);
@@ -178,7 +177,7 @@ void main() {
     }
   }
 
-  testWidgets('探索舷窗进度来自当天目标，完成与修改目标都会更新', (tester) async {
+  testWidgets('童趣页头根据当天目标切换学习操作与打卡', (tester) async {
     final poems = StateProvider<int>((ref) => 0);
     final math = StateProvider<int>((ref) => 4);
     final goals = StateProvider<Set<DailyGoalActivity>>(
@@ -199,25 +198,15 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 1));
     await drainHiveWritesForTesting(tester);
-    final ring = find.descendant(
-      of: find.byType(PlayfulCheckInContent),
-      matching: find.byType(CircularProgressIndicator),
-    );
-    expect(find.text('0 / 2 目标完成'), findsOneWidget);
-    expect(tester.widget<CircularProgressIndicator>(ring).value, 0);
+    expect(find.widgetWithText(FilledButton, '去学诗词'), findsOneWidget);
     container.read(poems.notifier).state = 1;
     await tester.pump();
-    expect(find.text('1 / 2 目标完成'), findsOneWidget);
-    expect(tester.widget<CircularProgressIndicator>(ring).value, .5);
     expect(find.widgetWithText(FilledButton, '去练口算'), findsOneWidget);
     container.read(goals.notifier).state = {DailyGoalActivity.math};
     await tester.pump();
-    expect(find.text('0 / 1 目标完成'), findsOneWidget);
-    expect(tester.widget<CircularProgressIndicator>(ring).value, 0);
+    expect(find.widgetWithText(FilledButton, '去练口算'), findsOneWidget);
     container.read(math.notifier).state = 12;
     await tester.pump();
-    expect(find.text('1 / 1 目标完成'), findsOneWidget);
-    expect(tester.widget<CircularProgressIndicator>(ring).value, 1);
     expect(find.widgetWithText(FilledButton, '打卡'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));

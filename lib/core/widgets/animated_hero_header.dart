@@ -11,6 +11,7 @@ import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/hero_starlight_painter.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/core/widgets/playful_hero_painter.dart';
+import 'package:poemath/core/widgets/theme_character_art.dart';
 
 enum AnimatedHeroStyle { aurora, starlight }
 
@@ -233,6 +234,18 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                 : 0.0;
                             final stretch = math.max(0.0, -offset);
                             final height = constraints.maxHeight;
+                            // 首页插画锚定右侧操作区，给按钮及呼吸动效留出空间。
+                            final actionInset =
+                                widget.style == AnimatedHeroStyle.aurora
+                                ? SpacingTokens.lg +
+                                      SpacingTokens.xxl * 2 +
+                                      SpacingTokens.md +
+                                      SpacingTokens.xxl *
+                                          math.max(
+                                            0,
+                                            media.textScaler.scale(16) / 16 - 1,
+                                          )
+                                : 0.0;
                             // 底边锚定：下拉造成的整体下移被向上的放大抵消，
                             // 背景始终覆盖顶边；后续实色内容覆盖视差溢出部分。
                             return Transform.translate(
@@ -303,7 +316,43 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                   milliseconds: 300,
                                                 ),
                                               ),
-                                          if (!theme.appearance.playful)
+                                          if (theme.appearance.playful)
+                                            Positioned(
+                                              top: 0,
+                                              bottom: 0,
+                                              left: media.padding.left,
+                                              right:
+                                                  media.padding.right +
+                                                  actionInset,
+                                              child: Align(
+                                                alignment:
+                                                    widget.style ==
+                                                        AnimatedHeroStyle
+                                                            .starlight
+                                                    ? const Alignment(.78, 0)
+                                                    : Alignment.centerRight,
+                                                child: Opacity(
+                                                  opacity:
+                                                      theme
+                                                              .appearance
+                                                              .storybook &&
+                                                          theme.brightness ==
+                                                              Brightness.light
+                                                      ? .58
+                                                      : .28,
+                                                  child: ThemeCharacterArt(
+                                                    key: const ValueKey(
+                                                      'hero-theme-illustration',
+                                                    ),
+                                                    size: math.min(
+                                                      height,
+                                                      SpacingTokens.xxl * 3,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          else
                                             RepaintBoundary(
                                               child: Image.asset(
                                                 theme.appearance.heroImage,
@@ -311,16 +360,11 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                 alignment:
                                                     Alignment.centerRight,
                                                 cacheWidth: 640,
-                                                color: theme.appearance.playful
-                                                    ? null
-                                                    : colors.foreground,
-                                                opacity: AlwaysStoppedAnimation(
-                                                  theme.appearance.storybook &&
-                                                          theme.brightness ==
-                                                              Brightness.light
-                                                      ? .4
-                                                      : .14,
-                                                ),
+                                                color: colors.foreground,
+                                                opacity:
+                                                    const AlwaysStoppedAnimation(
+                                                      .14,
+                                                    ),
                                                 excludeFromSemantics: true,
                                               ),
                                             ),

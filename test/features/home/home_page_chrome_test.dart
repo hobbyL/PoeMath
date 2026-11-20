@@ -75,16 +75,17 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  for (final preset in [AppSubject.candy, AppSubject.space]) {
+  for (final preset in AppSubject.values) {
     for (final (size, scale) in [
       (const Size(411, 914), 1.0),
       (const Size(320, 640), 1.0),
+      (const Size(320, 640), 2.0),
       (const Size(914, 411), 1.0),
       (const Size(640, 320), 1.0),
       (const Size(914, 411), 2.0),
       (const Size(640, 320), 2.0),
     ]) {
-      testWidgets('童趣页头紧凑并露出目标：$preset/$size/$scale', (tester) async {
+      testWidgets('四主题共用宣纸页头排列且正文可见：$preset/$size/$scale', (tester) async {
         final landscape = size.width > size.height;
         await _pump(
           tester,
@@ -94,6 +95,7 @@ void main() {
               ? const EdgeInsets.only(left: 32, right: 24)
               : const EdgeInsets.only(top: 32),
           streak: 3650,
+          reduceMotion: true,
           theme: AppTheme.resolve(
             subject: preset,
             brightness: Brightness.light,
@@ -101,34 +103,37 @@ void main() {
         );
         expect(tester.takeException(), isNull);
         final header = tester.getRect(_background);
-        expect(header.height, lessThanOrEqualTo(landscape ? 200 : 280));
-        if (landscape) {
-          final content = find.byKey(
-            ValueKey(
-              preset == AppSubject.space
-                  ? 'space-check-in'
-                  : 'storybook-check-in',
-            ),
-          );
-          expect(
-            tester.getCenter(content).dx,
-            closeTo(header.center.dx + 4, 1),
-          );
+        if (preset == AppSubject.candy || preset == AppSubject.space) {
+          final art = find.byKey(const ValueKey('hero-theme-illustration'));
+          expect(art, findsOneWidget);
+          final artBounds = tester.getRect(art);
+          expect(artBounds.height, greaterThan(0));
+          expect(header.contains(artBounds.center), isTrue);
+          expect(artBounds.height, lessThanOrEqualTo(header.height));
+        }
+        expect(
+          header.height,
+          lessThanOrEqualTo(landscape ? 200 : size.height / 2),
+        );
+        final content = tester.getRect(
+          find.byKey(const ValueKey('home-check-in-content')),
+        );
+        final summary = tester.getRect(
+          find.byKey(const ValueKey('home-check-in-summary')),
+        );
+        final action = tester.getRect(find.byType(FilledButton));
+        expect(
+          content.center.dx,
+          closeTo(header.center.dx + (landscape ? 4 : 0), 1),
+        );
+        expect(summary.left, closeTo(content.left, 1));
+        if (landscape || scale == 1) {
+          expect(action.left, greaterThan(summary.right));
+          expect(action.right, closeTo(content.right, 1));
+          expect(action.center.dy, closeTo(summary.center.dy, 1));
         } else {
-          final summary = find.byKey(const ValueKey('home-check-in-summary'));
-          for (final row
-              in find
-                  .descendant(of: summary, matching: find.byType(Wrap))
-                  .evaluate()) {
-            expect(
-              tester.getCenter(find.byWidget(row.widget)).dx,
-              closeTo(header.center.dx, 1),
-            );
-          }
-          expect(
-            tester.getCenter(find.byType(FilledButton)).dx,
-            closeTo(header.center.dx, 1),
-          );
+          expect(action.top, greaterThan(summary.bottom));
+          expect(action.center.dx, closeTo(content.center.dx, 1));
         }
         final goalTitle = tester.getRect(find.text('今日学习目标 · 完成后可打卡'));
         // 预留底部导航后仍能看见目标区域；大字号标题允许自然换行。
@@ -147,7 +152,7 @@ void main() {
     }
     for (final landscape in [false, true]) {
       for (final reduced in [false, true]) {
-        testWidgets('童趣首页连续下拉回弹并可向上滚动：$preset/$landscape/$reduced', (
+        testWidgets('四主题首页连续下拉回弹并可向上滚动：$preset/$landscape/$reduced', (
           tester,
         ) async {
           await _pump(
@@ -504,7 +509,7 @@ void main() {
         expect(rect.width, greaterThanOrEqualTo(44));
         expect(rect.height, greaterThanOrEqualTo(44));
         expect(button.hitTestable(), findsOneWidget);
-        if (scale == 1) {
+        if (landscape || scale == 1) {
           expect(
             rect.center.dy,
             closeTo(

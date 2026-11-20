@@ -117,6 +117,14 @@ void main() {
           find.byKey(const ValueKey('profile-header-background')),
         );
         expect(background.height, lessThanOrEqualTo(200));
+        if (subject == AppSubject.candy || subject == AppSubject.space) {
+          final art = find.byKey(const ValueKey('hero-theme-illustration'));
+          expect(art, findsOneWidget);
+          final artBounds = tester.getRect(art);
+          expect(artBounds.height, greaterThan(0));
+          expect(background.contains(artBounds.center), isTrue);
+          expect(artBounds.height, lessThanOrEqualTo(background.height));
+        }
         final avatar = tester.getRect(find.byType(CircleAvatar));
         final name = tester.getRect(
           find.byKey(const ValueKey('profile-nickname-label')),

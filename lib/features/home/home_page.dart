@@ -25,7 +25,6 @@ import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/home/home_check_in_header.dart';
-import 'package:poemath/features/home/playful_check_in_content.dart';
 import 'package:poemath/features/home/practice_resume_section.dart';
 import 'package:poemath/features/home/today_plan_section.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
@@ -145,11 +144,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                   pending: !isCheckedIn,
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: SpacingTokens.lg,
-                    vertical: !theme.appearance.playful
-                        ? SpacingTokens.lg
-                        : media.orientation == Orientation.landscape
+                    vertical: media.orientation == Orientation.landscape
                         ? SpacingTokens.sm
-                        : SpacingTokens.md,
+                        : SpacingTokens.lg,
                   ),
                   child: _buildStreakCard(
                     context,
@@ -312,15 +309,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     final summary = Column(
       key: const ValueKey('home-check-in-summary'),
-      crossAxisAlignment: theme.appearance.playful
-          ? CrossAxisAlignment.center
-          : CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Wrap(
-          alignment: theme.appearance.playful
-              ? WrapAlignment.center
-              : WrapAlignment.start,
           spacing: SpacingTokens.sm,
           runSpacing: SpacingTokens.xs,
           crossAxisAlignment: WrapCrossAlignment.center,
@@ -336,9 +328,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         const SizedBox(height: SpacingTokens.sm),
         Wrap(
-          alignment: theme.appearance.playful
-              ? WrapAlignment.center
-              : WrapAlignment.start,
           spacing: SpacingTokens.xs,
           crossAxisAlignment: WrapCrossAlignment.end,
           children: [
@@ -368,21 +357,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     final media = MediaQuery.of(context);
     final contentWidth =
         media.size.width - media.padding.horizontal - SpacingTokens.lg * 2;
-    if (theme.appearance.playful) {
-      return PlayfulCheckInContent(
-        key: const ValueKey('home-check-in-content'),
-        contentWidth: contentWidth,
-        summary: summary,
-        action: reminder,
-        completedGoals: goals.where((goal) => goal.isComplete).length,
-        totalGoals: goals.length,
-      );
-    }
     final textScale = media.textScaler.scale(16) / 16;
     final effectiveWidth = contentWidth / textScale;
-    if (!theme.appearance.playful &&
-        (effectiveWidth >= ResponsiveLayout.mediumBreakpoint ||
-            textScale <= 1.25)) {
+    // 四主题复用宣纸布局，横屏保持信息和操作同排，窄竖屏大字时再纵排。
+    if (media.orientation == Orientation.landscape ||
+        effectiveWidth >= ResponsiveLayout.mediumBreakpoint ||
+        textScale <= 1.25) {
       return Row(
         key: const ValueKey('home-check-in-content'),
         children: [
@@ -399,12 +379,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       children: [
         summary,
         const SizedBox(height: SpacingTokens.md),
-        Align(
-          alignment: theme.appearance.playful
-              ? Alignment.centerLeft
-              : Alignment.center,
-          child: reminder,
-        ),
+        Align(child: reminder),
       ],
     );
   }
