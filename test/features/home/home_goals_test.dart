@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/widgets/app_tile.dart';
 import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/domain/today_plan.dart';
 import 'package:poemath/features/home/home_page.dart';
@@ -15,6 +17,78 @@ import '../../helpers/hive_test_helper.dart';
 void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
+
+  for (final subject in AppSubject.values) {
+    testWidgets('$subject 已完成目标保留箭头并可继续学习', (tester) async {
+      tester.view.physicalSize = const Size(411, 914);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final router = GoRouter(
+        routes: [
+          GoRoute(path: '/', builder: (_, __) => const HomePage()),
+          GoRoute(
+            path: AppRoutes.poemTab,
+            builder: (_, __) => const Scaffold(body: Text('诗词学习入口')),
+          ),
+          GoRoute(
+            path: AppRoutes.mathTab,
+            builder: (_, __) => const Scaffold(body: Text('数学学习入口')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            staticDayKeyOverride(),
+            dailyGoalTypesProvider.overrideWithValue({
+              DailyGoalActivity.poem,
+              DailyGoalActivity.math,
+            }),
+            dailyPoemGoalProvider.overrideWithValue(1),
+            dailyMathGoalProvider.overrideWithValue(10),
+            todayPoemCountProvider.overrideWithValue(1),
+            todayMathCountProvider.overrideWithValue(20),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.resolve(
+              subject: subject,
+              brightness: Brightness.light,
+            ),
+            routerConfig: router,
+          ),
+        ),
+      );
+      for (final (title, destination) in [
+        ('诗词 1/1 首', '诗词学习入口'),
+        ('口算 20/10 题', '数学学习入口'),
+      ]) {
+        router.go('/');
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        await drainHiveWritesForTesting(tester);
+        final card = find.ancestor(
+          of: find.text(title),
+          matching: find.byType(AppTile),
+        );
+        expect(
+          find.descendant(of: card, matching: find.text('目标已完成')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: card, matching: find.byIcon(Icons.chevron_right)),
+          findsOneWidget,
+        );
+        await tester.ensureVisible(card);
+        await tester.tap(card);
+        await tester.pumpAndSettle();
+        expect(find.text(destination), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+      await drainHiveWritesForTesting(tester);
+    });
+  }
 
   for (final poem in [true, false]) {
     testWidgets('已完成练习清单仍显示真实打卡差额，进入${poem ? '诗词' : '口算'}', (tester) async {

@@ -594,8 +594,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 subtitle: goal.isComplete
                     ? '目标已完成'
                     : '还差 ${goal.goal - goal.count} ${goal.unit} · ${goal.action}',
-                onTap: goal.isComplete ? null : () => context.go(goal.route),
-                trailing: goal.isComplete ? const SizedBox.shrink() : null,
+                onTap: () => context.go(goal.route),
               ),
           ],
         ),
