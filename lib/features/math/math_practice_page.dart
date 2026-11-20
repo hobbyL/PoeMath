@@ -1096,7 +1096,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final theme = Theme.of(context);
 
     if (!_ready || problems.isEmpty || problem == null) {
-      return Scaffold(
+      return AppScaffold(
         appBar: AppBar(
           title: Text(widget.adventureNode == null ? '口算练习' : '数学探险'),
           leading: widget.adventureNode == null
@@ -1130,7 +1130,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final sideBySide =
         size.width >= ResponsiveLayout.mediumBreakpoint &&
         size.width > size.height;
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         leading: widget.adventureNode == null
             ? null

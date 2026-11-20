@@ -78,7 +78,7 @@ class _MathSessionDetailPageState extends ConsumerState<MathSessionDetailPage> {
     final dur = session.durationSeconds;
     final durStr = dur >= 60 ? '${dur ~/ 60}分${dur % 60}秒' : '$dur秒';
 
-    return Scaffold(
+    return AppScaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
           final columns = ResponsiveLayout.columns(constraints.maxWidth);

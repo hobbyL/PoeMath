@@ -49,7 +49,8 @@ class _TextbookSourcePageState extends ConsumerState<TextbookCourseSourcePage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => AppScaffold(
+    backgroundScene: PineInkScene.study,
     appBar: AppBar(title: const Text('对照原书')),
     body: ref
         .watch(textbookPathProvider(widget.book.pdfSha256))

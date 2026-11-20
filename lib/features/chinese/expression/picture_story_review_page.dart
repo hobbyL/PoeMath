@@ -228,7 +228,8 @@ class _PictureStoryReviewPageState extends ConsumerState<PictureStoryReviewPage>
                 ]
               : revisions)
         : revisions.take(revisions.isEmpty ? 0 : revisions.length - 1).toList();
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(title: const Text('修改表达与点评')),
       body: record == null
           ? AppEmptyState(

@@ -1003,7 +1003,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       return PoemPracticeUnavailable(title: '背诵练习', missing: poem == null);
     }
     if (_draftOpening || _lines.isEmpty) {
-      return Scaffold(
+      return AppScaffold(
+        backgroundScene: PineInkScene.branch,
         appBar: AppBar(title: const Text('背诵练习')),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -1019,7 +1020,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
           unawaited(_draft?.exit(context));
         }
       },
-      child: Scaffold(
+      child: AppScaffold(
+        backgroundScene: PineInkScene.branch,
         appBar: AppBar(
           title: Row(
             mainAxisSize: MainAxisSize.min,

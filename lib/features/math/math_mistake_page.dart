@@ -52,7 +52,7 @@ class _MathMistakePageState extends ConsumerState<MathMistakePage> {
     }
     final sortedGrades = availableGrades.toList()..sort();
 
-    return Scaffold(
+    return AppScaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
           final columns = ResponsiveLayout.columns(constraints.maxWidth);

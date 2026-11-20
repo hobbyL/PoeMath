@@ -10,6 +10,7 @@
 //      且无法返回。改为渲染本页并给出重新进入的入口。
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/widgets/app_scaffold.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
@@ -50,7 +51,7 @@ class RouteFallbackPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: Text(title)),
       body: SafeArea(
         child: Center(

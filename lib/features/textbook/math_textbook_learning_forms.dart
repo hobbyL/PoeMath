@@ -300,7 +300,8 @@ class _MathLearningFormPageState extends State<_MathLearningFormPage> {
     onPopInvokedWithResult: (didPop, _) {
       if (!didPop) _leave();
     },
-    child: Scaffold(
+    child: AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         title: Text(_title),
         leading: IconButton(
@@ -741,7 +742,8 @@ class _MathSourcePickerPageState extends State<_MathSourcePickerPage> {
       .where((id) => !widget.lesson.blocks.any((block) => block.id == id))
       .toList();
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => AppScaffold(
+    backgroundScene: PineInkScene.study,
     appBar: AppBar(
       title: Text('选择原书内容（${_selected.length}）'),
       actions: [
@@ -836,7 +838,8 @@ class _MathLearningJsonPageState extends State<_MathLearningJsonPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => AppScaffold(
+    backgroundScene: PineInkScene.study,
     appBar: AppBar(title: const Text('导入学习配置')),
     body: SafeArea(
       child: ListView(

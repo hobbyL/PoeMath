@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:poemath/core/widgets/app_scaffold.dart';
+import 'package:poemath/core/widgets/pine_ink_surface.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
@@ -843,7 +845,8 @@ class _TextbookCourseEditorPageState
     final node = widget.node;
     return PopScope(
       canPop: !_saving,
-      child: Scaffold(
+      child: AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(title: Text(widget.creating ? '添加内容' : '编辑内容')),
         body: SafeArea(
           top: false,

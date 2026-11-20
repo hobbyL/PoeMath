@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:poemath/core/widgets/app_scaffold.dart';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -382,7 +383,7 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
   Widget build(BuildContext context) {
     if (_canShowChild) return widget.child;
     final setup = !_access.enabled;
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('家长保护'),
         leading: IconButton(

@@ -32,7 +32,8 @@ class PictureStoryPage extends ConsumerWidget {
     } on Object {
       // 保留损坏目录原值，恢复后可重试；不能误显示成空题库。
     }
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         centerTitle: navigationTitle != null,

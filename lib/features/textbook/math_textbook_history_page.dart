@@ -32,7 +32,8 @@ class MathTextbookHistoryPage extends ConsumerWidget {
           (b) => b.pdfSha256 == bookId && b.subject == TextbookSubject.math,
         )
         .firstOrNull;
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(title: Text(parent ? '作答记录与家长核对' : '本书学习记录')),
       body: SafeArea(
         child: book == null
@@ -265,7 +266,8 @@ class _MathTextbookAttemptPageState
         item.exercise.fields.every(
           (field) => field.rule.kind == MathTextbookAnswerKind.parent,
         );
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(title: const Text('作答详情')),
       body: SafeArea(
         child: ListView(

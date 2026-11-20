@@ -55,7 +55,7 @@ class MathMistakeDetailPage extends ConsumerWidget {
     final mistake = repo.getById(mistakeId);
 
     if (mistake == null) {
-      return Scaffold(
+      return AppScaffold(
         appBar: AppBar(title: const Text('错题详情')),
         body: const AppEmptyState(
           icon: Icons.check_circle_outline,
@@ -77,7 +77,7 @@ class MathMistakeDetailPage extends ConsumerWidget {
       diagnosisCategory: mistake.errorType,
     );
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('错题详情'),
         actions: [

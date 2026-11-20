@@ -432,7 +432,8 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
         .firstOrNull;
     final course = ref.watch(mathTextbookCourseProvider(widget.bookId));
     final progress = ref.watch(mathTextbookGenerationProvider)[widget.bookId];
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         title: const Text('内容审核'),
         actions: [

@@ -328,7 +328,8 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     final theme = Theme.of(context);
 
     if (poem == null) {
-      return Scaffold(
+      return AppScaffold(
+        backgroundScene: PineInkScene.branch,
         appBar: AppBar(title: const Text('诗词详情')),
         body: const AppEmptyState(
           icon: Icons.menu_book_outlined,
@@ -348,7 +349,8 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     // 名句播放文本：按行拼接。
     final famousLinesText = poem.famousLines.join('。');
 
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.branch,
       // 本页不用 AppBar：顶部原来只放诗题 + 拼音/收藏两个按钮，占掉整条
       // 高度。改为悬浮条 —— 左返回、中间诗题+作者、右拼音+收藏，与原来
       // AppBar 的排布一致但不再占独立一行，正文因此多出一屏空间。

@@ -162,7 +162,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
       if (_followLatest) _scrollToBottomSoon();
     });
 
-    return Scaffold(
+    return AppScaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         // leading 显式返回箭头（点左上角退出页面）；标题位放「模型 | 供应商」

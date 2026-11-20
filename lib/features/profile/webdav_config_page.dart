@@ -150,7 +150,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
     final theme = Theme.of(context);
     final isEditing = widget.existing != null;
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: Text(isEditing ? '编辑配置' : '添加 WebDAV')),
       body: SafeArea(
         child: Form(

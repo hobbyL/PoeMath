@@ -95,7 +95,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('备份与恢复')),
       body: SafeArea(
         child: AnimatedPageBody(

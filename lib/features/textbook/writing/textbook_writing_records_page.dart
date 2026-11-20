@@ -35,7 +35,8 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final view = _content(context, ref);
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(title: Text(view.title)),
       body: SafeArea(child: view.content),
     );

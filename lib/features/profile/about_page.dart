@@ -54,7 +54,7 @@ class _AboutPageState extends State<AboutPage> {
         ? 'v${_packageInfo!.version} (${_packageInfo!.buildNumber})'
         : 'v${AppConstants.appVersion}';
 
-    return Scaffold(
+    return AppScaffold(
       // 本页不用 AppBar：顶部只放一个「关于」标题，占掉整条高度却不承载
       // 交互。改为内容顶格 + 返回按钮浮动左上角（见下方 Positioned）。
       //

@@ -360,7 +360,7 @@ class _SpeechRecognitionSettingsPageState
         _messageIsError ? theme.colorScheme.error : theme.colorScheme.primary;
     final testButtonLabel = _recording ? '结束并验证' : '开始真实录音测试';
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('语音识别设置'),
         actions: [

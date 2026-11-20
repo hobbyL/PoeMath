@@ -286,7 +286,7 @@ class _PromptSettingsPageState extends ConsumerState<PromptSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('AI 提示词设置'),
         backgroundColor: theme.colorScheme.surface,

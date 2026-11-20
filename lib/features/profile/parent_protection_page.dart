@@ -195,7 +195,7 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final usage = CloudUsageService.instance;
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text(
           '家长保护与云额度',

@@ -36,7 +36,8 @@ class PoemReviewPage extends ConsumerWidget {
       ..sort((a, b) => a.nextReviewDate.compareTo(b.nextReviewDate));
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.branch,
       appBar: AppBar(title: const Text('复习计划')),
       body: dueToday.isEmpty && upcoming.isEmpty
           ? const AppEmptyState(

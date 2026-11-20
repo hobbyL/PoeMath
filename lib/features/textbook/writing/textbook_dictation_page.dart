@@ -387,7 +387,8 @@ class _TextbookDictationPageState extends ConsumerState<TextbookDictationPage>
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) unawaited(_confirmExit());
       },
-      child: Scaffold(
+      child: AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(
           title: Text(lesson == null ? '听写' : '听写·${lesson.title}'),
         ),

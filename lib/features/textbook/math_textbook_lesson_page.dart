@@ -625,7 +625,8 @@ class _MathTextbookLessonPageState extends ConsumerState<MathTextbookLessonPage>
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _leave();
       },
-      child: Scaffold(
+      child: AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(
           title: Text(_showSource ? '原书范围与待整理内容' : lesson?.title ?? '内容审核'),
           leading: IconButton(
@@ -954,7 +955,8 @@ class _MathComparisonPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DefaultTabController(
     length: 2,
-    child: Scaffold(
+    child: AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         title: const Text('比较整理结果'),
         bottom: const TabBar(

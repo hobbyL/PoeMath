@@ -60,7 +60,8 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
           .putIfAbsent(poem.textbookUnit ?? '课标必背（未标教材单元）', () => [])
           .add(poem);
     }
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.branch,
       appBar: AppBar(title: const Text('教材学习路线')),
       body: SafeArea(
         child: AnimatedPageBody(

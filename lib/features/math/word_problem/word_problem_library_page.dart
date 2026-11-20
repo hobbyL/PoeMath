@@ -69,7 +69,7 @@ class _WordProblemLibraryPageState
           .add(problem);
     }
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('应用题题库'),
         // 「生成新题」常驻入口：宽屏图标+文案 / 窄屏仅图标（文案进 tooltip），

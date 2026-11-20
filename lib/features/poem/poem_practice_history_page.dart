@@ -33,7 +33,8 @@ class _PoemPracticeHistoryPageState
               lines[line.lineIndex] == line.lineText,
         )
         .toList();
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.branch,
       appBar: AppBar(title: const Text('练习结果与错句')),
       body: ListView(
         padding: const EdgeInsets.all(SpacingTokens.md),

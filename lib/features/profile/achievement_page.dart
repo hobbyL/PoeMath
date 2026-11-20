@@ -33,7 +33,7 @@ class AchievementPage extends ConsumerWidget {
     final unlockedCount = repo.unlockedCount;
     final totalCount = allDefs.length;
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('成就勋章')),
       body: SafeArea(
         child: AnimatedPageBody(

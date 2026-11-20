@@ -131,7 +131,7 @@ class _PictureStoryCandidateEditorPageState
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) unawaited(_leave());
       },
-      child: Scaffold(
+      child: AppScaffold(
         appBar: AppBar(
           title: const Text('编辑生成题目'),
           actions: [

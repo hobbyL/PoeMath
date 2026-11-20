@@ -14,7 +14,8 @@ class PoemPracticeUnavailable extends StatelessWidget {
   final bool missing;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => AppScaffold(
+    backgroundScene: PineInkScene.branch,
     appBar: AppBar(title: Text(title)),
     body: AppEmptyState(
       icon: Icons.menu_book_outlined,

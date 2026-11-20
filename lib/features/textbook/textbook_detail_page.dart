@@ -286,7 +286,8 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
           onPressed: onSubject,
           icon: const Icon(Icons.category_outlined),
         );
-        return Scaffold(
+        return AppScaffold(
+          backgroundScene: PineInkScene.study,
           bottomNavigationBar: bottomNavigationBar,
           appBar: layout.doublePage
               ? null

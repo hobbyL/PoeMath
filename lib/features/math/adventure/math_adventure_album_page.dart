@@ -21,7 +21,7 @@ class MathAdventureAlbumPage extends ConsumerWidget {
       0,
       (sum, item) => sum + item.collectedRegionIds.length,
     );
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('自然纪念册'),
         leading: BackButton(

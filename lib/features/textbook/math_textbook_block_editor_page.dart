@@ -205,7 +205,8 @@ class _MathTextbookBlockEditorPageState
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _leave();
       },
-      child: Scaffold(
+      child: AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(
           title: const Text('对照并修改内容'),
           leading: IconButton(

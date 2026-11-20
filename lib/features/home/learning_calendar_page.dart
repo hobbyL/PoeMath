@@ -47,7 +47,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
 
     final monthLabel = '${_currentMonth.year}年${_currentMonth.month}月';
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         centerTitle: true,
         title: Row(
@@ -94,26 +94,32 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildStat(
-                    theme,
-                    Icons.local_fire_department_rounded,
-                    '$streak',
-                    '连续打卡',
-                    theme.colorScheme.error,
+                  Expanded(
+                    child: _buildStat(
+                      theme,
+                      Icons.local_fire_department_rounded,
+                      '$streak',
+                      '连续打卡',
+                      theme.colorScheme.error,
+                    ),
                   ),
-                  _buildStat(
-                    theme,
-                    Icons.event_available,
-                    '${records.length}',
-                    '本月学习',
-                    theme.colorScheme.primary,
+                  Expanded(
+                    child: _buildStat(
+                      theme,
+                      Icons.event_available,
+                      '${records.length}',
+                      '本月学习',
+                      theme.colorScheme.primary,
+                    ),
                   ),
-                  _buildStat(
-                    theme,
-                    Icons.star_rounded,
-                    '${records.fold<int>(0, (s, r) => s + r.starsEarned)}',
-                    '本月星星',
-                    theme.semantic.caution,
+                  Expanded(
+                    child: _buildStat(
+                      theme,
+                      Icons.star_rounded,
+                      '${records.fold<int>(0, (s, r) => s + r.starsEarned)}',
+                      '本月星星',
+                      theme.semantic.caution,
+                    ),
                   ),
                 ],
               ),
@@ -235,13 +241,16 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
               : null,
         ),
         alignment: Alignment.center,
-        child: Text(
-          '$day',
-          style: theme.textTheme.bodySmall?.copyWith(
-            fontWeight: isToday ? FontWeight.bold : null,
-            color: level >= 3
-                ? theme.colorScheme.onPrimary
-                : theme.colorScheme.onSurface,
+        child: AutoFitLine(
+          child: Text(
+            '$day',
+            maxLines: 1,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: isToday ? FontWeight.bold : null,
+              color: level >= 3
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurface,
+            ),
           ),
         ),
       ),
@@ -409,6 +418,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
         ),
         Text(
           label,
+          textAlign: TextAlign.center,
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

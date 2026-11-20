@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:poemath/core/widgets/app_scaffold.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -53,7 +54,7 @@ class _LearningBackgroundPageState
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => AppScaffold(
         appBar: AppBar(title: const Text('学习背景')),
         body: SafeArea(
           child: ListView(

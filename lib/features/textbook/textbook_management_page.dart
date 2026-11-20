@@ -162,7 +162,8 @@ class _TextbookManagementPageState
       visualDensity: VisualDensity.standard,
       padding: const EdgeInsets.all(SpacingTokens.sm),
     );
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         title: const Text('书籍管理', maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [

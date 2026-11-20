@@ -811,7 +811,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     final theme = Theme.of(context);
 
     if (poem == null) {
-      return Scaffold(
+      return AppScaffold(
+        backgroundScene: PineInkScene.branch,
         appBar: AppBar(title: const Text('跟读练习')),
         body: const AppEmptyState(
           icon: Icons.menu_book_outlined,
@@ -825,7 +826,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       _lines = _splitLines(poem.content);
     }
 
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.branch,
       appBar: AppBar(
         title: Text(poem.title),
         actions: [

@@ -263,7 +263,7 @@ class _WordProblemPreviewPageState
     final isWide = MediaQuery.sizeOf(context).width >= 420;
     final confirmLabel = '确认入库 $_selectedCount 题';
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('家长预览'),
         actions: [

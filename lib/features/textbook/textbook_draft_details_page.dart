@@ -452,7 +452,8 @@ class _TextbookDraftDetailsState
     final contentStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         title: const Text('原书与待整理内容'),
         actions: [

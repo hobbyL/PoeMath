@@ -291,7 +291,7 @@ class _PictureStoryGeneratePageState
     final canOperate = !_busy && _sameProfile && !_loadFailed;
     final selectedCount = draft?.selectedPrompts.length ?? 0;
     final error = _error ?? _run.message;
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('AI 看图说话出题'),
         actions: [

@@ -529,7 +529,8 @@ class _MathTextbookPracticePageState
     onPopInvokedWithResult: (didPop, _) {
       if (!didPop) _leave();
     },
-    child: Scaffold(
+    child: AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         title: Text(_pageTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         leading: IconButton(

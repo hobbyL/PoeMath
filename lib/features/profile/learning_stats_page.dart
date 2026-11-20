@@ -30,7 +30,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
     final theme = Theme.of(context);
     final stats = ref.watch(dailyStatsProvider(_days));
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('学习报告'),
         actions: [

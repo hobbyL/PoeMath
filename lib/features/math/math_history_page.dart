@@ -22,7 +22,7 @@ class MathHistoryPage extends ConsumerWidget {
     final repo = ref.watch(mathSessionRepoProvider);
     final sessions = repo.getAll();
 
-    return Scaffold(
+    return AppScaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
           final columns = ResponsiveLayout.columns(

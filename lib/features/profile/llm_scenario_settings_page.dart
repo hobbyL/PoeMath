@@ -276,7 +276,7 @@ class _LlmScenarioSettingsPageState
     final providers = settingsRepo.llmProviders;
     final activeId = settingsRepo.llmActiveProviderId;
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('使用场景设置')),
       body: ListView(
         padding: const EdgeInsets.all(SpacingTokens.md),

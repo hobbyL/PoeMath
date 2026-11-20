@@ -143,7 +143,8 @@ class _PictureStoryHistoryPageState
             slivers: slivers,
           );
         }
-        return Scaffold(
+        return AppScaffold(
+          backgroundScene: PineInkScene.study,
           appBar: AppBar(title: Text(id == null ? '看图说话记录' : '题目练习记录')),
           body: SafeArea(
             top: false,

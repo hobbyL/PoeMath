@@ -17,7 +17,8 @@ class MathTextbookRecordPage extends ConsumerWidget {
         .where((book) => book.pdfSha256 == snapshot.bookId)
         .firstOrNull;
     final item = snapshot.item;
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(title: const Text('教材作答快照')),
       body: SafeArea(
         child: ListView(

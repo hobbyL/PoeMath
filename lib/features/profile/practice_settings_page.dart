@@ -86,7 +86,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('练习设置')),
       body: SafeArea(
         child: AnimatedPageBody(

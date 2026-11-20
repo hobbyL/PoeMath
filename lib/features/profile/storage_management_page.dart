@@ -117,7 +117,7 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
             if (kind != StorageCacheKind.legacySpeechModels)
               StorageCacheEntry(kind: kind),
         ];
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('存储管理'),
         actions: [

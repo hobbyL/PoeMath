@@ -62,7 +62,7 @@ class CloudUsageHistoryPage extends StatelessWidget {
     }
     final hasAny = daily.any((d) => d.total > 0);
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('用量历史')),
       body: SafeArea(
         child: ListView(

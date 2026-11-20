@@ -586,7 +586,8 @@ class _TextbookLessonContentPageState
         : lessons.length == 1
         ? '${selected.label}·${lessons.single.title}'
         : selected.label;
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       bottomNavigationBar: _session == null
           ? null
           : SafeArea(

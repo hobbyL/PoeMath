@@ -254,7 +254,7 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
     final theme = Theme.of(context);
 
     if (formula == null) {
-      return Scaffold(
+      return AppScaffold(
         appBar: AppBar(title: const Text('公式详情')),
         body: const AppEmptyState(
           icon: Icons.functions_outlined,
@@ -264,7 +264,7 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
       );
     }
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: Text(formula.name),
         actions: [

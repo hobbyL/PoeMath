@@ -102,7 +102,7 @@ class SettingsPage extends ConsumerWidget {
       _SettingsSection.application => '应用与提醒',
     };
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: Text(pageTitle)),
       body: SafeArea(
         child: AnimatedPageBody(

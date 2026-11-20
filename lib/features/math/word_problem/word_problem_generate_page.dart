@@ -143,7 +143,7 @@ class _WordProblemGeneratePageState
     ref.watch(settingsRepositoryProvider);
     _ensureTopicsAvailable();
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('应用题 AI 出题')),
       body: configAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

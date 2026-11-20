@@ -650,7 +650,8 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
   Widget build(BuildContext context) {
     final target = _target;
     if (_loading || target == null) {
-      return Scaffold(
+      return AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -661,7 +662,8 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     final labelHeight =
         MediaQuery.textScalerOf(context).scale(labelStyle.fontSize!) *
         (labelStyle.height ?? 1);
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         centerTitle: true,
         titleSpacing: SpacingTokens.sm,

@@ -316,7 +316,8 @@ abstract class RecognitionPageState<W extends RecognitionPage>
   bool get showNavigationBar => true;
 
   Widget frame(String title, List<Widget> children, {bool compact = false}) =>
-      Scaffold(
+      AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: showNavigationBar ? AppBar(title: Text(title)) : null,
         body: SafeArea(
           child: Stack(

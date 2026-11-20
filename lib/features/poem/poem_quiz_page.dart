@@ -491,7 +491,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     final theme = Theme.of(context);
 
     if (poem == null) {
-      return Scaffold(
+      return AppScaffold(
+        backgroundScene: PineInkScene.branch,
         appBar: AppBar(title: const Text('诗词测试')),
         body: const AppEmptyState(
           icon: Icons.menu_book_outlined,
@@ -502,7 +503,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     }
 
     if (_session == null) {
-      return Scaffold(
+      return AppScaffold(
+        backgroundScene: PineInkScene.branch,
         appBar: AppBar(title: Text('${_quizType.label} · ${poem.title}')),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -520,7 +522,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
           unawaited(_draft?.exit(context));
         }
       },
-      child: Scaffold(
+      child: AppScaffold(
+        backgroundScene: PineInkScene.branch,
         appBar: AppBar(title: Text('${_quizType.label} · ${poem.title}')),
         body: PoemDraftSaveStatus(
           draft: _draft,

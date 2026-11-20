@@ -567,7 +567,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) unawaited(_confirmEndChallenge());
       },
-      child: Scaffold(
+      child: AppScaffold(
         appBar: AppBar(
           title: Text(
             '${_started && _verticalScheme ? '竖式挑战' : '限时挑战'} · ${GradePresets.get(grade, semester).label}',

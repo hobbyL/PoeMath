@@ -25,7 +25,7 @@ class StudyHubPage extends ConsumerWidget {
 
     final filterLabel = selectedCategory ?? '全部';
 
-    return Scaffold(
+    return AppScaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
           final columns = ResponsiveLayout.columns(constraints.maxWidth);

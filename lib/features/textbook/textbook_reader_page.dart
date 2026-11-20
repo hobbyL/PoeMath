@@ -189,7 +189,8 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
   Widget build(BuildContext context) {
     final book = _book;
     if (book == null) {
-      return Scaffold(
+      return AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(title: const Text('原书阅读')),
         body: const AppEmptyState(
           icon: Icons.menu_book_outlined,
@@ -209,7 +210,8 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
     );
     final pathState = ref.watch(textbookPathProvider(book.pdfSha256));
     final revision = _viewerRevision;
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         title: Text(
           widget.title ?? book.title,

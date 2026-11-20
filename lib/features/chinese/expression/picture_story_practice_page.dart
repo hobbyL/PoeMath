@@ -944,7 +944,8 @@ class _PictureStoryPracticePageState
     final theme = Theme.of(context);
     final prompt = _prompt;
     if (prompt == null) {
-      return Scaffold(
+      return AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(title: const Text('看图说话')),
         body: PictureStoryUnavailableView(
           message: _promptReadFailed ? '题目暂时无法读取，请返回题库重试。' : '题目不存在，请返回选择其他题目。',
@@ -1015,7 +1016,8 @@ class _PictureStoryPracticePageState
     ThemeData theme,
     PictureStoryPrompt prompt,
     PictureStoryPracticeRecord record,
-  ) => Scaffold(
+  ) => AppScaffold(
+    backgroundScene: PineInkScene.study,
     appBar: AppBar(title: const Text('本次表达')),
     body: SafeArea(
       child: ListView(

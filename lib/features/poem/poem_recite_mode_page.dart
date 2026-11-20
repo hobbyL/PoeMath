@@ -23,7 +23,8 @@ class PoemReciteModePage extends ConsumerWidget {
     final theme = Theme.of(context);
 
     if (poem == null) {
-      return Scaffold(
+      return AppScaffold(
+        backgroundScene: PineInkScene.branch,
         appBar: AppBar(title: const Text('选择模式')),
         body: const AppEmptyState(
           icon: Icons.menu_book_outlined,
@@ -36,7 +37,8 @@ class PoemReciteModePage extends ConsumerWidget {
     final gradeText = poem.grade != null ? '${poem.grade}年级' : '';
     final diffText = '难度 ${'★' * poem.difficulty}';
 
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.branch,
       appBar: AppBar(title: const Text('选择练习模式')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(SpacingTokens.lg),

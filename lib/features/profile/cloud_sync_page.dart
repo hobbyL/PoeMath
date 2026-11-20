@@ -413,7 +413,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     final skipped = detailed.skipped;
     final busy = _uploading || _downloading;
 
-    return Scaffold(
+    return AppScaffold(
       floatingActionButton: _selectedId == null
           ? null
           : FloatingActionButton.small(

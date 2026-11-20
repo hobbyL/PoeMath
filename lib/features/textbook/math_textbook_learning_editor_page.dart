@@ -269,7 +269,8 @@ class _MathTextbookLearningEditorPageState
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _leave();
       },
-      child: Scaffold(
+      child: AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(
           title: Text(title),
           leading: IconButton(

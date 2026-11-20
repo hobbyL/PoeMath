@@ -356,7 +356,8 @@ class _TextbookCourseReviewPageState
         .firstOrNull;
     return PopScope(
       canPop: !_importing,
-      child: Scaffold(
+      child: AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(
           title: const Text('内容审核'),
           actions: [
@@ -692,7 +693,8 @@ class _TextbookCourseLessonPageState
       'recitations': lesson.recitations,
       'exercises': lesson.exercises,
     };
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         title: Text(lesson.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
@@ -929,7 +931,8 @@ class _TextbookCoveragePageState extends ConsumerState<_TextbookCoveragePage> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: !_saving,
-      child: Scaffold(
+      child: AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(title: const Text('核对内容范围')),
         body: SafeArea(
           top: false,

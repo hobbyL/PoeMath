@@ -42,7 +42,7 @@ class WeeklyReportPage extends ConsumerWidget {
     final dateRange =
         '${startDate.month}/${startDate.day} - ${endDate.month}/${endDate.day}';
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('学习周报'),
         actions: [

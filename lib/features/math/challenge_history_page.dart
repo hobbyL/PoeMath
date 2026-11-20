@@ -22,7 +22,7 @@ class ChallengeHistoryPage extends ConsumerWidget {
     final records = repo.getAll();
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return AppScaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
           final columns = ResponsiveLayout.columns(constraints.maxWidth);

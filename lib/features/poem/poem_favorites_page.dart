@@ -25,7 +25,8 @@ class PoemFavoritesPage extends ConsumerWidget {
     final progressRepo = ref.watch(poemProgressRepoProvider);
     final favorites = favRepo.getAll();
 
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.branch,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final columns = ResponsiveLayout.columns(constraints.maxWidth);

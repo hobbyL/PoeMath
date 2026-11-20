@@ -113,7 +113,7 @@ class _PictureStoryDetailPageState
       failed = true;
     }
     if (prompt == null) {
-      return Scaffold(
+      return AppScaffold(
         appBar: AppBar(
           leading: BackButton(onPressed: _goBack),
           title: const Text(

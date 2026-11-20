@@ -6,6 +6,7 @@
 //       计入每日目标；星星/打卡/学习活动/成就同步）。
 
 import 'dart:async';
+import 'package:poemath/core/widgets/app_scaffold.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -619,7 +620,7 @@ class _WordProblemPracticePageState
   @override
   Widget build(BuildContext context) {
     if (!_ready || _resumeError != null) {
-      return Scaffold(
+      return AppScaffold(
         appBar: AppBar(title: const Text('应用题练习')),
         body: Center(
           child: _resumeError == null
@@ -632,7 +633,7 @@ class _WordProblemPracticePageState
     final problem = _current;
     final total = _problems.length;
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: Text('${_currentIndex + 1} / $total'),
         actions: [

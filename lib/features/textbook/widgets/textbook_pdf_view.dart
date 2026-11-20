@@ -6,7 +6,7 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:poemath/core/services/textbook_content_cache.dart';
 import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/core/services/textbook_pdf_page_loader.dart';
-import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_corner.dart';
@@ -221,7 +221,10 @@ class _TextbookPdfViewState extends State<TextbookPdfView> {
     controller: _controller,
     initialPageNumber: widget.options.initialPage,
     params: PdfViewerParams(
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+      // 只透出原书之外的页面底图，PDF 纸张仍由阅读器独立绘制。
+      backgroundColor: Theme.of(context).appearance.pine
+          ? Colors.transparent
+          : Theme.of(context).colorScheme.surfaceContainer,
       layoutPages: widget.horizontalPaging
           ? (pages, params) => textbookHorizontalPages(
               pages,

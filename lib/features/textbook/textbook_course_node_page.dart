@@ -353,7 +353,8 @@ class _TextbookCourseNodePageState
             : null;
     return PopScope(
       canPop: !_saving,
-      child: Scaffold(
+      child: AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(
           title: Text(
             '$title · $status',

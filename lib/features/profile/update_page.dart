@@ -66,7 +66,7 @@ class _UpdatePageState extends State<UpdatePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScaffold(
       // 本页不用 AppBar：顶部只放一个「检查更新」标题，占掉整条高度却不
       // 承载交互。改为内容顶格 + 返回按钮浮动左上角（见下方 Positioned）。
       body: SafeArea(

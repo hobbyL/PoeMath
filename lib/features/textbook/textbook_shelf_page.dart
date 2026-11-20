@@ -212,7 +212,8 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
     final textStyle = DefaultTextStyle.of(context).style
         .merge(theme.textTheme.bodySmall)
         .copyWith(height: 1.5);
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(title: const Text('教材下载')),
       body: SafeArea(
         child: CustomScrollView(

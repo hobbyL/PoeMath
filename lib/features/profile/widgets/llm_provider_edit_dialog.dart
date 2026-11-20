@@ -667,7 +667,7 @@ class _LlmProviderEditDialogState
 
     return ScaffoldMessenger(
       key: _messengerKey,
-      child: Scaffold(
+      child: AppScaffold(
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.close),

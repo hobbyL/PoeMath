@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
@@ -93,7 +93,8 @@ class _PictureStorySceneScaffoldState
         namesRoute: true,
         explicitChildNodes: true,
         label: widget.semanticLabel,
-        child: Scaffold(
+        child: AppScaffold(
+          backgroundScene: PineInkScene.study,
           bottomNavigationBar: widget.bottomNavigationBar,
           body: LayoutBuilder(
             builder: (context, constraints) {
@@ -223,7 +224,12 @@ class _PictureStorySceneScaffoldState
                                   padding: EdgeInsets.only(top: imageHeight),
                                   child: ColoredCard(
                                     color: theme.scaffoldBackgroundColor,
-                                    backgroundOpacity: 1,
+                                    // 松墨书斋底图位于页面纸面之后；透明正文面
+                                    // 让它在题图下方继续可见，同时保留各内容卡片
+                                    // 自己的清晰表面。
+                                    backgroundOpacity: theme.appearance.pine
+                                        ? 0
+                                        : 1,
                                     borderRadius: BorderRadius.zero,
                                     constraints: BoxConstraints(
                                       minHeight: constraints.maxHeight,

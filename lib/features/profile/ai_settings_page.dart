@@ -64,7 +64,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
     final providerCount = settingsRepo.llmProviders.length;
     final assistantEnabled = ref.watch(assistantEnabledProvider);
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('AI 设置')),
       body: ListView(
         padding: const EdgeInsets.all(SpacingTokens.md),

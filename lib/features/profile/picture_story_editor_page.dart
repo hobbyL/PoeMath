@@ -295,7 +295,7 @@ class _PictureStoryEditorPageState
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) unawaited(_requestExit());
       },
-      child: Scaffold(
+      child: AppScaffold(
         appBar: AppBar(
           title: Text(widget.promptId == null ? '新增题目' : '编辑题目'),
           leading: IconButton(

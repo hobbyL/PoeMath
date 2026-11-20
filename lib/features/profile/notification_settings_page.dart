@@ -264,7 +264,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('通知设置')),
       body: SafeArea(
         child: AnimatedPageBody(

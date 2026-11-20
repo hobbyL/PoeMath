@@ -42,7 +42,8 @@ class MathTextbookBookPage extends ConsumerWidget {
           (b) => b.pdfSha256 == bookId && b.subject == TextbookSubject.math,
         )
         .firstOrNull;
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         title: Text(_modeLabel(mode) ?? '数学课本'),
         actions: [
@@ -496,7 +497,8 @@ class _MathTextbookKnowledgePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final points = mathTextbookStudyNotes(lesson);
     final examples = mathTextbookWorkedExamples(lesson);
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(title: Text(lesson.title)),
       body: SafeArea(
         child: points.isEmpty && examples.isEmpty
@@ -567,7 +569,8 @@ class MathTextbookKnowledgeNotesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final blocks = mathTextbookKnowledgeImageBlocks(lesson, point);
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(title: Text(point.title)),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -636,7 +639,8 @@ class _MathTextbookPracticeOverviewPage extends ConsumerWidget {
         !learning.noExercises &&
         learning.exercises.isNotEmpty;
     if (!hasOriginal && plans.isEmpty) {
-      return Scaffold(
+      return AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(title: Text(lesson.title)),
         body: SafeArea(
           child: AppEmptyState(
@@ -654,7 +658,8 @@ class _MathTextbookPracticeOverviewPage extends ConsumerWidget {
         ),
       );
     }
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(title: Text(lesson.title)),
       body: SafeArea(
         child: ListView(
@@ -816,7 +821,8 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
     );
   }
 
-  Widget _statusPage(String title, Widget body) => Scaffold(
+  Widget _statusPage(String title, Widget body) => AppScaffold(
+    backgroundScene: PineInkScene.study,
     appBar: AppBar(title: Text(title)),
     body: SafeArea(child: body),
   );
@@ -888,7 +894,8 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
         onHistory: () =>
             context.push(AppRoutes.mathTextbookHistoryOf(book.pdfSha256)),
       ),
-      _ => Scaffold(
+      _ => AppScaffold(
+        backgroundScene: PineInkScene.study,
         appBar: AppBar(title: Text(lesson.title)),
         body: SafeArea(child: _content(book, lesson, progress)),
       ),

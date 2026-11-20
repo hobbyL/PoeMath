@@ -127,7 +127,8 @@ class MathTextbookSourceContentPage extends StatelessWidget {
     final firstSource = reading.firstOrNull?.sources.first;
     void openPage(int page) =>
         context.push(AppRoutes.textbookReadOf(book.pdfSha256), extra: page);
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         title: Text(title),
         actions: [

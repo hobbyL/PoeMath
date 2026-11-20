@@ -156,7 +156,8 @@ class _PictureStoryRecordDetailPageState
         ),
       );
     }
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
         title: const Text('练习详情'),
         actions: [if (togglePrompt != null) togglePrompt],

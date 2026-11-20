@@ -152,7 +152,7 @@ class _LlmProviderSettingsPageState
         ? settingsRepo.imageGenerationActiveProviderId
         : settingsRepo.llmActiveProviderId;
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: Text(widget.imageGeneration ? '图片生成设置' : '供应商设置')),
       body: ListView(
         padding: const EdgeInsets.all(SpacingTokens.md),

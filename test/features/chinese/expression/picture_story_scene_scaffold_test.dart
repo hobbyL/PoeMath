@@ -3,7 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/color_tokens.dart';
+import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
@@ -26,6 +28,7 @@ void main() {
     bool accessibleNavigation = false,
     bool pageAnimations = true,
     Brightness brightness = Brightness.light,
+    bool pineTheme = false,
     VoidCallback? onComplete,
     Uint8List? imageBytes,
     Future<Uint8List> Function()? loadImage,
@@ -46,7 +49,12 @@ void main() {
         child: PageAnimationScope(
           enabled: pageAnimations,
           child: MaterialApp(
-            theme: ThemeData(brightness: brightness),
+            theme: pineTheme
+                ? AppTheme.resolve(
+                    subject: AppSubject.poem,
+                    brightness: brightness,
+                  )
+                : ThemeData(brightness: brightness),
             builder: (context, child) => MediaQuery(
               data: MediaQuery.of(context).copyWith(
                 textScaler: TextScaler.linear(textScale),
@@ -90,6 +98,19 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('松墨表达详情的正文纸面透出书斋底图', (tester) async {
+    await mount(tester, pineTheme: true, pageAnimations: false);
+
+    final page = tester.widget<ColoredCard>(find.byType(ColoredCard).first);
+    expect(page.backgroundOpacity, 0);
+    expect(
+      find.byKey(const ValueKey('picture-story-scene-image')),
+      findsOneWidget,
+    );
+    expect(find.text('题目内容'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('内容上移覆盖题图，题图慢速上移，返回和完成按钮固定可点', (tester) async {
     var completions = 0;

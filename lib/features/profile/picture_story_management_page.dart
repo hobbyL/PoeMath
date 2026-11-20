@@ -67,7 +67,7 @@ class _PictureStoryManagementPageState
           .map((p) => p.id)
           .toSet();
     } on Object {
-      return Scaffold(
+      return AppScaffold(
         appBar: AppBar(title: const Text('看图说话题库')),
         body: PictureStoryUnavailableView(
           message: '本地题库暂时无法读取，已保存内容仍保留。请重试或恢复有效备份。',
@@ -111,7 +111,7 @@ class _PictureStoryManagementPageState
           ),
         ),
     ];
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('看图说话题库'),
         actions: [

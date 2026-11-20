@@ -509,7 +509,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('音频设置')),
       body: SafeArea(
         child: AnimatedPageBody(

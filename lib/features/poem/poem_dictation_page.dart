@@ -719,7 +719,8 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
       return PoemPracticeUnavailable(title: '诗词听写', missing: poem == null);
     }
     if (_draftOpening || _lines.isEmpty) {
-      return Scaffold(
+      return AppScaffold(
+        backgroundScene: PineInkScene.branch,
         appBar: AppBar(title: const Text('诗词听写')),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -735,7 +736,8 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
           unawaited(_draft?.exit(context));
         }
       },
-      child: Scaffold(
+      child: AppScaffold(
+        backgroundScene: PineInkScene.branch,
         appBar: AppBar(
           title: Text('听写 · ${poem.title}'),
           // 点选 ⇄ 默写 模式切换：导航栏正下方（AppBar.bottom）。
