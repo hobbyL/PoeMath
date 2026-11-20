@@ -612,6 +612,47 @@ void main() {
     expect(UserStatsRepository().get().mathTotalCorrect, 1);
   });
 
+  test('新一轮巩固复用本书题组，作答独立；清理缓存保留冻结草稿和历史', () async {
+    final files = TextbookFileService(directoryProvider: () async => root);
+    courses = MathTextbookCourseRepository(
+      directoryProvider: () async => root,
+      files: files,
+    );
+    final lesson = await saveLesson(mathLearningFixture(count: 1));
+    var repo = repository();
+    final first = await repo.start(lesson.id, planId: 'plan');
+    await complete(repo, await answer(repo, first, '-999'));
+    final history = (await repo.load()).toJson();
+    final second = await repository().start(lesson.id, planId: 'plan');
+    expect(second.seed, first.seed);
+    expect(
+      second.items.map((i) => i.toJson()),
+      first.items.map((i) => i.toJson()),
+    );
+    expect(second.sessionId, isNot(first.sessionId));
+    expect(second.operationIds.single, isNot(first.operationIds.single));
+    expect(second.answers.single, isEmpty);
+    expect(second.results.single, isNull);
+    repo = repository();
+    final resumed = (await repo.loadDraft(lesson.id, planId: 'plan'))!;
+    final typed = resumed.copyWith(
+      answers: [
+        {'answer': '未交输入'},
+      ],
+    );
+    await repo.saveDraft(typed);
+    await files.clearExtractedContent(book);
+    expect((await files.storageUsage(book)).contentFiles, 0);
+    await reopenStorage();
+    courses = MathTextbookCourseRepository(directoryProvider: () async => root);
+    repo = repository();
+    final afterClear = (await repo.loadDraft(lesson.id, planId: 'plan'))!;
+    expect(afterClear.toJson(), typed.toJson());
+    expect((await repo.load()).toJson(), history);
+    expect(HiveBoxes.mathSessions.length, 1);
+    expect(UserStatsRepository().get().mathTotalProblems, 1);
+  });
+
   test('纸上题只保存家长核对状态，授权撤销和重复核对不污染自动正确率', () async {
     final lesson = await saveLesson(
       mathLearningFixture(manual: true),

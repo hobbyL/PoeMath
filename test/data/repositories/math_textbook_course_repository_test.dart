@@ -26,6 +26,48 @@ void main() {
   });
   tearDown(() async => root.delete(recursive: true));
 
+  test('课程整理缓存跨实例复用，热读不重复解析；清理和原稿变化立即失效', () async {
+    final files = TextbookFileService(directoryProvider: () async => root);
+    repository = MathTextbookCourseRepository(
+      directoryProvider: () async => root,
+      files: files,
+    );
+    await repository.saveGenerated(
+      book,
+      mathMisclassifiedPracticeFixture(),
+      generation: 0,
+      authorize: authorize,
+    );
+    final originalFile = File(
+      '${root.path}/textbooks/math-courses/${book.pdfSha256}.json',
+    );
+    final original = await originalFile.readAsString();
+    final prepared = (await repository.load(book))!;
+    expect(identical(await repository.load(book), prepared), isTrue);
+    final cacheDirectory = Directory(
+      '${root.path}/textbooks/cache/${book.pdfSha256}',
+    );
+    final cacheFile = (await cacheDirectory.list().toList()).single as File;
+    final written = await cacheFile.lastModified();
+    final reopened = MathTextbookCourseRepository(
+      directoryProvider: () async => root,
+    );
+    expect((await reopened.load(book))!.toJson(), prepared.toJson());
+    expect(await cacheFile.lastModified(), written);
+    expect(await originalFile.readAsString(), original);
+
+    await files.clearExtractedContent(book);
+    expect(await cacheDirectory.list().toList(), isEmpty);
+    final rebuilt = (await repository.load(book))!;
+    expect(identical(rebuilt, prepared), isFalse);
+    expect(rebuilt.toJson(), prepared.toJson());
+    expect(await originalFile.readAsString(), original);
+    await originalFile.writeAsString('{broken');
+    await expectLater(repository.load(book), throwsFormatException);
+    await originalFile.writeAsString(original);
+    expect((await repository.load(book))!.toJson(), prepared.toJson());
+  });
+
   for (final large in [false, true]) {
     test('旧自动分类读取时修正，练习写入读取同一配置，原文件不变（后台：$large）', () async {
       final original = mathMisclassifiedPracticeFixture(

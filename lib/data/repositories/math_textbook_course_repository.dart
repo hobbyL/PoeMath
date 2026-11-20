@@ -5,9 +5,14 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:crypto/crypto.dart';
+import 'package:poemath/core/services/textbook_content_cache.dart';
+import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/data/models/textbook_course.dart'
+    show textbookContentDigest;
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/domain/math_textbook_content_organizer.dart';
 
@@ -25,7 +30,7 @@ MathTextbookCourse _decodeCourse(Uint8List bytes) {
   )) {
     return course;
   }
-  // Read-time compatibility does not write files or advance the edit revision.
+  // Read-time compatibility never rewrites the authored file/edit revision.
   // withCurrentCourse uses this same decoder when starting/submitting practice.
   return MathTextbookCourse(
     pdfSha256: course.pdfSha256,
@@ -46,15 +51,34 @@ Future<MathTextbookCourse> _decodeLargeCourse(Uint8List bytes) => Isolate.run(
   debugName: 'math-textbook-course-decode',
 );
 
+Future<MathTextbookCourse> _decodePreparedCourse(Object? data) => Isolate.run(
+  () => MathTextbookCourse.fromJson(data),
+  debugName: 'math-textbook-prepared-course',
+);
+
 /// 数学人工草稿独立于语文课程和派生缓存；重新整理产生待采纳版本。
 class MathTextbookCourseRepository {
   MathTextbookCourseRepository({
     Future<Directory> Function()? directoryProvider,
-  }) : _directoryProvider = directoryProvider ?? getApplicationSupportDirectory;
+    TextbookFileService? files,
+  }) : _directoryProvider = directoryProvider ?? getApplicationSupportDirectory,
+       _files =
+           files ?? TextbookFileService(directoryProvider: directoryProvider);
   final Future<Directory> Function() _directoryProvider;
+  final TextbookFileService _files;
+  TextbookContentCache contentCache(Textbook book) => _files.contentCache(book);
   static const maxBytes = TextbookCourseRepository.maxBytes;
   Future<void> _tail = Future.value();
   final _epochs = <String, int>{};
+  // Keep only the most recently read book. Every hit still checks the source
+  // bytes and the shared clear epoch, including reads made before grading.
+  ({
+    TextbookContentCache cache,
+    int revision,
+    String key,
+    MathTextbookCourse course,
+  })?
+  _prepared;
 
   int generation(String id) => _epochs[id] ?? 0;
   void invalidate(String id) {
@@ -83,6 +107,8 @@ class MathTextbookCourseRepository {
   }
 
   Future<MathTextbookCourse?> _load(Textbook book) async {
+    final cache = contentCache(book);
+    final cacheRevision = cache.revision;
     final file = await _file(book);
     if (!await file.exists()) return null;
     final bytes = BytesBuilder(copy: false);
@@ -93,11 +119,36 @@ class MathTextbookCourseRepository {
       bytes.add(chunk);
     }
     final data = bytes.takeBytes();
+    if (cache.revision != cacheRevision) throw StateError('原书缓存已失效');
+    final key = textbookContentDigest({
+      'kind': 'math-course',
+      'version': 1,
+      'source': sha256.convert(data).toString(),
+    });
+    final previous = _prepared;
+    if (previous != null &&
+        identical(previous.cache, cache) &&
+        previous.revision == cacheRevision &&
+        previous.key == key) {
+      previous.course.matchBook(book);
+      return previous.course;
+    }
     // Validating thousands of blocks must not block the reading transition.
-    final course = data.length >= 64 * 1024
-        ? await _decodeLargeCourse(data)
-        : _decodeCourse(data);
+    final course = await cache.mathData<MathTextbookCourse>(
+      key,
+      decode: _decodePreparedCourse,
+      encode: (course) => course.toJson(),
+      load: () async => data.length >= 64 * 1024
+          ? await _decodeLargeCourse(data)
+          : _decodeCourse(data),
+    );
     course.matchBook(book);
+    _prepared = (
+      cache: cache,
+      revision: cacheRevision,
+      key: key,
+      course: course,
+    );
     return course;
   }
 

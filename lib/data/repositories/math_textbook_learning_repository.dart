@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:hive/hive.dart';
+import 'package:poemath/core/services/math_textbook_practice_cache.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/math_session.dart';
@@ -238,7 +239,7 @@ class MathTextbookLearningRepository {
       course,
       MathTextbookPracticeDraft.fromJson(raw),
     );
-    _validateDraft(course, draft);
+    await _validateDraft(course, draft);
     return draft;
   });
 
@@ -282,7 +283,7 @@ class MathTextbookLearningRepository {
         })) {
       return draft;
     }
-    _validateDraft(
+    await _validateDraft(
       MathTextbookCourse(
         pdfSha256: course!.pdfSha256,
         pageCount: course.pageCount,
@@ -342,7 +343,7 @@ class MathTextbookLearningRepository {
       answers: [for (final i in kept) draft.answers[i]],
       results: [for (final i in kept) draft.results[i]],
     );
-    _validateDraft(course, next, newSession: true);
+    await _validateDraft(course, next, newSession: true);
     await drafts.save(draftKind, next.toJson(), scope: next.scope);
     return next;
   }
@@ -372,22 +373,23 @@ class MathTextbookLearningRepository {
               .where((p) => p.id == planId)
               .firstOrNull;
     if (planId != null && plan == null) throw StateError('本课巩固计划已更新');
-    final seed = plan == null ? null : Random.secure().nextInt(2147483647);
+    final prepared = await prepareMathTextbookPractice(
+      cache: courses.contentCache(book),
+      book: book,
+      lesson: lesson,
+      plan: plan,
+    );
+    _current();
+    final seed = prepared.seed;
     final items = plan == null
-        ? originalMathTextbookItems(lesson)
+        ? prepared.items
               .where(
                 (item) => (exerciseIds ?? access.exerciseIds).contains(
                   item.exercise.id,
                 ),
               )
               .toList()
-        : generateMathTextbookPractice(
-            lesson: lesson,
-            plan: plan,
-            grade: book.grade,
-            semester: book.semester,
-            random: Random(seed!),
-          );
+        : prepared.items;
     if (items.isEmpty) throw StateError('本课没有可练习的题目');
     final draft = MathTextbookPracticeDraft(
       sessionId: _newId(),
@@ -405,7 +407,7 @@ class MathTextbookLearningRepository {
       startedAt: _clock(),
     );
     drafts.claim(draftKind, scope: draft.scope);
-    _validateDraft(course, draft, newSession: true);
+    await _validateDraft(course, draft, newSession: true);
     await drafts.save(draftKind, draft.toJson(), scope: draft.scope);
     return draft;
   });
@@ -423,11 +425,11 @@ class MathTextbookLearningRepository {
     return _validateDraft(course, stored);
   });
 
-  MathTextbookLesson _validateDraft(
+  Future<MathTextbookLesson> _validateDraft(
     MathTextbookCourse? course,
     MathTextbookPracticeDraft draft, {
     bool newSession = false,
-  }) {
+  }) async {
     if (utf8.encode(jsonEncode(draft.toJson())).length >
         MathTextbookProgress.maxBytes) {
       throw const FormatException('本次练习草稿超过容量，请家长拆分题组');
@@ -498,22 +500,24 @@ class MathTextbookLearningRepository {
             draft.seed == null)) {
       throw StateError('巩固范围已更新，请重新开始；已有作答保留');
     }
-    final expected = plan == null
-        ? originalMathTextbookItems(lesson)
-        : generateMathTextbookPractice(
-            lesson: lesson,
-            plan: plan,
-            grade: book.grade,
-            semester: book.semester,
-            random: Random(draft.seed!),
-          );
+    final expected = (await prepareMathTextbookPractice(
+      cache: courses.contentCache(book),
+      book: book,
+      lesson: lesson,
+      plan: plan,
+      seed: draft.seed,
+    )).items;
+    _current();
+    drafts.assertOwner(draftKind, scope: draft.scope);
+    final expectedById = {for (final item in expected) item.exercise.id: item};
     if (draft.items.map((i) => i.exercise.id).toSet().length !=
             draft.items.length ||
         plan != null && draft.items.length != expected.length ||
         draft.items.any(
-          (item) => !expected.any(
-            (value) => jsonEncode(value.toJson()) == jsonEncode(item.toJson()),
-          ),
+          (item) =>
+              !expectedById.containsKey(item.exercise.id) ||
+              jsonEncode(expectedById[item.exercise.id]!.toJson()) !=
+                  jsonEncode(item.toJson()),
         )) {
       throw const FormatException('练习题目或答案规则与已审核课程不一致');
     }
@@ -524,7 +528,7 @@ class MathTextbookLearningRepository {
   Future<void> saveDraft(MathTextbookPracticeDraft draft) =>
       _serial((course) async {
         MathTextbookPracticeDraft.fromJson(draft.toJson());
-        _validateDraft(course, draft);
+        await _validateDraft(course, draft);
         await drafts.save(draftKind, draft.toJson(), scope: draft.scope);
       });
 
@@ -532,7 +536,7 @@ class MathTextbookLearningRepository {
     MathTextbookPracticeDraft draft,
     int index,
   ) => _serial((course) async {
-    final lesson = _validateDraft(course, draft);
+    final lesson = await _validateDraft(course, draft);
     if (index < 0 || index >= draft.items.length || index != draft.index) {
       throw RangeError.index(index, draft.items);
     }
@@ -752,7 +756,7 @@ class MathTextbookLearningRepository {
           }
           return finished.session;
         }
-        _validateDraft(course, draft);
+        await _validateDraft(course, draft);
         if (draft.results.any((r) => r == null) || draft.finishedAt == null) {
           throw StateError('请先完成本次题目');
         }

@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:poemath/core/services/cache_file_storage.dart';
 import 'package:poemath/core/services/textbook_cover_cache.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/data/models/textbook_course.dart'
+    show textbookContentDigest;
 import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
@@ -33,6 +36,7 @@ class TextbookContentCache {
   static const _maxBookLayoutBytes = 64 * 1024 * 1024;
   static const _maxMemoryLayouts = 4;
   static const _maxMathImageBytes = 16 * 1024 * 1024;
+  static const _maxMathDataBytes = 32 * 1024 * 1024;
   final Textbook book;
   final Future<Directory> Function() _directoryProvider;
   final _texts = <int, String>{};
@@ -40,6 +44,7 @@ class TextbookContentCache {
   final _layouts = <int, TextbookPageText>{};
   final _pendingLayouts = <int, Future<TextbookPageText>>{};
   final _pendingNumbers = <int, Future<int?>>{};
+  final _pendingMathData = <String, Future<Object>>{};
   Future<TextbookPageNumbers>? _numberRead;
   TextbookPageNumbers? _pageNumbers;
   int _characters = 0;
@@ -63,13 +68,16 @@ class TextbookContentCache {
     'data': data,
   };
 
-  Future<Object?> _read(String name) async {
+  Future<Object?> _read(String name, {int maxBytes = _maxFileBytes}) async {
     try {
       final file = File('${(await _directory()).path}/$name.json');
-      if (!await file.exists() || await file.length() > _maxFileBytes) {
+      if (!await file.exists() || await file.length() > maxBytes) {
         return null;
       }
-      final value = jsonDecode(await file.readAsString());
+      final text = await file.readAsString();
+      final value = text.length >= 64 * 1024
+          ? await Isolate.run(() => jsonDecode(text))
+          : jsonDecode(text);
       if (value is! Map<String, dynamic> ||
           value['version'] != formatVersion ||
           value['sha256'] != book.pdfSha256 ||
@@ -84,10 +92,15 @@ class TextbookContentCache {
     }
   }
 
-  Future<void> _write(String name, Object data, int generation) async {
+  Future<void> _write(
+    String name,
+    Object data,
+    int generation, {
+    int maxBytes = _maxFileBytes,
+  }) async {
     try {
       final bytes = utf8.encode(jsonEncode(_envelope(data)));
-      if (bytes.length > _maxFileBytes ||
+      if (bytes.length > maxBytes ||
           (name.startsWith('page-') &&
               bytes.length > _maxBookTextBytes ~/ book.pageCount) ||
           (name.startsWith('layout-') &&
@@ -98,6 +111,61 @@ class TextbookContentCache {
     } on Object {
       // Derived data must not make its usable source result fail.
     }
+  }
+
+  /// Completed course/question data shares the book's clear epoch and atomic
+  /// write queue. Disk survives re-entry/restart; concurrent first reads coalesce.
+  Future<T> mathData<T extends Object>(
+    String key, {
+    required FutureOr<T> Function(Object? value) decode,
+    required Object Function(T value) encode,
+    required Future<T> Function() load,
+  }) {
+    if (!Textbook.isValidId(key)) throw ArgumentError.value(key, 'key');
+    final existing = _pendingMathData[key];
+    if (existing != null) return existing.then((value) => value as T);
+    final generation = revision;
+    void check() {
+      if (generation != revision) throw StateError('原书缓存已失效');
+    }
+
+    late final Future<T> result;
+    result = (() async {
+      try {
+        final raw = await _read('math-data-$key', maxBytes: _maxMathDataBytes);
+        check();
+        if (raw is Map<String, dynamic> && raw['data'] != null) {
+          T? cached;
+          try {
+            final valid = await _validMathData(raw);
+            if (valid) cached = await decode(raw['data']);
+          } on Object {
+            // Corrupt or obsolete derived results are rebuilt, not published.
+          }
+          check();
+          if (cached != null) return cached;
+        }
+        final value = await load();
+        check();
+        final data = encode(value);
+        final digest = await _mathDataDigest(data);
+        check();
+        await _write(
+          'math-data-$key',
+          {'data': data, 'digest': digest},
+          generation,
+          maxBytes: _maxMathDataBytes,
+        );
+        check();
+        return value;
+      } finally {
+        if (identical(_pendingMathData[key], result)) {
+          _pendingMathData.remove(key);
+        }
+      }
+    })();
+    _pendingMathData[key] = result;
+    return result;
   }
 
   Future<void> _writeBytes(String name, List<int> bytes, int generation) {
@@ -403,6 +471,7 @@ class TextbookContentCache {
     _layouts.clear();
     _pendingLayouts.clear();
     _pendingNumbers.clear();
+    _pendingMathData.clear();
     _numberRead = null;
     _pageNumbers = null;
     _characters = 0;
@@ -425,6 +494,14 @@ class TextbookContentCache {
     return result;
   }
 }
+
+Future<String> _mathDataDigest(Object data) => Isolate.run(
+  () => textbookContentDigest({'data': data}),
+  debugName: 'math-textbook-cache-digest',
+);
+
+Future<bool> _validMathData(Map<String, dynamic> raw) async =>
+    raw['digest'] == await _mathDataDigest(raw['data'] as Object);
 
 Map<String, Object?> encodeTextbookPageNumbers(TextbookPageNumbers numbers) => {
   'pageNumberVersion': TextbookContentCache.pageNumberVersion,

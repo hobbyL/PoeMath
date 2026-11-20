@@ -17,7 +17,9 @@ import 'package:poemath/domain/math_textbook_progress.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 
 final mathTextbookRepositoryProvider = Provider<MathTextbookCourseRepository>(
-  (ref) => MathTextbookCourseRepository(),
+  (ref) => MathTextbookCourseRepository(
+    files: ref.watch(textbookFileServiceProvider),
+  ),
 );
 
 final mathTextbookProfileProvider = StreamProvider<String>((ref) async* {
