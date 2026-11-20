@@ -1000,7 +1000,7 @@ void main() {
         find.descendant(of: card(item), matching: find.byType(RawImage)),
       );
       expect(image.image, same(covers[files.paths[item.pdfSha256]]));
-      expect(image.fit, BoxFit.contain);
+      expect(image.fit, BoxFit.cover);
     }
     expect(find.text('本机教材'), findsNothing);
     expect(find.textContaining('已下载教材占用'), findsNothing);

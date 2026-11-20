@@ -44,6 +44,7 @@ class ColoredCard extends StatelessWidget {
     this.width,
     this.constraints,
     this.borderRadius,
+    this.clipBehavior = Clip.none,
   }) : assert(color != null || gradient != null, 'color 与 gradient 至少提供一个');
 
   /// 卡片主色调，背景色将基于此色生成；提供 [gradient] 时可省略。
@@ -80,6 +81,9 @@ class ColoredCard extends StatelessWidget {
 
   /// 默认卡片圆角；铺满页面的背景区域可显式使用 [BorderRadius.zero]。
   final BorderRadius? borderRadius;
+
+  /// 图片贴边时由卡片自己的轮廓裁切，避免页面圆角与主题切角不一致。
+  final Clip clipBehavior;
 
   @override
   Widget build(BuildContext context) {
@@ -148,6 +152,7 @@ class ColoredCard extends StatelessWidget {
     return Container(
       width: width,
       constraints: constraints,
+      clipBehavior: clipBehavior,
       decoration: cutCorners
           ? ShapeDecoration(
               color: decoration.color,

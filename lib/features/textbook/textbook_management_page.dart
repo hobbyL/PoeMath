@@ -237,28 +237,24 @@ class _TextbookManagementPageState
                           key: ValueKey('textbook-card-${book.pdfSha256}'),
                           color: theme.colorScheme.primary,
                           padding: EdgeInsets.zero,
+                          clipBehavior: Clip.antiAlias,
                           onTap: () => _open(book),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(
-                              theme.appearance.cardRadius,
+                          child: paths[book.pdfSha256]!.when(
+                            data: (path) => path == null
+                                ? TextbookCoverPlaceholder(
+                                    title: title,
+                                    status: cloudIds.contains(book.pdfSha256)
+                                        ? '可重新下载'
+                                        : '需重新导入',
+                                  )
+                                : TextbookPdfCover(path: path, title: title),
+                            loading: () => TextbookCoverPlaceholder(
+                              title: title,
+                              status: '正在检查本地文件',
                             ),
-                            child: paths[book.pdfSha256]!.when(
-                              data: (path) => path == null
-                                  ? TextbookCoverPlaceholder(
-                                      title: title,
-                                      status: cloudIds.contains(book.pdfSha256)
-                                          ? '可重新下载'
-                                          : '需重新导入',
-                                    )
-                                  : TextbookPdfCover(path: path, title: title),
-                              loading: () => TextbookCoverPlaceholder(
-                                title: title,
-                                status: '正在检查本地文件',
-                              ),
-                              error: (_, __) => TextbookCoverPlaceholder(
-                                title: title,
-                                status: '文件检查失败',
-                              ),
+                            error: (_, __) => TextbookCoverPlaceholder(
+                              title: title,
+                              status: '文件检查失败',
                             ),
                           ),
                         ),

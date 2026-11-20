@@ -786,35 +786,31 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                                   ),
                                   color: theme.colorScheme.primary,
                                   padding: EdgeInsets.zero,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(
-                                      theme.appearance.cardRadius,
-                                    ),
-                                    child: available
-                                        ? _previewVisible
-                                              ? _preview(
-                                                  path.requireValue!,
-                                                  book,
-                                                  layout,
-                                                )
-                                              : const SizedBox.shrink()
-                                        : entry?.coverAsset != null
-                                        ? Image.asset(
-                                            entry!.coverAsset!,
-                                            fit: BoxFit.contain,
-                                            errorBuilder: (_, __, ___) =>
-                                                TextbookCoverPlaceholder(
-                                                  title: book.title,
-                                                  status: '下载后可翻页查看',
-                                                ),
-                                          )
-                                        : TextbookCoverPlaceholder(
-                                            title: book.title,
-                                            status: path.isLoading
-                                                ? '正在检查本地文件'
-                                                : '本地 PDF 暂不可用',
-                                          ),
-                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: available
+                                      ? _previewVisible
+                                            ? _preview(
+                                                path.requireValue!,
+                                                book,
+                                                layout,
+                                              )
+                                            : const SizedBox.shrink()
+                                      : entry?.coverAsset != null
+                                      ? Image.asset(
+                                          entry!.coverAsset!,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) =>
+                                              TextbookCoverPlaceholder(
+                                                title: book.title,
+                                                status: '下载后可翻页查看',
+                                              ),
+                                        )
+                                      : TextbookCoverPlaceholder(
+                                          title: book.title,
+                                          status: path.isLoading
+                                              ? '正在检查本地文件'
+                                              : '本地 PDF 暂不可用',
+                                        ),
                                 ),
                               ),
                             ),

@@ -135,11 +135,7 @@ class TextbookCoverPlaceholder extends StatelessWidget {
 
 /// PDF 库和位图生命周期仅在适配层出现，页面只提供本机路径。
 class TextbookPdfCover extends ConsumerStatefulWidget {
-  const TextbookPdfCover({
-    super.key,
-    required this.path,
-    required this.title,
-  });
+  const TextbookPdfCover({super.key, required this.path, required this.title});
 
   final String path;
   final String title;
@@ -244,5 +240,5 @@ class _TextbookPdfCoverState extends ConsumerState<TextbookPdfCover> {
           title: widget.title,
           status: _failed ? '封面暂不可用' : '正在生成封面',
         )
-      : RawImage(image: _image, fit: BoxFit.contain);
+      : RawImage(image: _image, fit: BoxFit.cover);
 }

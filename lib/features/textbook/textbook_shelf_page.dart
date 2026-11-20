@@ -70,139 +70,137 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
       key: ValueKey('textbook-download-card-${book.pdfSha256}'),
       color: theme.colorScheme.primary,
       padding: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       onTap: () => _open(entry),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(theme.appearance.cardRadius),
-        child: Column(
-          children: [
-            AspectRatio(
-              aspectRatio: 3 / 4,
-              child: Semantics(
-                label: book.title,
-                image: true,
-                excludeSemantics: true,
-                child: entry.coverAsset == null
-                    ? TextbookCoverPlaceholder(
+      child: Column(
+        children: [
+          AspectRatio(
+            aspectRatio: 3 / 4,
+            child: Semantics(
+              label: book.title,
+              image: true,
+              excludeSemantics: true,
+              child: entry.coverAsset == null
+                  ? TextbookCoverPlaceholder(
+                      title: book.title,
+                      status: book.volumeLabel,
+                    )
+                  : Image.asset(
+                      entry.coverAsset!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => TextbookCoverPlaceholder(
                         title: book.title,
                         status: book.volumeLabel,
-                      )
-                    : Image.asset(
-                        entry.coverAsset!,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => TextbookCoverPlaceholder(
-                          title: book.title,
-                          status: book.volumeLabel,
-                        ),
                       ),
-              ),
+                    ),
             ),
-            Expanded(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  minHeight: SpacingTokens.minTapTarget + SpacingTokens.sm,
-                ),
-                child: Stack(
-                  fit: StackFit.passthrough,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        SpacingTokens.sm,
-                        SpacingTokens.sm,
-                        SpacingTokens.sm,
-                        SpacingTokens.sm,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Tooltip(
-                            message: entry.editionLabel,
-                            child: Text(
-                              entry.editionLabel,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: textStyle,
-                            ),
+          ),
+          Expanded(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: SpacingTokens.minTapTarget + SpacingTokens.sm,
+              ),
+              child: Stack(
+                fit: StackFit.passthrough,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      SpacingTokens.sm,
+                      SpacingTokens.sm,
+                      SpacingTokens.sm,
+                      SpacingTokens.sm,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Tooltip(
+                          message: entry.editionLabel,
+                          child: Text(
+                            entry.editionLabel,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: textStyle,
                           ),
-                          const SizedBox(height: SpacingTokens.xs),
-                          const Spacer(),
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              right: SpacingTokens.minTapTarget,
+                        ),
+                        const SizedBox(height: SpacingTokens.xs),
+                        const Spacer(),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            right: SpacingTokens.minTapTarget,
+                          ),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              minHeight: SpacingTokens.lg,
                             ),
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(
-                                minHeight: SpacingTokens.lg,
-                              ),
-                              child: Align(
-                                alignment: Alignment.bottomLeft,
-                                heightFactor: 1,
-                                child: Tooltip(
-                                  message: status,
-                                  child: Text(
-                                    status,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: textStyle.copyWith(
-                                      color: failed
-                                          ? theme.colorScheme.error
-                                          : theme.colorScheme.onSurfaceVariant,
-                                    ),
+                            child: Align(
+                              alignment: Alignment.bottomLeft,
+                              heightFactor: 1,
+                              child: Tooltip(
+                                message: status,
+                                child: Text(
+                                  status,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textStyle.copyWith(
+                                    color: failed
+                                        ? theme.colorScheme.error
+                                        : theme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    // The hit target extends upward; it must not add 44px to
-                    // the status line or leave its icon floating above the end.
-                    PositionedDirectional(
-                      end: SpacingTokens.sm,
-                      bottom: SpacingTokens.sm,
-                      child: IconButton(
-                        style: IconButton.styleFrom(
-                          overlayColor: Colors.transparent,
-                          splashFactory: NoSplash.splashFactory,
-                          fixedSize: const Size.square(
-                            SpacingTokens.minTapTarget,
-                          ),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.standard,
-                          padding: EdgeInsets.zero,
-                          alignment: Alignment.bottomCenter,
                         ),
-                        tooltip: action,
-                        icon: Icon(
-                          active
-                              ? Icons.close
-                              : installed
-                              ? Icons.auto_stories_outlined
-                              : failed
-                              ? Icons.refresh
-                              : Icons.download_outlined,
-                          size: SpacingTokens.lg,
-                        ),
-                        onPressed: () {
-                          final controller = ref.read(
-                            textbookDownloadsProvider.notifier,
-                          );
-                          if (active) {
-                            controller.cancel(book.pdfSha256);
-                          } else if (installed) {
-                            _read(entry);
-                          } else {
-                            controller.download(entry);
-                          }
-                        },
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  // The hit target extends upward; it must not add 44px to
+                  // the status line or leave its icon floating above the end.
+                  PositionedDirectional(
+                    end: SpacingTokens.sm,
+                    bottom: SpacingTokens.sm,
+                    child: IconButton(
+                      style: IconButton.styleFrom(
+                        overlayColor: Colors.transparent,
+                        splashFactory: NoSplash.splashFactory,
+                        fixedSize: const Size.square(
+                          SpacingTokens.minTapTarget,
+                        ),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.standard,
+                        padding: EdgeInsets.zero,
+                        alignment: Alignment.bottomCenter,
+                      ),
+                      tooltip: action,
+                      icon: Icon(
+                        active
+                            ? Icons.close
+                            : installed
+                            ? Icons.auto_stories_outlined
+                            : failed
+                            ? Icons.refresh
+                            : Icons.download_outlined,
+                        size: SpacingTokens.lg,
+                      ),
+                      onPressed: () {
+                        final controller = ref.read(
+                          textbookDownloadsProvider.notifier,
+                        );
+                        if (active) {
+                          controller.cancel(book.pdfSha256);
+                        } else if (installed) {
+                          _read(entry);
+                        } else {
+                          controller.download(entry);
+                        }
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
