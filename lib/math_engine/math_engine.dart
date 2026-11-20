@@ -35,6 +35,49 @@ import 'validators/constraint_checker.dart';
 class MathEngine {
   const MathEngine._();
 
+  /// 综合专项（mode=null）的能力目录，不使用随机试生成决定可用性。
+  static List<MathSkill> supportedSkills({
+    required int grade,
+    required String semester,
+    required DifficultyLevel difficulty,
+  }) {
+    final config = DifficultyAdjuster.adjust(
+      GradePresets.get(grade, semester),
+      difficulty,
+    );
+    final supported = <MathSkill>{};
+    for (final generator in _buildGenerators(config)) {
+      for (final skill in _generatorSkills(generator)) {
+        final available = switch (skill) {
+          MathSkill.addition => config.allowedOperators.contains(Operator.add),
+          MathSkill.additionCarry =>
+            config.allowCarry && config.allowedOperators.contains(Operator.add),
+          MathSkill.subtraction => config.allowedOperators.contains(
+            Operator.subtract,
+          ),
+          MathSkill.subtractionBorrow =>
+            config.allowBorrow &&
+                config.allowedOperators.contains(Operator.subtract),
+          MathSkill.multiplicationTable || MathSkill.multiplication =>
+            config.allowedOperators.contains(Operator.multiply),
+          MathSkill.division => config.allowedOperators.contains(
+            Operator.divide,
+          ),
+          // 加减生成器目前只生成单步；混合生成器原生为 chain。
+          MathSkill.operationOrder =>
+            generator is MixedOperationGen &&
+                config.allowedModes.contains(ProblemMode.chain),
+          MathSkill.equation => config.allowedModes.contains(
+            ProblemMode.findMissing,
+          ),
+          _ => true,
+        };
+        if (available) supported.add(skill);
+      }
+    }
+    return List.unmodifiable(MathSkill.values.where(supported.contains));
+  }
+
   /// UI 与生成器共享年级、难度对应的模式白名单。
   static Set<ProblemMode> supportedModes({
     required int grade,
