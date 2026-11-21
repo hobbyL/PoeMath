@@ -28,7 +28,7 @@ void main() {
     bool accessibleNavigation = false,
     bool pageAnimations = true,
     Brightness brightness = Brightness.light,
-    bool pineTheme = false,
+    AppSubject? subject,
     VoidCallback? onComplete,
     Uint8List? imageBytes,
     Future<Uint8List> Function()? loadImage,
@@ -49,11 +49,8 @@ void main() {
         child: PageAnimationScope(
           enabled: pageAnimations,
           child: MaterialApp(
-            theme: pineTheme
-                ? AppTheme.resolve(
-                    subject: AppSubject.poem,
-                    brightness: brightness,
-                  )
+            theme: subject != null
+                ? AppTheme.resolve(subject: subject, brightness: brightness)
                 : ThemeData(brightness: brightness),
             builder: (context, child) => MediaQuery(
               data: MediaQuery.of(context).copyWith(
@@ -99,18 +96,20 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('松墨表达详情的正文纸面透出书斋底图', (tester) async {
-    await mount(tester, pineTheme: true, pageAnimations: false);
+  for (final subject in AppSubject.values) {
+    testWidgets('$subject 表达详情的正文纸面透出主题底图', (tester) async {
+      await mount(tester, subject: subject, pageAnimations: false);
 
-    final page = tester.widget<ColoredCard>(find.byType(ColoredCard).first);
-    expect(page.backgroundOpacity, 0);
-    expect(
-      find.byKey(const ValueKey('picture-story-scene-image')),
-      findsOneWidget,
-    );
-    expect(find.text('题目内容'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      final page = tester.widget<ColoredCard>(find.byType(ColoredCard).first);
+      expect(page.backgroundOpacity, 0);
+      expect(
+        find.byKey(const ValueKey('picture-story-scene-image')),
+        findsOneWidget,
+      );
+      expect(find.text('题目内容'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('内容上移覆盖题图，题图慢速上移，返回和完成按钮固定可点', (tester) async {
     var completions = 0;

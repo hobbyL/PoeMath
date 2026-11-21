@@ -157,6 +157,7 @@ class _PromptCardState extends ConsumerState<_PromptCard> {
     return ColoredCard(
       color: theme.colorScheme.primary,
       padding: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
           Semantics(
@@ -177,9 +178,7 @@ class _PromptCardState extends ConsumerState<_PromptCard> {
                       key: _imageKey,
                       image: prompt.image,
                       preview: true,
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(SpacingTokens.radiusMedium),
-                      ),
+                      borderRadius: BorderRadius.zero,
                     ),
                     Padding(
                       padding: const EdgeInsets.all(SpacingTokens.md),

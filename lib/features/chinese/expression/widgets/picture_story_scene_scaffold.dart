@@ -224,12 +224,9 @@ class _PictureStorySceneScaffoldState
                                   padding: EdgeInsets.only(top: imageHeight),
                                   child: ColoredCard(
                                     color: theme.scaffoldBackgroundColor,
-                                    // 松墨书斋底图位于页面纸面之后；透明正文面
-                                    // 让它在题图下方继续可见，同时保留各内容卡片
-                                    // 自己的清晰表面。
-                                    backgroundOpacity: theme.appearance.pine
-                                        ? 0
-                                        : 1,
+                                    // 页面底图延续到题图下方，内容卡片仍保留
+                                    // 各自的不透明阅读面。
+                                    backgroundOpacity: 0,
                                     borderRadius: BorderRadius.zero,
                                     constraints: BoxConstraints(
                                       minHeight: constraints.maxHeight,
