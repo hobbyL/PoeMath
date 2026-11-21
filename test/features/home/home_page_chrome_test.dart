@@ -225,11 +225,12 @@ void main() {
         }
 
         expect(tester.getTopLeft(_background), Offset.zero);
-        final headerIcons =
-            brightness == Brightness.light &&
-                (subject == AppSubject.candy || subject == AppSubject.poem)
-            ? Brightness.dark
-            : Brightness.light;
+        final foreground = AnimatedHeroColors(
+          AppTheme.resolve(subject: subject, brightness: brightness),
+        ).foreground;
+        final headerIcons = foreground.computeLuminance() > .5
+            ? Brightness.light
+            : Brightness.dark;
         expectStatusBar(headerIcons);
         final scroll = tester.state<ScrollableState>(
           find.byType(Scrollable).first,
@@ -411,7 +412,7 @@ void main() {
         .first
         .debugLayer!
         .find<SystemUiOverlayStyle>(const Offset(205, 16));
-    expect(statusBarStyle()?.statusBarIconBrightness, Brightness.light);
+    expect(statusBarStyle()?.statusBarIconBrightness, Brightness.dark);
     final before = tester.getRect(_background);
     final summary = find.byKey(const ValueKey('home-check-in-summary'));
     final summaryBefore = tester.getTopLeft(summary);

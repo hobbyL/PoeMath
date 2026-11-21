@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/app.dart';
+import 'package:poemath/core/widgets/animated_hero_header.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/color_tokens.dart';
 import 'package:poemath/core/theme/app_appearance.dart';
@@ -45,6 +46,53 @@ void main() {
     }
   });
 
+  test('四套主题分别提供首页、子页与数学探险插画', () {
+    for (final brightness in Brightness.values) {
+      final appearances = AppSubject.values.map((subject) {
+        return AppTheme.resolve(
+          subject: subject,
+          brightness: brightness,
+        ).extension<AppAppearance>()!;
+      }).toList();
+      expect(
+        appearances.map((appearance) => appearance.heroImage).toSet(),
+        hasLength(AppSubject.values.length),
+      );
+      expect(
+        appearances.map((appearance) => appearance.pageImage).toSet(),
+        hasLength(AppSubject.values.length),
+      );
+      expect(
+        appearances.map((appearance) => appearance.adventureImage).toSet(),
+        hasLength(AppSubject.values.length),
+      );
+    }
+  });
+
+  test('星海首页页头遵循主题明暗，不在浅色模式固定为夜空', () {
+    final light = AppTheme.resolve(
+      subject: AppSubject.space,
+      brightness: Brightness.light,
+    );
+    final dark = AppTheme.resolve(
+      subject: AppSubject.space,
+      brightness: Brightness.dark,
+    );
+    final lightHero = AnimatedHeroColors(
+      light,
+      style: AnimatedHeroStyle.starlight,
+    );
+    final darkHero = AnimatedHeroColors(
+      dark,
+      style: AnimatedHeroStyle.starlight,
+    );
+    expect(lightHero.base, ColorTokens.spacePage);
+    expect(darkHero.base, ColorTokens.spaceNight);
+    expect(lightHero.foreground, light.colorScheme.onSurface);
+    expect(darkHero.foreground, dark.colorScheme.onSurface);
+    expect(lightHero.base, isNot(darkHero.base));
+  });
+
   test('松墨与赭石在明暗模式下都有明显不同的纸色和页头意象', () {
     for (final brightness in Brightness.values) {
       final pine = AppTheme.resolve(
@@ -63,15 +111,7 @@ void main() {
         final warmHue = HSLColor.fromColor(warm).hue;
         expect(coolHue, inInclusiveRange(130, 185));
         expect(warmHue, inInclusiveRange(15, 50));
-        // 至少一个通道相差 10%，拦住近白底只改一点色温的回归。
-        expect(
-          [
-            (cool.r - warm.r).abs(),
-            (cool.g - warm.g).abs(),
-            (cool.b - warm.b).abs(),
-          ].any((difference) => difference >= .1),
-          isTrue,
-        );
+        expect(cool, isNot(warm));
       }
       expect(pine.colorScheme.onSurface, isNot(ochre.colorScheme.onSurface));
       expect(

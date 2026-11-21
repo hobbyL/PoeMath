@@ -104,8 +104,8 @@ class ColoredCard extends StatelessWidget {
     final cutCorners =
         paper && appearance.space && borderRadius == null && border == null;
     final cutShape = BeveledRectangleBorder(
-      borderRadius: BorderRadius.circular(SpacingTokens.radiusLarge),
-      side: BorderSide(color: scheme.outlineVariant),
+      borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+      side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .8)),
     );
     final decoration = BoxDecoration(
       color: gradient == null
@@ -123,16 +123,12 @@ class ColoredCard extends StatelessWidget {
                       blurRadius: SpacingTokens.sm,
                     ),
                   ],
-                  AppCardStyle.paper => [
-                    BoxShadow(
-                      color: scheme.outlineVariant.withValues(alpha: .45),
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  AppCardStyle.paper => null,
                   AppCardStyle.soft => [
                     BoxShadow(
-                      color: scheme.primary.withValues(alpha: .16),
-                      offset: const Offset(0, SpacingTokens.xs),
+                      color: scheme.primary.withValues(alpha: .1),
+                      offset: const Offset(0, SpacingTokens.xs / 2),
+                      blurRadius: SpacingTokens.xs,
                     ),
                   ],
                   AppCardStyle.outlined => null,
@@ -144,7 +140,8 @@ class ColoredCard extends StatelessWidget {
               ? switch (appearance.cardStyle) {
                   AppCardStyle.sheet => null,
                   AppCardStyle.paper => Border.all(
-                    color: scheme.outlineVariant,
+                    color: scheme.outlineVariant.withValues(alpha: .7),
+                    // 描边不参与内边距，保留贴边按钮、封面和行尾的几何契约。
                     strokeAlign: BorderSide.strokeAlignOutside,
                   ),
                   AppCardStyle.soft => null,

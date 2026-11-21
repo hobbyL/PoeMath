@@ -11,14 +11,19 @@ enum AppVisualStyle { ink, pine, storybook, space }
 class AppAppearance extends ThemeExtension<AppAppearance> {
   const AppAppearance({
     required this.heroImage,
+    String? pageImage,
+    String? adventureImage,
     this.visualStyle = AppVisualStyle.ink,
     this.cardStyle = AppCardStyle.paper,
     this.cardRadius = SpacingTokens.radiusMedium,
     this.controlRadius = SpacingTokens.radiusSmall,
     this.navigationRadius = SpacingTokens.radiusSmall,
-  });
+  }) : pageImage = pageImage ?? heroImage,
+       adventureImage = adventureImage ?? heroImage;
 
   final String heroImage;
+  final String pageImage;
+  final String adventureImage;
   final AppVisualStyle visualStyle;
   final AppCardStyle cardStyle;
   final double cardRadius;
@@ -26,6 +31,8 @@ class AppAppearance extends ThemeExtension<AppAppearance> {
   final double navigationRadius;
 
   bool get pine => visualStyle == AppVisualStyle.pine;
+  bool get ochre => visualStyle == AppVisualStyle.ink;
+  bool get ink => pine || ochre;
   bool get playful => storybook || space;
   bool get storybook => visualStyle == AppVisualStyle.storybook;
   bool get space => visualStyle == AppVisualStyle.space;
@@ -33,6 +40,8 @@ class AppAppearance extends ThemeExtension<AppAppearance> {
   @override
   AppAppearance copyWith({
     String? heroImage,
+    String? pageImage,
+    String? adventureImage,
     AppVisualStyle? visualStyle,
     AppCardStyle? cardStyle,
     double? cardRadius,
@@ -40,6 +49,8 @@ class AppAppearance extends ThemeExtension<AppAppearance> {
     double? navigationRadius,
   }) => AppAppearance(
     heroImage: heroImage ?? this.heroImage,
+    pageImage: pageImage ?? this.pageImage,
+    adventureImage: adventureImage ?? this.adventureImage,
     visualStyle: visualStyle ?? this.visualStyle,
     cardStyle: cardStyle ?? this.cardStyle,
     cardRadius: cardRadius ?? this.cardRadius,
@@ -52,6 +63,8 @@ class AppAppearance extends ThemeExtension<AppAppearance> {
     if (other is! AppAppearance) return this;
     return AppAppearance(
       heroImage: t < .5 ? heroImage : other.heroImage,
+      pageImage: t < .5 ? pageImage : other.pageImage,
+      adventureImage: t < .5 ? adventureImage : other.adventureImage,
       visualStyle: t < .5 ? visualStyle : other.visualStyle,
       cardStyle: t < .5 ? cardStyle : other.cardStyle,
       cardRadius: lerpDouble(cardRadius, other.cardRadius, t)!,
@@ -68,5 +81,9 @@ class AppAppearance extends ThemeExtension<AppAppearance> {
 extension ThemeDataAppearance on ThemeData {
   AppAppearance get appearance =>
       extension<AppAppearance>() ??
-      const AppAppearance(heroImage: 'assets/images/ink_landscape_overlay.png');
+      const AppAppearance(
+        heroImage: 'assets/images/ink_landscape_overlay.png',
+        pageImage: 'assets/images/ink_landscape_overlay.png',
+        adventureImage: 'assets/images/adventure_map_forest.jpg',
+      );
 }

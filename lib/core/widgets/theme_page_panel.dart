@@ -12,44 +12,52 @@ class ThemePagePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final storybook = theme.appearance.storybook;
-    return Padding(
-      padding: storybook
-          ? const EdgeInsets.fromLTRB(
-              SpacingTokens.sm,
-              SpacingTokens.md,
-              SpacingTokens.sm,
-              SpacingTokens.sm,
-            )
-          : EdgeInsets.zero,
-      child: ColoredCard(
-        color: storybook
-            ? theme.colorScheme.surface
-            : theme.scaffoldBackgroundColor,
-        backgroundOpacity: 1,
-        borderRadius: storybook
-            ? BorderRadius.circular(SpacingTokens.radiusLarge)
-            : BorderRadius.zero,
-        padding: EdgeInsets.zero,
-        child: CustomPaint(
-          painter: storybook
-              ? _BookBindingPainter(
-                  rule: theme.colorScheme.outlineVariant,
-                  hole: theme.scaffoldBackgroundColor,
-                )
-              : null,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              storybook
-                  ? SpacingTokens.xl
-                  : theme.appearance.pine
-                  ? SpacingTokens.lg
-                  : SpacingTokens.md,
-              theme.appearance.pine ? SpacingTokens.lg : SpacingTokens.md,
-              theme.appearance.pine ? SpacingTokens.lg : SpacingTokens.md,
-              SpacingTokens.md,
+    if (storybook) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(
+          SpacingTokens.sm,
+          SpacingTokens.md,
+          SpacingTokens.sm,
+          SpacingTokens.sm,
+        ),
+        child: ColoredCard(
+          color: theme.colorScheme.surface,
+          backgroundOpacity: 1,
+          borderRadius: BorderRadius.circular(SpacingTokens.radiusLarge),
+          padding: EdgeInsets.zero,
+          child: CustomPaint(
+            painter: _BookBindingPainter(
+              rule: theme.colorScheme.outlineVariant,
+              hole: theme.scaffoldBackgroundColor,
             ),
-            child: child,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                SpacingTokens.xl,
+                SpacingTokens.lg,
+                SpacingTokens.lg,
+                SpacingTokens.md,
+              ),
+              child: child,
+            ),
           ),
+        ),
+      );
+    }
+    return Padding(
+      padding: EdgeInsets.zero,
+      child: ColoredCard(
+        color: theme.scaffoldBackgroundColor,
+        backgroundOpacity: 1,
+        borderRadius: BorderRadius.zero,
+        padding: EdgeInsets.zero,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            theme.appearance.ink ? SpacingTokens.lg : SpacingTokens.md,
+            theme.appearance.ink ? SpacingTokens.lg : SpacingTokens.md,
+            theme.appearance.ink ? SpacingTokens.lg : SpacingTokens.md,
+            SpacingTokens.md,
+          ),
+          child: child,
         ),
       ),
     );
@@ -66,21 +74,28 @@ class _BookBindingPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final line = Paint()..color = rule;
     final fill = Paint()..color = hole;
-    canvas.drawLine(
-      const Offset(SpacingTokens.lg, SpacingTokens.md),
-      Offset(SpacingTokens.lg, size.height - SpacingTokens.md),
-      line,
-    );
+    // 装订只占页边，避免整页长线与密集线圈抢占正文注意力。
     for (
       var y = SpacingTokens.xl;
       y < size.height - SpacingTokens.md;
-      y += SpacingTokens.xxl
+      y += SpacingTokens.xxl * 2
     ) {
-      canvas.drawCircle(Offset(SpacingTokens.sm, y), SpacingTokens.xs, fill);
-      canvas.drawLine(
-        Offset(0, y),
+      canvas.drawCircle(
         Offset(SpacingTokens.sm, y),
-        line..strokeWidth = 2,
+        SpacingTokens.xs / 2,
+        fill,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            0,
+            y - SpacingTokens.xs / 2,
+            SpacingTokens.sm,
+            SpacingTokens.xs,
+          ),
+          const Radius.circular(SpacingTokens.xs / 2),
+        ),
+        line,
       );
     }
   }

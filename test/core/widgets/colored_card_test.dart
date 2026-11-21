@@ -93,7 +93,7 @@ void main() {
     expect(taps, 3);
   });
 
-  testWidgets('默认纸面是独立的不透明表面，带细边线和纸页底边', (tester) async {
+  testWidgets('默认纸面是独立的不透明表面，带细边线且无厚重底边', (tester) async {
     await tester.pumpWidget(
       wrap(const ColoredCard(color: kRed, child: Text('卡片'))),
     );
@@ -102,10 +102,27 @@ void main() {
     expect(decoration.color!.a, 1);
     expect(decoration.gradient, isNull);
     expect(decoration.border, isNotNull);
-    expect(decoration.boxShadow, isNotEmpty);
+    expect(decoration.boxShadow, isNull);
     expect(
       decoration.borderRadius,
       BorderRadius.circular(SpacingTokens.radiusMedium),
+    );
+  });
+
+  testWidgets('纸卡细描边不改变零内边距内容与贴边操作的位置', (tester) async {
+    const contentKey = ValueKey('edge-content');
+    await tester.pumpWidget(
+      wrap(
+        const ColoredCard(
+          color: kRed,
+          padding: EdgeInsets.zero,
+          child: SizedBox(key: contentKey, width: 200, height: 80),
+        ),
+      ),
+    );
+    expect(
+      tester.getRect(find.byKey(contentKey)),
+      tester.getRect(find.byType(ColoredCard)),
     );
   });
 

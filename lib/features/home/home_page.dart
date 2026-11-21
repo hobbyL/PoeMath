@@ -284,18 +284,21 @@ class _HomePageState extends ConsumerState<HomePage> {
             style: FilledButton.styleFrom(
               backgroundColor: theme.appearance.space
                   ? ColorTokens.spaceSecondaryLight
-                  : theme.appearance.playful || theme.appearance.pine
+                  : theme.appearance.playful || theme.appearance.ink
                   ? theme.colorScheme.primary
                   : colors.foreground,
               foregroundColor: theme.appearance.space
                   ? ColorTokens.spaceNight
-                  : theme.appearance.playful || theme.appearance.pine
+                  : theme.appearance.playful || theme.appearance.ink
                   ? theme.colorScheme.onPrimary
                   : colors.base,
             ),
             child: Text(pendingGoal?.action ?? '打卡'),
           );
 
+    final media = MediaQuery.of(context);
+    final textScale = media.textScaler.scale(16) / 16;
+    final compactHeading = media.size.width < 360 && textScale > 1.25;
     final summary = Column(
       key: const ValueKey('home-check-in-summary'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,10 +312,13 @@ class _HomePageState extends ConsumerState<HomePage> {
             Text(
               isCheckedIn ? '今日已打卡 ✓' : '今日待打卡',
               style:
-                  (theme.appearance.pine
-                          ? theme.textTheme.titleLarge
-                          : theme.textTheme.bodyMedium)
-                      ?.copyWith(color: colors.foreground),
+                  (compactHeading
+                          ? theme.textTheme.bodyLarge
+                          : theme.textTheme.titleLarge)
+                      ?.copyWith(
+                        color: colors.foreground,
+                        fontWeight: FontWeight.w500,
+                      ),
             ),
             _LevelBadge(levelName: stats.levelName, colors: colors),
           ],
@@ -326,9 +332,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               '$streak',
               style: theme.textTheme.displaySmall?.copyWith(
                 color: colors.foreground,
-                fontWeight: theme.appearance.pine
-                    ? FontWeight.w500
-                    : FontWeight.bold,
+                fontWeight: FontWeight.w500,
               ),
             ),
             Padding(
@@ -347,10 +351,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     final reminder = isCheckedIn ? action : HomeCheckInReminder(child: action);
     // 顶部始终铺满页面，前景宽度扣除安全区和共享背景的左右留白。
     // 不在前景放 LayoutBuilder，避免手势帧重新布局时钳制滚动偏移。
-    final media = MediaQuery.of(context);
     final contentWidth =
         media.size.width - media.padding.horizontal - SpacingTokens.lg * 2;
-    final textScale = media.textScaler.scale(16) / 16;
     final effectiveWidth = contentWidth / textScale;
     // 四主题复用宣纸布局，横屏保持信息和操作同排，窄竖屏大字时再纵排。
     if (media.orientation == Orientation.landscape ||
@@ -563,8 +565,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       children: [
         for (final goal in goals)
           AppTile(
-            flat: theme.appearance.storybook || theme.appearance.pine,
-            layout: theme.appearance.storybook
+            flat: theme.appearance.storybook || theme.appearance.ink,
+            layout:
+                theme.appearance.storybook &&
+                    MediaQuery.orientationOf(context) != Orientation.landscape
                 ? AppTileLayout.poster
                 : AppTileLayout.row,
             icon: goal.isComplete ? Icons.check_circle_outline : goal.icon,
@@ -692,7 +696,7 @@ class _LevelBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (theme.appearance.pine) {
+    if (theme.appearance.ink) {
       return ColoredCard(
         color: theme.colorScheme.secondary,
         backgroundOpacity: 1,

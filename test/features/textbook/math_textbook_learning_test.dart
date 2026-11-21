@@ -450,6 +450,21 @@ void defineMathTextbookLearningTests({
     (widget) => widget is TextField && widget.decoration?.labelText == label,
   );
 
+  Finder contentRawImages(WidgetTester tester) {
+    final decorativeImages = find
+        .descendant(
+          of: find.byKey(const ValueKey('theme-page-art')),
+          matching: find.byType(RawImage),
+        )
+        .evaluate()
+        .map((element) => element.widget)
+        .toSet();
+    return find.byWidgetPredicate(
+      (widget) => widget is RawImage && !decorativeImages.contains(widget),
+      description: '正文图片',
+    );
+  }
+
   Future<void> enter(WidgetTester tester, String label, String text) async {
     await visible(tester, input(label));
     await tester.enterText(input(label), text);
@@ -846,7 +861,7 @@ void defineMathTextbookLearningTests({
     expect(find.text('请完成下方完整原页中“做一做”的题目，再记录结果，提交给家长核对。'), findsNothing);
     await waitForImages(tester);
     final firstImage = tester
-        .widgetList<RawImage>(find.byType(RawImage))
+        .widgetList<RawImage>(contentRawImages(tester))
         .firstWhere((image) => image.image != null)
         .image!;
     final size = (firstImage.width, firstImage.height);
@@ -877,7 +892,11 @@ void defineMathTextbookLearningTests({
     router!.go(practicePath);
     await tester.pump();
     await tester.pump();
-    expect(find.byType(RawImage), findsOneWidget, reason: '草稿校验仍被阻塞时就显示缓存题图');
+    expect(
+      contentRawImages(tester),
+      findsOneWidget,
+      reason: '草稿校验仍被阻塞时就显示缓存题图',
+    );
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.byType(TextField), findsNothing, reason: '校验完成前只允许查看题图');
     blocked.complete();
@@ -885,7 +904,7 @@ void defineMathTextbookLearningTests({
     await waitForImages(tester);
     expect(rendered, hasLength(1), reason: '退出重进同一原题直接读取 PNG，不重渲染 PDF');
     final secondImage = tester
-        .widgetList<RawImage>(find.byType(RawImage))
+        .widgetList<RawImage>(contentRawImages(tester))
         .firstWhere((image) => image.image != null)
         .image!;
     expect((secondImage.width, secondImage.height), size);

@@ -50,8 +50,8 @@ class ColorTokens {
   static const Color poemGold = Color(0xFFC9A56A);
 
   /// 赭石主色；完整纸色与夜色均独立于松墨。
-  static const Color inkOchre = Color(0xFF7C4028);
-  static const Color inkOchreLight = Color(0xFFF0BE82);
+  static const Color inkOchre = Color(0xFF835036);
+  static const Color inkOchreLight = Color(0xFFD9AF7D);
 
   // 松墨：近白素宣、沉墨与松绿。绿只用于墨色，纸面保持低饱和。
   static const Color pinePaper = Color(0xFFF5F7F6);
@@ -70,37 +70,37 @@ class ColorTokens {
   static const Color pineNightMuted = Color(0xFFAFCCC1);
   static const Color pineNightRule = Color(0xFF3C5146);
 
-  // 赭石：暖黄旧纸、棕墨与朱砂；夜色保持赤褐基调。
-  static const Color ochrePaper = Color(0xFFEDD4AC);
-  static const Color ochreSurface = Color(0xFFFFF2D9);
-  static const Color ochreRaised = Color(0xFFE8CCA2);
-  static const Color ochrePaperDeep = Color(0xFFDFC095);
-  static const Color ochreInk = Color(0xFF422B20);
-  static const Color ochreMutedInk = Color(0xFF694A37);
-  static const Color ochreRule = Color(0xFFC0A077);
+  // 赭石：浅绢、赭墨与朱砂；淡彩山水保留矿物色。
+  static const Color ochrePaper = Color(0xFFF7F3EB);
+  static const Color ochreSurface = Color(0xFFFFFCF6);
+  static const Color ochreRaised = Color(0xFFEDE4D5);
+  static const Color ochrePaperDeep = Color(0xFFE5D8C4);
+  static const Color ochreInk = Color(0xFF382D27);
+  static const Color ochreMutedInk = Color(0xFF6A5C4F);
+  static const Color ochreRule = Color(0xFFDDD2C2);
   static const Color ochreAccent = Color(0xFF705126);
   static const Color ochreAccentLight = Color(0xFFE2C58D);
-  static const Color ochreNight = Color(0xFF322118);
-  static const Color ochreNightSurface = Color(0xFF493124);
-  static const Color ochreNightRaised = Color(0xFF604332);
-  static const Color ochreNightInk = Color(0xFFFFF0D5);
-  static const Color ochreNightMuted = Color(0xFFD7BFA0);
-  static const Color ochreNightRule = Color(0xFF88674C);
-  static const Color ochreSeal = Color(0xFF8C372A);
+  static const Color ochreNight = Color(0xFF211E1A);
+  static const Color ochreNightSurface = Color(0xFF2E2923);
+  static const Color ochreNightRaised = Color(0xFF40382F);
+  static const Color ochreNightInk = Color(0xFFF2E7D6);
+  static const Color ochreNightMuted = Color(0xFFC7BBA6);
+  static const Color ochreNightRule = Color(0xFF65584B);
+  static const Color ochreSeal = Color(0xFF984637);
   static const Color ochreSealLight = Color(0xFFF0AF91);
   static const Color ochreCaution = Color(0xFF69451E);
   static const Color ochreSuccess = Color(0xFF24542D);
 
   // 奶糖乐园：柔粉与莓果，青薄荷和葡萄紫作点缀。
-  static const Color candyPage = Color(0xFFFFF0F6);
-  static const Color candySurface = Color(0xFFFFFAFD);
-  static const Color candyRaised = Color(0xFFF8DDEB);
-  static const Color candyPrimary = Color(0xFF9B345E);
+  static const Color candyPage = Color(0xFFFFF5F6);
+  static const Color candySurface = Color(0xFFFFFCF8);
+  static const Color candyRaised = Color(0xFFFCE3E7);
+  static const Color candyPrimary = Color(0xFFA03F61);
   static const Color candySecondary = Color(0xFF376553);
   static const Color candyTertiary = Color(0xFF6E4595);
-  static const Color candyInk = Color(0xFF30192A);
-  static const Color candyMuted = Color(0xFF765469);
-  static const Color candyRule = Color(0xFFE8BED1);
+  static const Color candyInk = Color(0xFF422D35);
+  static const Color candyMuted = Color(0xFF765A63);
+  static const Color candyRule = Color(0xFFECD3DA);
   static const Color candyNight = Color(0xFF2C1D30);
   static const Color candyNightSurface = Color(0xFF3D2A43);
   static const Color candyNightRaised = Color(0xFF503657);
@@ -112,9 +112,9 @@ class ColorTokens {
   static const Color candyTertiaryLight = Color(0xFFD8BBFF);
 
   // 星海探险：天空蓝、星光金与紫罗兰，夜间保留深蓝天幕。
-  static const Color spacePage = Color(0xFFE8F3FF);
-  static const Color spaceSurface = Color(0xFFF9FCFF);
-  static const Color spaceRaised = Color(0xFFD9E9FC);
+  static const Color spacePage = Color(0xFFF0F5FC);
+  static const Color spaceSurface = Color(0xFFFCFDFF);
+  static const Color spaceRaised = Color(0xFFE0EAF8);
   static const Color spacePrimary = Color(0xFF2558A5);
   static const Color spaceSecondary = Color(0xFF7B5100);
   static const Color spaceTertiary = Color(0xFF6648A3);

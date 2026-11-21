@@ -83,7 +83,7 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                   title: '今天没有待安排的任务',
                   description: '可按自己的节奏学习。',
                   padding: EdgeInsets.all(
-                    theme.appearance.pine ? SpacingTokens.md : SpacingTokens.xl,
+                    theme.appearance.ink ? SpacingTokens.md : SpacingTokens.xl,
                   ),
                 ),
               if (plan.tasks.isNotEmpty) ...[
@@ -92,14 +92,14 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                     for (final task in plan.tasks)
                       AppTile(
                         flat:
-                            theme.appearance.storybook || theme.appearance.pine,
+                            theme.appearance.storybook || theme.appearance.ink,
                         icon: task.completed
                             ? Icons.check_circle_outline
                             : _icon(task.kind),
                         iconColor: task.completed
                             ? theme.semantic.success
                             : theme.colorScheme.primary,
-                        crossAxisAlignment: theme.appearance.pine
+                        crossAxisAlignment: theme.appearance.ink
                             ? CrossAxisAlignment.center
                             : CrossAxisAlignment.start,
                         title: '${task.kind.label} · ${task.title}',

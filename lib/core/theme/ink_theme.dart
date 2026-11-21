@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/theme/app_theme_builder.dart';
 
-/// 松墨素宣与赭石旧纸：独立完整色板，共用排版与组件交互。
+/// 松墨素宣与赭石浅绢：独立完整色板，共用排版与组件交互。
 /// 学科页面沿用用户的配色选择，切换 Tab 不会改变主题。
 class InkTheme {
   const InkTheme._();
@@ -73,16 +73,25 @@ class InkTheme {
         ink,
         headingFontFamily: TypographyTokens.inkFontFamily,
         headingFallback: TypographyTokens.serifFallback,
-        headingWeight: ochre ? FontWeight.w600 : FontWeight.w500,
+        headingWeight: FontWeight.w500,
       ),
       appearance: AppAppearance(
         visualStyle: ochre ? AppVisualStyle.ink : AppVisualStyle.pine,
         cardStyle: ochre ? AppCardStyle.paper : AppCardStyle.sheet,
+        cardRadius: ochre
+            ? SpacingTokens.radiusCompact
+            : SpacingTokens.radiusMedium,
         controlRadius: ochre
             ? SpacingTokens.radiusSmall
             : SpacingTokens.radiusCompact,
         heroImage: ochre
-            ? 'assets/images/ink_study_overlay.png'
+            ? 'assets/images/ochre_autumn_header.webp'
+            : 'assets/images/ink_landscape_overlay.png',
+        pageImage: ochre
+            ? 'assets/images/ochre_autumn_page.webp'
+            : 'assets/images/ink_landscape_overlay.png',
+        adventureImage: ochre
+            ? 'assets/images/ochre_autumn_header.webp'
             : 'assets/images/ink_landscape_overlay.png',
       ),
       semantic: SemanticColorsExt(

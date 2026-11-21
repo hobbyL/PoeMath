@@ -59,7 +59,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final theme = Theme.of(context);
     final stats = ref.watch(userStatsProvider);
     final streak = ref.watch(streakProvider);
-    final unlockedCount = ref.watch(unlockedAchievementsCountProvider);
     final keyRecovered = ref.watch(hiveKeyRecoveredProvider);
     final media = MediaQuery.of(context);
     _settingsCenterY = media.padding.top + SpacingTokens.lg;
@@ -85,84 +84,32 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       _buildStatsPanel(context, stats, streak),
       const SizedBox(height: SpacingTokens.md),
 
-      // 学习报告、学习日历、成就勋章：奶糖和宣纸沿用一行三个卡片。
-      if (theme.appearance.space)
-        ResponsiveCardGrid(
-          children: [
-            for (final (icon, label, route) in [
-              (Icons.bar_chart_rounded, '学习报告', AppRoutes.learningStats),
-              (
-                Icons.calendar_month_rounded,
-                '学习日历',
-                AppRoutes.learningCalendar,
-              ),
-              (Icons.emoji_events_rounded, '成就勋章', AppRoutes.achievements),
-            ])
-              AppTile(
-                icon: icon,
-                iconColor: theme.colorScheme.primary,
-                title: label,
-                subtitle: '',
-                onTap: () => context.push(route),
-              ),
-          ],
-        )
-      else
-        Row(
+      IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: ColoredCard(
-                color: theme.colorScheme.primary,
+              child: _buildProfileShortcut(
+                context,
+                icon: Icons.bar_chart_rounded,
+                label: '学习报告',
                 onTap: () => context.push(AppRoutes.learningStats),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.bar_chart_rounded,
-                      size: 32,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(height: SpacingTokens.sm),
-                    Text(
-                      '学习报告',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
             const SizedBox(width: SpacingTokens.sm),
             Expanded(
-              child: ColoredCard(
-                color: theme.colorScheme.primary,
+              child: _buildProfileShortcut(
+                context,
+                icon: Icons.calendar_month_rounded,
+                label: '学习日历',
                 onTap: () => context.push(AppRoutes.learningCalendar),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.calendar_month_rounded,
-                      size: 32,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(height: SpacingTokens.sm),
-                    Text(
-                      '学习日历',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
             const SizedBox(width: SpacingTokens.sm),
-            Expanded(
-              child: _buildAchievementCard(context, theme, unlockedCount),
-            ),
+            Expanded(child: _buildAchievementCard(context)),
           ],
         ),
+      ),
       const SizedBox(height: SpacingTokens.sm),
 
       // 本周学习周报
@@ -419,25 +366,30 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
   }
 
-  Widget _buildAchievementCard(
-    BuildContext context,
-    ThemeData theme,
-    int unlockedCount,
-  ) {
+  Widget _buildProfileShortcut(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
     return ColoredCard(
       color: theme.colorScheme.primary,
-      onTap: () => context.push(AppRoutes.achievements),
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpacingTokens.xs,
+        vertical: SpacingTokens.md,
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.emoji_events_rounded,
-            size: 32,
-            color: theme.colorScheme.primary,
-          ),
+          Icon(icon, size: SpacingTokens.xl, color: theme.colorScheme.primary),
           const SizedBox(height: SpacingTokens.sm),
           Text(
-            '成就勋章',
+            label,
             textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -446,6 +398,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       ),
     );
   }
+
+  Widget _buildAchievementCard(BuildContext context) => _buildProfileShortcut(
+    context,
+    icon: Icons.emoji_events_rounded,
+    label: '成就勋章',
+    onTap: () => context.push(AppRoutes.achievements),
+  );
 }
 
 /// 四主题共用宣纸的个人信息布局，方向变化只调整头像与信息的排列。

@@ -134,7 +134,7 @@ class AppThemeBuilder {
           final selected = states.contains(WidgetState.selected);
           return text.labelMedium!.copyWith(
             color: selected
-                ? appearance.pine
+                ? appearance.ink
                       ? scheme.primary
                       : scheme.onPrimary
                 : scheme.onSurfaceVariant,

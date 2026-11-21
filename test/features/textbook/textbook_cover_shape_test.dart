@@ -113,12 +113,12 @@ void main() {
             reason: '封面应铺满卡片，$point 不应露出底色',
           );
         }
-        // 这些点位于旧 4dp 圆角内，但在 16dp 切角外。
+        // 页角必须按当前 8dp 切角裁掉，不能让方形封面露出。
         for (final point in [
-          bounds.topLeft + const Offset(6, 4),
-          bounds.topRight + const Offset(-6, 4),
-          bounds.bottomLeft + const Offset(6, -4),
-          bounds.bottomRight + const Offset(-6, -4),
+          bounds.topLeft + const Offset(2, 2),
+          bounds.topRight + const Offset(-2, 2),
+          bounds.bottomLeft + const Offset(2, -2),
+          bounds.bottomRight + const Offset(-2, -2),
         ]) {
           expect(
             pixel(point).toARGB32(),

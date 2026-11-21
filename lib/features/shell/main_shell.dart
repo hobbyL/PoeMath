@@ -313,7 +313,7 @@ class _MainShellState extends ConsumerState<MainShell>
                 ),
               ),
             )
-          : theme.appearance.pine
+          : theme.appearance.ink
           ? ColoredCard(
               color: theme.colorScheme.surface,
               backgroundOpacity: 1,
@@ -360,7 +360,7 @@ class _NavigationTab extends StatelessWidget {
               ? theme.colorScheme.onPrimary
               : theme.colorScheme.onSurfaceVariant,
         );
-    final labelStyle = theme.appearance.space || theme.appearance.pine
+    final labelStyle = theme.appearance.space || theme.appearance.ink
         ? defaultLabelStyle.copyWith(
             color: selected
                 ? theme.colorScheme.primary
@@ -391,7 +391,7 @@ class _NavigationTab extends StatelessWidget {
                   onPressed: onTap,
                   style: TextButton.styleFrom(
                     foregroundColor: labelStyle.color,
-                    backgroundColor: selected && !theme.appearance.pine
+                    backgroundColor: selected && !theme.appearance.ink
                         ? theme.appearance.space
                               ? theme.colorScheme.primaryContainer
                               : theme.colorScheme.primary
@@ -413,7 +413,7 @@ class _NavigationTab extends StatelessWidget {
                         ? Duration.zero
                         : const Duration(milliseconds: 200),
                   ),
-                  child: theme.appearance.pine
+                  child: theme.appearance.ink
                       ? Stack(
                           clipBehavior: Clip.none,
                           alignment: Alignment.center,

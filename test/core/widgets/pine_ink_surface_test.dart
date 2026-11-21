@@ -4,10 +4,17 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/theme/app_appearance.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/widgets/pine_ink_surface.dart';
 
 import '../../helpers/theme_contrast.dart';
+
+String _imageAssetName(Image image) {
+  final provider = image.image;
+  final asset = provider is ResizeImage ? provider.imageProvider : provider;
+  return (asset as AssetImage).assetName;
+}
 
 void main() {
   for (final brightness in Brightness.values) {
@@ -72,6 +79,68 @@ void main() {
           );
         }
         expect(painted, greaterThan(2000), reason: '不能只接入图片但实际未绘制');
+        expect(minimumContrast, greaterThanOrEqualTo(4.5));
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final preset in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('$preset/$brightness 页面底图使用对应主题插画', (tester) async {
+        final theme = AppTheme.resolve(subject: preset, brightness: brightness);
+        const capture = ValueKey('themed-page');
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: RepaintBoundary(
+                key: capture,
+                child: ColoredBox(
+                  color: theme.scaffoldBackgroundColor,
+                  child: const SizedBox(
+                    width: 320,
+                    height: 200,
+                    child: PineInkSurface(page: true, child: SizedBox.expand()),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        final art = tester.widget<Image>(find.byType(Image));
+        expect(_imageAssetName(art), theme.appearance.pageImage);
+        await tester.runAsync(
+          () => precacheImage(art.image, tester.element(find.byType(Image))),
+        );
+        await tester.pump();
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(capture),
+        );
+        final pixels = (await tester.runAsync(() async {
+          final image = await boundary.toImage();
+          try {
+            return await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+          } finally {
+            image.dispose();
+          }
+        }))!;
+        var painted = 0;
+        var minimumContrast = double.infinity;
+        for (var offset = 0; offset < pixels.lengthInBytes; offset += 4) {
+          final background = Color.fromARGB(
+            pixels.getUint8(offset + 3),
+            pixels.getUint8(offset),
+            pixels.getUint8(offset + 1),
+            pixels.getUint8(offset + 2),
+          );
+          if (background != theme.scaffoldBackgroundColor) painted++;
+          minimumContrast = math.min(
+            minimumContrast,
+            contrastRatio(theme.colorScheme.onSurfaceVariant, background),
+          );
+        }
+        expect(painted, greaterThan(1500));
         expect(minimumContrast, greaterThanOrEqualTo(4.5));
         expect(tester.takeException(), isNull);
       });

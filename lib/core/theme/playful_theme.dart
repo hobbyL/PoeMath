@@ -54,13 +54,19 @@ class PlayfulTheme {
       page: palette.page,
       text: AppThemeBuilder.textTheme(
         palette.ink,
-        headingWeight: FontWeight.w700,
+        headingWeight: FontWeight.w600,
       ),
       appearance: AppAppearance(
         visualStyle: space ? AppVisualStyle.space : AppVisualStyle.storybook,
         heroImage: space
-            ? 'assets/images/theme_space_banner.png'
-            : 'assets/images/theme_candy_banner.png',
+            ? 'assets/images/space_companion.webp'
+            : 'assets/images/candy_companion.webp',
+        pageImage: space
+            ? 'assets/images/space_companion.webp'
+            : 'assets/images/candy_companion.webp',
+        adventureImage: space
+            ? 'assets/images/space_companion.webp'
+            : 'assets/images/candy_companion.webp',
         cardStyle: space ? AppCardStyle.outlined : AppCardStyle.soft,
         cardRadius: space
             ? SpacingTokens.radiusCompact

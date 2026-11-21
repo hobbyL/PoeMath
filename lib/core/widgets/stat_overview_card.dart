@@ -42,10 +42,13 @@ class StatOverviewCard extends StatelessWidget {
           // 左右各多缩进 16（口算练习页顶部统计卡与下方练习卡的错位即此）。
           // 需要留白的调用方自行包 Padding。
           padding: EdgeInsets.zero,
-          clipBehavior: theme.appearance.pine ? Clip.antiAlias : Clip.none,
+          clipBehavior: theme.appearance.ink ? Clip.antiAlias : Clip.none,
           color: theme.colorScheme.primary,
           backgroundOpacity: theme.appearance.storybook ? 0 : .02,
           child: PineInkSurface(
+            scene: theme.appearance.ochre
+                ? PineInkScene.study
+                : PineInkScene.landscape,
             child: Padding(
               padding: const EdgeInsets.all(SpacingTokens.md),
               child: Row(

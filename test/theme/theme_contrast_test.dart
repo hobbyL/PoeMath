@@ -16,7 +16,8 @@ import '../helpers/day_key_override.dart';
 import '../helpers/hive_test_helper.dart';
 import '../helpers/theme_contrast.dart';
 
-// 读取真实绘制的背景（含光晕和光带），避免只检查渐变端点而漏掉叠色。
+// 在文字实际所在的位置采样背景，包含插画、光晕与下拉位移。
+// 右侧独立插画的深色眼睛不在文字下方，不应迫使整幅人物降低透明度。
 Future<void> _expectRenderedHeaderContrast(WidgetTester tester) async {
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(const ValueKey('home-check-in-background')),
@@ -29,22 +30,32 @@ Future<void> _expectRenderedHeaderContrast(WidgetTester tester) async {
       image.dispose();
     }
   }))!;
-  var darkest = double.infinity;
-  var lightest = 0.0;
-  for (var offset = 0; offset < pixels.lengthInBytes; offset += 4) {
-    final color = Color.fromARGB(
-      pixels.getUint8(offset + 3),
-      pixels.getUint8(offset),
-      pixels.getUint8(offset + 1),
-      pixels.getUint8(offset + 2),
-    );
-    expect(color.a, 1, reason: '贴边背景不能透出页面底色');
-    final luminance = color.computeLuminance();
-    darkest = math.min(darkest, luminance);
-    lightest = math.max(lightest, luminance);
-  }
+  final width = boundary.size.width.ceil();
   for (final label in ['今日待打卡', '天连续']) {
     final text = tester.widget<Text>(find.text(label));
+    final textBounds = tester.getRect(find.text(label));
+    final bounds = Rect.fromPoints(
+      boundary.globalToLocal(textBounds.topLeft),
+      boundary.globalToLocal(textBounds.bottomRight),
+    ).intersect(Offset.zero & boundary.size);
+    expect(bounds.isEmpty, isFalse);
+    var darkest = double.infinity;
+    var lightest = 0.0;
+    for (var y = bounds.top.ceil(); y < bounds.bottom.floor(); y++) {
+      for (var x = bounds.left.ceil(); x < bounds.right.floor(); x++) {
+        final offset = (y * width + x) * 4;
+        final color = Color.fromARGB(
+          pixels.getUint8(offset + 3),
+          pixels.getUint8(offset),
+          pixels.getUint8(offset + 1),
+          pixels.getUint8(offset + 2),
+        );
+        expect(color.a, 1, reason: '文字背景不能透出页面底色');
+        final luminance = color.computeLuminance();
+        darkest = math.min(darkest, luminance);
+        lightest = math.max(lightest, luminance);
+      }
+    }
     final foreground = text.style!.color!.computeLuminance();
     // 前景必须完全高于或低于所有背景亮度，再检查最接近的像素。
     final contrast = foreground > lightest
@@ -70,7 +81,7 @@ void main() {
             theme.navigationBarTheme.labelTextStyle!.resolve({
               WidgetState.selected,
             })!.color!,
-            theme.appearance.pine ? scheme.surface : scheme.primary,
+            theme.appearance.ink ? scheme.surface : scheme.primary,
           ),
           '导航未选中文字': (
             theme.navigationBarTheme.labelTextStyle!.resolve({})!.color!,

@@ -250,7 +250,7 @@ void main() {
                       const PracticeResumeSection(),
                       AppTile(
                         key: const ValueKey('baseline'),
-                        flat: kind == 'word',
+                        flat: true,
                         icon: Icons.play_circle_outline,
                         iconColor: Theme.of(context).colorScheme.secondary,
                         title: title,
@@ -326,9 +326,7 @@ void main() {
         expect(
           discardRect.right +
               SpacingTokens.sm +
-              (kind == 'word'
-                  ? (SpacingTokens.minTapTarget - arrowRect.width) / 2
-                  : 0),
+              (SpacingTokens.minTapTarget - arrowRect.width) / 2,
           closeTo(arrowRect.left, .01),
         );
         expect(discardRect.center.dx, greaterThan(cardRect.center.dx));

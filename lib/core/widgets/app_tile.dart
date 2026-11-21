@@ -198,7 +198,7 @@ class AppTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final titleStyle = theme.textTheme.titleSmall?.copyWith(
-      fontFamily: flat || theme.appearance.pine
+      fontFamily: flat || theme.appearance.ink
           ? null
           : theme.textTheme.titleLarge?.fontFamily,
       fontWeight: selected ? FontWeight.w700 : FontWeight.w600,

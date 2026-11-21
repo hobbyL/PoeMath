@@ -161,7 +161,7 @@ class PracticeResumeSection extends ConsumerWidget {
       }
     } on Object {
       readingCard = AppTile(
-        flat: theme.appearance.pine,
+        flat: theme.appearance.ink,
         icon: Icons.refresh,
         iconColor: theme.colorScheme.error,
         title: '最近阅读暂时无法读取',
@@ -173,7 +173,7 @@ class PracticeResumeSection extends ConsumerWidget {
     final cards = <Widget>[
       for (final draft in drafts)
         AppTile(
-          flat: theme.appearance.pine,
+          flat: theme.appearance.ink,
           icon: draft['kind'] == MathAdventureNode.draftKind
               ? Icons.explore_outlined
               : draft['kind'] == 'math'

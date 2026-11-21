@@ -25,7 +25,7 @@ class AnimatedHeroColors {
     final dark = theme.brightness == Brightness.dark;
     final starlight = style == AnimatedHeroStyle.starlight;
     final scheme = theme.colorScheme;
-    if (theme.appearance.pine) {
+    if (theme.appearance.ink) {
       return AnimatedHeroColors._(
         foreground: scheme.onSurface,
         base: theme.scaffoldBackgroundColor,
@@ -34,11 +34,13 @@ class AnimatedHeroColors {
       );
     }
     if (theme.appearance.space) {
-      return const AnimatedHeroColors._(
-        foreground: ColorTokens.spaceNightInk,
-        base: ColorTokens.spaceNight,
-        depth: ColorTokens.spaceNight,
-        glow: ColorTokens.spaceSecondaryLight,
+      return AnimatedHeroColors._(
+        foreground: scheme.onSurface,
+        base: dark ? ColorTokens.spaceNight : ColorTokens.spacePage,
+        depth: dark ? ColorTokens.spaceNightRaised : ColorTokens.spaceRaised,
+        glow: dark
+            ? ColorTokens.spaceSecondaryLight
+            : scheme.secondaryContainer,
       );
     }
     if (theme.appearance.playful) {
@@ -292,7 +294,7 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                             colors.foreground,
                                                         motion: _motion,
                                                       )
-                                                    : !theme.appearance.pine &&
+                                                    : !theme.appearance.ink &&
                                                           widget.style ==
                                                               AnimatedHeroStyle
                                                                   .starlight
@@ -319,7 +321,7 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                             (height + stretch),
                                                         ink: theme
                                                             .appearance
-                                                            .pine,
+                                                            .ink,
                                                       ),
                                               )
                                               .animatePage(context)
@@ -335,23 +337,23 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                               left: media.padding.left,
                                               right:
                                                   media.padding.right +
-                                                  actionInset,
+                                                  (actionInset == 0
+                                                      ? SpacingTokens.md
+                                                      : actionInset),
                                               child: Align(
                                                 alignment:
-                                                    widget.style ==
-                                                        AnimatedHeroStyle
-                                                            .starlight
-                                                    ? const Alignment(.78, 0)
-                                                    : Alignment.centerRight,
+                                                    Alignment.centerRight,
                                                 child: Opacity(
                                                   opacity:
-                                                      theme
-                                                              .appearance
-                                                              .storybook &&
-                                                          theme.brightness ==
-                                                              Brightness.light
-                                                      ? .58
-                                                      : .28,
+                                                      theme.appearance.storybook
+                                                      ? (theme.brightness ==
+                                                                Brightness.dark
+                                                            ? .56
+                                                            : .92)
+                                                      : (theme.brightness ==
+                                                                Brightness.dark
+                                                            ? .55
+                                                            : .9),
                                                   child: ThemeCharacterArt(
                                                     key: const ValueKey(
                                                       'hero-theme-illustration',
@@ -375,20 +377,12 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                                   Brightness.dark,
                                             )
                                           else
-                                            RepaintBoundary(
-                                              child: Image.asset(
-                                                theme.appearance.heroImage,
-                                                fit: BoxFit.cover,
-                                                alignment:
-                                                    Alignment.centerRight,
-                                                cacheWidth: 640,
-                                                color: colors.foreground,
-                                                opacity:
-                                                    const AlwaysStoppedAnimation(
-                                                      .14,
-                                                    ),
-                                                excludeFromSemantics: true,
-                                              ),
+                                            _OchreLandscape(
+                                              image: theme.appearance.heroImage,
+                                              paper: colors.base,
+                                              dark:
+                                                  theme.brightness ==
+                                                  Brightness.dark,
                                             ),
                                         ],
                                       ),
@@ -474,7 +468,7 @@ class HeroAvatarHalo extends StatelessWidget {
       vertical: SpacingTokens.xs,
     );
     if (Theme.of(context).appearance.storybook ||
-        Theme.of(context).appearance.pine) {
+        Theme.of(context).appearance.ink) {
       return Padding(padding: padding, child: child);
     }
     final colors = AnimatedHeroColors(
@@ -558,7 +552,7 @@ class HeroStatusTag extends StatelessWidget {
       style: AnimatedHeroStyle.starlight,
     );
     final motion = context.dependOnInheritedWidgetOfExactType<_HeroMotion>()!;
-    if (theme.appearance.pine) {
+    if (theme.appearance.ink) {
       final stars = icon == Icons.star_rounded;
       final accent = Color.lerp(
         stars ? theme.colorScheme.secondary : theme.colorScheme.primary,
@@ -1015,6 +1009,61 @@ class _HeroAuroraPainter extends CustomPainter {
       oldDelegate.pull != pull ||
       oldDelegate.ink != ink ||
       oldDelegate.motion != motion;
+}
+
+/// 浅绛淡彩保留矿物色，书画在纸边自然淡出，不染成单色横幅。
+class _OchreLandscape extends StatelessWidget {
+  const _OchreLandscape({
+    required this.image,
+    required this.paper,
+    required this.dark,
+  });
+
+  final String image;
+  final Color paper;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        ShaderMask(
+          blendMode: BlendMode.dstIn,
+          shaderCallback: (bounds) => const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white, Colors.white, Colors.transparent],
+            stops: [0, .68, 1],
+          ).createShader(bounds),
+          child: Image.asset(
+            image,
+            fit: BoxFit.cover,
+            alignment: Alignment.centerRight,
+            cacheWidth: 1280,
+            opacity: AlwaysStoppedAnimation(dark ? .13 : .38),
+            excludeFromSemantics: true,
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: SizedBox(
+            height: SpacingTokens.xxl,
+            width: double.infinity,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [paper.withValues(alpha: 0), paper],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// 山水沿纸面铺开，底部锚定保留亭子与近岸；纸边淡出衔接正文。

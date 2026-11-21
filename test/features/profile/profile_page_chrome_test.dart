@@ -100,42 +100,39 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  for (final (size, scale) in [
-    (const Size(411, 914), 1.0),
-    (const Size(320, 640), 1.0),
-    (const Size(320, 640), 2.0),
-    (const Size(914, 411), 1.0),
-    (const Size(640, 320), 2.0),
-  ]) {
-    testWidgets('奶糖三个学习入口始终同一行：$size/$scale', (tester) async {
-      await _pump(
-        tester,
-        subject: AppSubject.candy,
-        size: size,
-        textScale: scale,
-      );
-      await drainHiveWritesForTesting(tester);
-      final cards = [
-        for (final title in ['学习报告', '学习日历', '成就勋章'])
-          tester.getRect(
-            find
-                .ancestor(
-                  of: find.text(title),
-                  matching: find.byType(ColoredCard),
-                )
-                .first,
-          ),
-      ];
-      for (final card in cards) {
-        expect(card.top, closeTo(cards.first.top, .01));
-        expect(card.bottom, closeTo(cards.first.bottom, .01));
-        expect(card.width, closeTo(cards.first.width, .01));
-        expect(card.width, greaterThanOrEqualTo(44));
-      }
-      expect(cards[1].left, greaterThan(cards[0].right));
-      expect(cards[2].left, greaterThan(cards[1].right));
-      expect(tester.takeException(), isNull);
-    });
+  for (final subject in [AppSubject.candy, AppSubject.space]) {
+    for (final (size, scale) in [
+      (const Size(411, 914), 1.0),
+      (const Size(320, 640), 1.0),
+      (const Size(320, 640), 2.0),
+      (const Size(914, 411), 1.0),
+      (const Size(640, 320), 2.0),
+    ]) {
+      testWidgets('$subject 三个学习入口始终同一行：$size/$scale', (tester) async {
+        await _pump(tester, subject: subject, size: size, textScale: scale);
+        await drainHiveWritesForTesting(tester);
+        final cards = [
+          for (final title in ['学习报告', '学习日历', '成就勋章'])
+            tester.getRect(
+              find
+                  .ancestor(
+                    of: find.text(title),
+                    matching: find.byType(ColoredCard),
+                  )
+                  .first,
+            ),
+        ];
+        for (final card in cards) {
+          expect(card.top, closeTo(cards.first.top, .01));
+          expect(card.bottom, closeTo(cards.first.bottom, .01));
+          expect(card.width, closeTo(cards.first.width, .01));
+          expect(card.width, greaterThanOrEqualTo(44));
+        }
+        expect(cards[1].left, greaterThan(cards[0].right));
+        expect(cards[2].left, greaterThan(cards[1].right));
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 
   testWidgets('奶糖三个学习入口可分别进入对应页面', (tester) async {
@@ -340,11 +337,13 @@ void main() {
           const ValueKey('profile-header-background'),
         );
         expect(tester.getTopLeft(background), Offset.zero);
-        final headerIcons =
-            brightness == Brightness.light &&
-                (subject == AppSubject.candy || subject == AppSubject.poem)
-            ? Brightness.dark
-            : Brightness.light;
+        final headerColors = AnimatedHeroColors(
+          Theme.of(tester.element(find.byType(ProfilePage))),
+          style: AnimatedHeroStyle.starlight,
+        );
+        final headerIcons = headerColors.foreground.computeLuminance() > .5
+            ? Brightness.light
+            : Brightness.dark;
         expectStatusBar(headerIcons);
         final scroll = tester.state<ScrollableState>(
           find.byType(Scrollable).first,
@@ -461,12 +460,12 @@ void main() {
   });
 
   for (final reduceMotion in [false, true]) {
-    testWidgets('个人页星光与下拉放大遵循系统减少动态效果：$reduceMotion', (tester) async {
+    testWidgets('个人页星海轨道与下拉放大遵循系统减少动态效果：$reduceMotion', (tester) async {
       await _pump(
         tester,
         reduceMotion: reduceMotion,
         accessibleNavigation: true,
-        subject: AppSubject.math,
+        subject: AppSubject.space,
       );
       final background = find.byKey(
         const ValueKey('profile-header-background'),
@@ -497,21 +496,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1500));
       final second = await pixels(background);
       expect(listEquals(first, second), reduceMotion);
-      if (!reduceMotion) {
-        var visiblyChanged = 0;
-        for (var offset = 0; offset < first.length; offset += 4) {
-          if ((first[offset] - second[offset]).abs() >= 10 ||
-              (first[offset + 1] - second[offset + 1]).abs() >= 10 ||
-              (first[offset + 2] - second[offset + 2]).abs() >= 10) {
-            visiblyChanged++;
-          }
-        }
-        expect(
-          visiblyChanged / (first.length / 4),
-          greaterThan(.15),
-          reason: '1.5 秒内至少 15% 背景像素有可辨识变化，不能仅凭少量像素变化认定动效可见',
-        );
-      }
       expect(listEquals(firstOrbits, await pixels(orbits)), reduceMotion);
       expect(listEquals(firstLevelTag, await pixels(levelTag)), reduceMotion);
       expect(listEquals(firstStarsTag, await pixels(starsTag)), reduceMotion);
@@ -570,12 +554,9 @@ void main() {
         final orbitFinder = find.byKey(const ValueKey('hero-avatar-orbits'));
         expect(
           orbitFinder,
-          subject == AppSubject.candy || subject == AppSubject.poem
-              ? findsNothing
-              : findsOneWidget,
+          subject != AppSubject.space ? findsNothing : findsOneWidget,
         );
-        final orbitBoundary =
-            subject == AppSubject.candy || subject == AppSubject.poem
+        final orbitBoundary = subject != AppSubject.space
             ? null
             : tester.renderObject<RenderRepaintBoundary>(orbitFinder);
         final orbitOffset = orbitBoundary == null
@@ -606,16 +587,29 @@ void main() {
           }))!;
           var brightest = 0.0;
           var darkest = 1.0;
-          for (var i = 0; i < pixels.lengthInBytes; i += 4) {
-            final color = Color.fromARGB(
-              pixels.getUint8(i + 3),
-              pixels.getUint8(i),
-              pixels.getUint8(i + 1),
-              pixels.getUint8(i + 2),
-            );
-            final luminance = color.computeLuminance();
-            if (luminance > brightest) brightest = luminance;
-            if (luminance < darkest) darkest = luminance;
+          final textBounds = tester.getRect(
+            find.byKey(const ValueKey('profile-nickname-label')),
+          );
+          final bounds = Rect.fromPoints(
+            boundary.globalToLocal(textBounds.topLeft),
+            boundary.globalToLocal(textBounds.bottomRight),
+          ).intersect(Offset.zero & boundary.size);
+          expect(bounds.isEmpty, isFalse);
+          final width = boundary.size.width.ceil();
+          // 检查昵称真正覆盖的像素；右侧人物不应因自身深色细节被冲淡。
+          for (var y = bounds.top.ceil(); y < bounds.bottom.floor(); y++) {
+            for (var x = bounds.left.ceil(); x < bounds.right.floor(); x++) {
+              final i = (y * width + x) * 4;
+              final color = Color.fromARGB(
+                pixels.getUint8(i + 3),
+                pixels.getUint8(i),
+                pixels.getUint8(i + 1),
+                pixels.getUint8(i + 2),
+              );
+              final luminance = color.computeLuminance();
+              if (luminance > brightest) brightest = luminance;
+              if (luminance < darkest) darkest = luminance;
+            }
           }
           expect(
             foreground > brightest

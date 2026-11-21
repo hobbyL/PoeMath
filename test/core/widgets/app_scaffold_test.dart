@@ -111,10 +111,7 @@ void main() {
         expect(editor, same(initialState));
         expect(editor.text.text, '正在写的学习笔记');
         expect(editor.scroll.offset, 240);
-        expect(
-          find.byType(Image),
-          preset == AppSubject.poem ? findsOneWidget : findsNothing,
-        );
+        expect(find.byType(Image), findsOneWidget);
         final before = taps;
         await tester.tap(find.byType(FloatingActionButton));
         expect(taps, before + 1);

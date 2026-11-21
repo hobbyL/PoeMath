@@ -14,13 +14,13 @@ class HomeSectionHeading extends StatelessWidget {
     return Text(
       title,
       style: theme.textTheme.titleMedium?.copyWith(
-        fontWeight: theme.appearance.pine ? FontWeight.w500 : FontWeight.bold,
+        fontWeight: theme.appearance.ink ? FontWeight.w500 : FontWeight.w600,
       ),
     );
   }
 }
 
-/// 目标、续练和今日清单共用分组；松墨的子项使用 AppTile.flat。
+/// 水墨主题使用整张纸面分组；童趣主题保留各自的卡片间距和轮廓。
 class HomeEntryGroup extends StatelessWidget {
   const HomeEntryGroup({
     super.key,
@@ -37,10 +37,10 @@ class HomeEntryGroup extends StatelessWidget {
     final theme = Theme.of(context);
     final grid = ResponsiveCardGrid(
       preferredTileWidth: preferredTileWidth,
-      divided: theme.appearance.pine,
+      divided: theme.appearance.ink,
       children: children,
     );
-    return theme.appearance.pine
+    return theme.appearance.ink
         ? ColoredCard(
             color: theme.colorScheme.primary,
             // 行内留白由 AppTile 统一提供，外层再加会让首尾条目显得更高。
