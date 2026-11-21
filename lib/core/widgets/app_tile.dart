@@ -161,6 +161,39 @@ class AppTile extends StatelessWidget {
   /// 海报式入口将图标置于文字上方，保留相同点击和尾部控件规则。
   final AppTileLayout layout;
 
+  AppTile copyWith({bool? flat}) => AppTile(
+    key: key,
+    icon: icon,
+    leading: leading,
+    leadingEdgeWidth: leadingEdgeWidth,
+    iconColor: iconColor,
+    backgroundColor: backgroundColor,
+    title: title,
+    titleMaxLines: titleMaxLines,
+    titleWrap: titleWrap,
+    titleSuffix: titleSuffix,
+    titleSuffixInline: titleSuffixInline,
+    subtitle: subtitle,
+    onTap: onTap,
+    allowTapWithTrailing: allowTapWithTrailing,
+    trailing: trailing,
+    trailingPrefix: trailingPrefix,
+    trailingText: trailingText,
+    trailingTextMaxLines: trailingTextMaxLines,
+    trailingAction: trailingAction,
+    trailingInTitle: trailingInTitle,
+    trailingIcon: trailingIcon,
+    onTrailingTap: onTrailingTap,
+    trailingTooltip: trailingTooltip,
+    subtitleMaxLines: subtitleMaxLines,
+    flat: flat ?? this.flat,
+    flatLeadingEdgeAligned: flatLeadingEdgeAligned,
+    flatTrailingEdgeAligned: flatTrailingEdgeAligned,
+    selected: selected,
+    crossAxisAlignment: crossAxisAlignment,
+    layout: layout,
+  );
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

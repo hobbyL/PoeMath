@@ -111,7 +111,7 @@ class SettingsPage extends ConsumerWidget {
             vertical: SpacingTokens.sm,
           ),
           // 首页按外观反馈、学习内容、智能语音、家长数据、应用提醒排列。
-          children: <Widget>[
+          children: _groupTileRows(<Widget>[
             // 一级入口统一跟随主题主色；具体设置项再使用各自的语义色。
             // ==================== hub：分组入口 ====================
             if (_section == _SettingsSection.hub) ...[
@@ -421,10 +421,39 @@ class SettingsPage extends ConsumerWidget {
               ),
               const SizedBox(height: SpacingTokens.md),
             ],
-          ],
+          ]),
         ),
       ),
     );
+  }
+
+  /// Collapse repeated settings rows into one themed paper surface while
+  /// retaining larger gaps as section separators.
+  List<Widget> _groupTileRows(List<Widget> children) {
+    final result = <Widget>[];
+    var pending = <AppTile>[];
+    void flush() {
+      if (pending.isEmpty) return;
+      result.add(AppTileGroup(children: List.unmodifiable(pending)));
+      pending = <AppTile>[];
+    }
+
+    for (final child in children) {
+      if (child is AppTile) {
+        pending.add(child);
+        continue;
+      }
+      if (child is SizedBox &&
+          child.height != null &&
+          child.height! <= SpacingTokens.sm &&
+          pending.isNotEmpty) {
+        continue;
+      }
+      flush();
+      result.add(child);
+    }
+    flush();
+    return result;
   }
 
   /// 执行一次设置写入，并在成功后刷新 provider 让开关文案同步。

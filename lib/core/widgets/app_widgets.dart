@@ -13,6 +13,7 @@ export 'package:poemath/core/widgets/animated_page_body.dart';
 export 'package:poemath/core/widgets/app_empty_state.dart';
 export 'package:poemath/core/widgets/app_scaffold.dart';
 export 'package:poemath/core/widgets/app_tile.dart';
+export 'package:poemath/core/widgets/app_tile_group.dart';
 export 'package:poemath/core/widgets/auto_fit_line.dart';
 export 'package:poemath/core/widgets/auto_fit_text.dart';
 export 'package:poemath/core/widgets/auto_fit_text_lines.dart';
