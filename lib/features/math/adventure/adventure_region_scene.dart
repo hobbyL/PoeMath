@@ -45,6 +45,11 @@ class AdventureRegionScene extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final night = theme.brightness == Brightness.dark;
+    final mapTint = switch (theme.appearance.visualStyle) {
+      AppVisualStyle.pine => null,
+      AppVisualStyle.ink || AppVisualStyle.space => scheme.primary,
+      AppVisualStyle.storybook => scheme.tertiary,
+    };
     return ColoredCard(
       color: theme.scaffoldBackgroundColor,
       backgroundOpacity: 1,
@@ -79,8 +84,14 @@ class AdventureRegionScene extends StatelessWidget {
                   repeat: ImageRepeat.repeatY,
                   alignment: Alignment.topCenter,
                   cacheWidth: 1024,
-                  color: night ? scheme.surface.withValues(alpha: .48) : null,
-                  colorBlendMode: BlendMode.srcATop,
+                  color: night
+                      ? scheme.surface.withValues(alpha: .48)
+                      : mapTint,
+                  colorBlendMode: night
+                      ? BlendMode.srcATop
+                      : mapTint == null
+                      ? null
+                      : BlendMode.color,
                 ),
               ),
             ),

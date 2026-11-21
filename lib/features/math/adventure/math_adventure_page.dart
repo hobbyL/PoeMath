@@ -58,41 +58,62 @@ class MathAdventureEntry extends ConsumerWidget {
           color: scheme.surface,
           backgroundOpacity: 1,
           padding: EdgeInsets.zero,
+          onTap: () => context.push(AppRoutes.mathAdventure),
           child: Stack(
             children: [
               Positioned.fill(
-                child: Image.asset(
-                  theme.appearance.pine
-                      ? theme.appearance.heroImage
-                      : MathAdventureRegion.forest.asset,
-                  alignment: theme.appearance.pine
-                      ? Alignment.bottomRight
-                      : Alignment.centerRight,
-                  fit: BoxFit.cover,
-                  color: theme.appearance.pine ? scheme.onSurface : null,
-                  opacity: theme.appearance.pine
-                      ? AlwaysStoppedAnimation(
-                          theme.brightness == Brightness.dark ? .3 : .6,
-                        )
-                      : null,
-                  cacheWidth: 1024,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: FractionallySizedBox(
+                    widthFactor: theme.appearance.playful ? .38 : 1,
+                    heightFactor: 1,
+                    child: Padding(
+                      padding: theme.appearance.playful
+                          ? const EdgeInsets.all(SpacingTokens.sm)
+                          : EdgeInsets.zero,
+                      child: Image.asset(
+                        theme.appearance.adventureImage,
+                        alignment: Alignment.centerRight,
+                        fit: theme.appearance.playful
+                            ? BoxFit.contain
+                            : BoxFit.cover,
+                        color: theme.appearance.pine ? scheme.onSurface : null,
+                        opacity: theme.appearance.pine
+                            ? AlwaysStoppedAnimation(
+                                theme.brightness == Brightness.dark ? .3 : .6,
+                              )
+                            : theme.appearance.ochre
+                            ? AlwaysStoppedAnimation(
+                                theme.brightness == Brightness.dark ? .4 : .8,
+                              )
+                            : null,
+                        cacheWidth: 1024,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              ColoredCard(
-                gradient: LinearGradient(
-                  colors: [
-                    scheme.surface,
-                    scheme.surface.withValues(alpha: .96),
-                    scheme.surface.withValues(alpha: .15),
-                  ],
-                  stops: const [0, .6, 1],
+              if (!theme.appearance.playful)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          scheme.surface,
+                          scheme.surface.withValues(alpha: .96),
+                          scheme.surface.withValues(alpha: .15),
+                        ],
+                        stops: const [0, .6, 1],
+                      ),
+                    ),
+                  ),
                 ),
-                onTap: () => context.push(AppRoutes.mathAdventure),
+              Padding(
                 padding: const EdgeInsets.all(SpacingTokens.lg),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: FractionallySizedBox(
-                    widthFactor: .7,
+                    widthFactor: theme.appearance.playful ? .62 : .7,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

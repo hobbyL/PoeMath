@@ -31,6 +31,17 @@ class PracticeEntryCard extends StatelessWidget {
         : theme.colorScheme.primary;
     final playful = theme.appearance.playful;
 
+    if (theme.appearance.ochre) {
+      return AppTile(
+        icon: icon,
+        iconColor: theme.colorScheme.primary,
+        title: title,
+        titleMaxLines: 1,
+        subtitle: description,
+        onTap: onTap,
+      );
+    }
+
     if (theme.appearance.space) {
       return AppTile(
         icon: icon,

@@ -17,7 +17,9 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/widgets/app_tile.dart';
 import 'package:poemath/core/widgets/stat_overview_card.dart';
+import 'package:poemath/core/widgets/theme_page_panel.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -294,19 +296,67 @@ void main() {
     for (final title in ['口算练习', '竖式计算', '应用题', '挑战模式']) {
       expect(find.text(title), findsOneWidget, reason: '缺少 $title 卡片');
     }
-    // 网格按行优先排布：宽度 800 时列数 = (800-32)/160 = 4，故四张同在一行。
-    // 断言 y 相同（同一行）且 x 递增（顺序正确）。
-    final xs = [
+    // 默认纸面使用两列目录行，按行优先排列。
+    final positions = [
       '口算练习',
       '竖式计算',
       '应用题',
       '挑战模式',
     ].map((t) => tester.getTopLeft(find.text(t))).toList();
-    expect(xs.map((o) => o.dy).toSet().length, 1, reason: '四张卡片应在同一行');
-    expect(
-      xs.map((o) => o.dx).toList(),
-      orderedEquals(List.of(xs.map((o) => o.dx))..sort()),
-    );
+    expect(positions.take(2).map((o) => o.dy).toSet(), hasLength(1));
+    expect(positions.skip(2).map((o) => o.dy).toSet(), hasLength(1));
+    expect(positions.first.dy, lessThan(positions.last.dy));
+    expect(positions[0].dx, lessThan(positions[1].dx));
+    expect(positions[2].dx, positions[0].dx);
+    expect(positions[3].dx, positions[1].dx);
+  });
+
+  testWidgets('四套主题的数学入口保留各自列数与页面材质', (tester) async {
+    final cases = [
+      (subject: AppSubject.poem, rows: 1),
+      (subject: AppSubject.math, rows: 2),
+      (subject: AppSubject.candy, rows: 2),
+      (subject: AppSubject.space, rows: 2),
+    ];
+    for (final testCase in cases) {
+      final container = ProviderContainer();
+      await _pumpTab(
+        tester,
+        container: container,
+        size: const Size(914, 1200),
+        theme: AppTheme.resolve(
+          subject: testCase.subject,
+          brightness: Brightness.light,
+        ),
+      );
+      final positions = [
+        '口算练习',
+        '竖式计算',
+        '应用题',
+        '挑战模式',
+      ].map((title) => tester.getTopLeft(find.text(title)).dy).toSet();
+      expect(
+        positions,
+        hasLength(testCase.rows),
+        reason: '${testCase.subject} 的入口列数',
+      );
+      expect(
+        find.byType(AppTile),
+        (testCase.subject == AppSubject.space ||
+                testCase.subject == AppSubject.math)
+            ? findsNWidgets(4)
+            : findsNothing,
+      );
+      expect(
+        find.byType(ThemePagePanel),
+        testCase.subject == AppSubject.candy ? findsOneWidget : findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 1));
+      await drainHiveWritesForTesting(tester);
+      container.dispose();
+    }
   });
 
   testWidgets('按学习背景开关隐藏卡片', (tester) async {

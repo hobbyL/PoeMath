@@ -130,7 +130,8 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   Widget build(BuildContext context) {
     final poems = ref.watch(filteredPoemsProvider);
 
-    return Scaffold(
+    return AppScaffold(
+      backgroundScene: PineInkScene.branch,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final columns = ResponsiveLayout.columns(constraints.maxWidth);

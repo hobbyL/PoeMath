@@ -272,12 +272,22 @@ class MathTabPage extends ConsumerWidget {
             final gridWidth = constraints.maxWidth - SpacingTokens.md * 2;
             final entryFontSize = theme.textTheme.titleSmall!.fontSize!;
             final entryScale = textScaler.scale(entryFontSize) / entryFontSize;
-            final columns = theme.appearance.space
-                ? (gridWidth / (360 * entryScale)).floor().clamp(1, 2)
-                : (gridWidth / (160 * entryScale)).floor().clamp(
-                    entryScale > 1.3 ? 1 : 2,
-                    4,
-                  );
+            final columns = switch (theme.appearance.visualStyle) {
+              AppVisualStyle.space =>
+                (gridWidth / (360 * entryScale)).floor().clamp(1, 2),
+              AppVisualStyle.ink =>
+                (gridWidth / (320 * entryScale)).floor().clamp(1, 2),
+              AppVisualStyle.storybook =>
+                (gridWidth / (220 * entryScale)).floor().clamp(
+                  entryScale > 1.3 ? 1 : 2,
+                  3,
+                ),
+              AppVisualStyle.pine =>
+                (gridWidth / (160 * entryScale)).floor().clamp(
+                  entryScale > 1.3 ? 1 : 2,
+                  4,
+                ),
+            };
 
             final list = ListView(
               // 为首张卡片的外侧描边留出空间，避免被滚动视口裁掉顶边。

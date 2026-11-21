@@ -56,7 +56,7 @@ class PoemCard extends StatelessWidget {
       color: theme.colorScheme.primary,
       onTap: onTap,
       padding: EdgeInsets.zero,
-      clipBehavior: theme.appearance.pine ? Clip.antiAlias : Clip.none,
+      clipBehavior: Clip.antiAlias,
       child: PineInkSurface(
         scene: PineInkScene.branch,
         child: Padding(
@@ -100,7 +100,7 @@ class PoemCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: SpacingTokens.sm),
-              if (theme.appearance.pine)
+              if (theme.appearance.ink || theme.appearance.storybook)
                 Center(
                   child: SizedBox(
                     width: SpacingTokens.xl,
@@ -122,7 +122,7 @@ class PoemCard extends StatelessWidget {
                             ))
                         .copyWith(
                           fontSize: TypographyTokens.fsTitle,
-                          letterSpacing: theme.appearance.pine ? .5 : 0,
+                          letterSpacing: theme.appearance.ink ? .5 : 0,
                         ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -178,12 +178,12 @@ class PoemCard extends StatelessWidget {
       padding: EdgeInsets.zero,
       labelPadding: const EdgeInsets.symmetric(horizontal: SpacingTokens.xs),
       visualDensity: VisualDensity.compact,
-      side: filled || theme.appearance.pine
+      side: filled || theme.appearance.ink || theme.appearance.storybook
           ? BorderSide.none
           : BorderSide(color: color.withValues(alpha: .3)),
       backgroundColor: filled
           ? color
-          : theme.appearance.pine
+          : theme.appearance.ink || theme.appearance.storybook
           ? Color.alphaBlend(
               color.withValues(alpha: .05),
               theme.colorScheme.surface,

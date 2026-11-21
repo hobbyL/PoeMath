@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/theme/app_appearance.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/math_adventure_progress.dart';
@@ -16,6 +17,12 @@ import 'package:poemath/features/math/adventure/math_adventure_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 import '../../helpers/hive_test_helper.dart';
+
+String _imageAssetName(Image image) {
+  final provider = image.image;
+  final asset = provider is ResizeImage ? provider.imageProvider : provider;
+  return (asset as AssetImage).assetName;
+}
 
 class _ReadFailure extends MathAdventureRepository {
   bool fail = true;
@@ -83,6 +90,21 @@ void main() {
           subject: subject,
           brightness: brightness,
         );
+        final forestMap = tester
+            .widgetList<Image>(find.byType(Image))
+            .firstWhere(
+              (image) =>
+                  _imageAssetName(image) ==
+                  'assets/images/adventure_map_forest.jpg',
+            );
+        expect(
+          forestMap.colorBlendMode,
+          brightness == Brightness.dark
+              ? BlendMode.srcATop
+              : subject == AppSubject.poem
+              ? null
+              : BlendMode.color,
+        );
         expect(find.text('当前关卡 · 开始探索'), findsOneWidget);
         expect(find.text('未解锁 · 先走完前一站'), findsWidgets);
         expect(find.textContaining('走过'), findsNothing);
@@ -120,6 +142,20 @@ void main() {
           brightness: brightness,
         );
         expect(find.text('数学探险'), findsOneWidget);
+        final theme = AppTheme.resolve(
+          subject: subject,
+          brightness: brightness,
+        );
+        final entryImage = tester.widget<Image>(
+          find.descendant(
+            of: find.byType(MathAdventureEntry),
+            matching: find.byType(Image),
+          ),
+        );
+        expect(
+          _imageAssetName(entryImage),
+          theme.extension<AppAppearance>()!.adventureImage,
+        );
         expect(tester.takeException(), isNull);
       });
     }
