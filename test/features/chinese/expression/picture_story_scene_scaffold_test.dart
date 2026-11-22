@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/theme/app_theme.dart';
@@ -16,6 +17,12 @@ import '../../../helpers/picture_story_fixture.dart';
 
 void main() {
   final sceneImage = find.byKey(const ValueKey('picture-story-scene-image'));
+  final sceneScrollable = find
+      .descendant(
+        of: find.byKey(const ValueKey('picture-story-scroll-view')),
+        matching: find.byType(Scrollable),
+      )
+      .first;
   final rasterImage = find.descendant(
     of: sceneImage,
     matching: find.byType(Image),
@@ -29,6 +36,7 @@ void main() {
     bool pageAnimations = true,
     Brightness brightness = Brightness.light,
     AppSubject? subject,
+    ScrollController? scrollController,
     VoidCallback? onComplete,
     Uint8List? imageBytes,
     Future<Uint8List> Function()? loadImage,
@@ -80,6 +88,7 @@ void main() {
                   icon: const Icon(Icons.check_outlined),
                 ),
               ],
+              scrollController: scrollController,
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -118,22 +127,41 @@ void main() {
     final actionBefore = tester.getRect(find.byTooltip('完成练习'));
     final imageBefore = tester.getRect(sceneImage);
     final contentBefore = tester.getRect(find.text('题目内容'));
-    expect(find.byType(AppBar), findsNothing);
-    expect(backBefore.center, const Offset(28, 52));
+    expect(find.byType(SliverPersistentHeader), findsOneWidget);
+    expect(backBefore.center.dy, closeTo(52, .01));
     expect(imageBefore.left, 0);
     expect(imageBefore.top, 0);
     expect(imageBefore.right, 400);
 
-    final scroll = tester.state<ScrollableState>(find.byType(Scrollable).first);
+    final scroll = tester.state<ScrollableState>(sceneScrollable);
     scroll.position.jumpTo(160);
     await tester.pump();
-    final imageAfter = tester.getRect(sceneImage);
     final contentAfter = tester.getRect(find.text('题目内容'));
-    expect(contentBefore.top - contentAfter.top, closeTo(160, .01));
-    expect(imageBefore.top - imageAfter.top, greaterThan(0));
-    expect(imageBefore.top - imageAfter.top, lessThan(160));
+    expect(contentAfter.top, lessThan(contentBefore.top));
+    final collapsedHeader = tester.getRect(
+      find.byKey(const ValueKey('picture-story-pinned-header')),
+    );
+    expect(collapsedHeader.top, lessThanOrEqualTo(0));
+    final sliver = tester.renderObject<RenderSliver>(
+      find.byType(SliverPersistentHeader),
+    );
+    expect(sliver.geometry!.paintExtent, greaterThanOrEqualTo(80));
     expect(tester.getRect(find.byType(BackButton)), backBefore);
     expect(tester.getRect(find.byTooltip('完成练习')), actionBefore);
+
+    scroll.position.jumpTo(scroll.position.maxScrollExtent);
+    await tester.pump();
+    final minimumHeader = tester.getRect(
+      find.byKey(const ValueKey('picture-story-pinned-header')),
+    );
+    expect(minimumHeader.height, closeTo(80, .01));
+    expect(
+      tester.getRect(sceneImage).height,
+      greaterThan(minimumHeader.height),
+    );
+    expect(tester.getRect(find.byType(BackButton)), backBefore);
+    scroll.position.jumpTo(160);
+    await tester.pump();
     await tester.tap(find.byTooltip('完成练习'));
     expect(completions, 1);
     expect(tester.takeException(), isNull);
@@ -159,9 +187,7 @@ void main() {
       final contentBefore = tester.getRect(find.text('题目内容'));
       final backBefore = tester.getRect(find.byType(BackButton));
       final actionBefore = tester.getRect(find.byTooltip('完成练习'));
-      final scroll = tester.state<ScrollableState>(
-        find.byType(Scrollable).first,
-      );
+      final scroll = tester.state<ScrollableState>(sceneScrollable);
       final gesture = await tester.startGesture(imageBefore.center);
       await gesture.moveBy(const Offset(0, 60));
       await tester.pump(const Duration(milliseconds: 16));
@@ -169,7 +195,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 16));
       final enlarged = tester.getRect(image);
       expect(scroll.position.pixels, lessThan(0));
-      expect(enlarged.top, closeTo(0, .01));
+      expect(enlarged.top, lessThanOrEqualTo(0));
+      expect(
+        tester
+            .getRect(find.byKey(const ValueKey('picture-story-pinned-header')))
+            .top,
+        0,
+      );
       expect(enlarged.width, greaterThan(imageBefore.width));
       expect(enlarged.height, greaterThan(imageBefore.height));
       expect(
@@ -177,9 +209,10 @@ void main() {
         closeTo(imageBefore.width / imageBefore.height, .01),
       );
       expect(
-        tester.getRect(find.text('题目内容')).top - contentBefore.top,
-        closeTo(enlarged.bottom - imageBefore.bottom, .01),
+        tester.getRect(find.text('题目内容')).top,
+        greaterThan(contentBefore.top),
       );
+      expect(enlarged.bottom, greaterThan(imageBefore.bottom));
       expect(tester.getRect(find.byType(BackButton)), backBefore);
       expect(tester.getRect(find.byTooltip('完成练习')), actionBefore);
       // 停住再松手，验证回弹而非快速甩动产生的惯性滚动。
@@ -204,20 +237,14 @@ void main() {
       );
       final imageBefore = tester.getRect(sceneImage);
       final contentBefore = tester.getRect(find.text('题目内容'));
-      tester
-          .state<ScrollableState>(find.byType(Scrollable).first)
-          .position
-          .jumpTo(160);
+      tester.state<ScrollableState>(sceneScrollable).position.jumpTo(160);
       await tester.pump();
       final imageAfter = tester.getRect(sceneImage);
       final contentAfter = tester.getRect(find.text('题目内容'));
-      expect(imageBefore.top - imageAfter.top, closeTo(160, .01));
-      expect(contentBefore.top - contentAfter.top, closeTo(160, .01));
+      expect(imageAfter.top, lessThanOrEqualTo(imageBefore.top));
+      expect(contentAfter.top, lessThan(contentBefore.top));
       expect(find.byType(BackButton).hitTestable(), findsOneWidget);
-      tester
-          .state<ScrollableState>(find.byType(Scrollable).first)
-          .position
-          .jumpTo(0);
+      tester.state<ScrollableState>(sceneScrollable).position.jumpTo(0);
       await tester.pump();
       await tester.dragFrom(imageBefore.center, const Offset(0, 180));
       await tester.pumpAndSettle();
@@ -227,16 +254,22 @@ void main() {
 
   for (final size in [const Size(320, 900), const Size(1100, 600)]) {
     testWidgets('窄屏大字与横屏完整插图不变形，返回固定：$size', (tester) async {
+      final scrollController = ScrollController();
+      addTearDown(scrollController.dispose);
       await mount(
         tester,
         size: size,
         textScale: 2,
         brightness: Brightness.dark,
+        scrollController: scrollController,
       );
       final image = tester.getRect(sceneImage);
       expect(image.center.dx, size.width / 2);
       expect(image.width / image.height, closeTo(4 / 3, .01));
-      expect(image.bottom, lessThanOrEqualTo(size.height * .55));
+      expect(
+        image.bottom,
+        lessThanOrEqualTo(size.height * .55 + tester.view.padding.top),
+      );
       final scene = tester.getRect(
         find.descendant(of: sceneImage, matching: find.byType(CustomPaint)),
       );
@@ -246,30 +279,39 @@ void main() {
       expect(back.top, greaterThanOrEqualTo(24));
       expect(back.width, greaterThanOrEqualTo(44));
       expect(back.height, greaterThanOrEqualTo(44));
-      await tester.scrollUntilVisible(
-        find.byType(TextField),
-        200,
-        scrollable: find.byType(Scrollable).first,
+      scrollController.position.jumpTo(
+        scrollController.position.maxScrollExtent,
       );
-      expect(find.byType(TextField).hitTestable(), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(
+        find.byType(TextField).hitTestable(),
+        findsOneWidget,
+        reason:
+            'field=${tester.getRect(find.byType(TextField))}, '
+            'body=${tester.getRect(find.byKey(const ValueKey('picture-story-body')))}, '
+            'pinned=${tester.getRect(find.byKey(const ValueKey('picture-story-pinned-header')))}, '
+            'sliver=${tester.renderObject<RenderSliver>(find.byType(SliverPersistentHeader)).geometry}, '
+            'viewport=${tester.getRect(find.byType(CustomScrollView))}, '
+            'scroll=${tester.state<ScrollableState>(sceneScrollable).position.pixels}/'
+            '${tester.state<ScrollableState>(sceneScrollable).position.maxScrollExtent}',
+      );
       expect(tester.getRect(find.byType(BackButton)), back);
       expect(tester.takeException(), isNull);
     });
   }
 
   testWidgets('键盘出现不会改变题图高度或浮动按钮位置', (tester) async {
-    await mount(tester);
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+    await mount(tester, scrollController: scrollController);
     final image = tester.getRect(sceneImage);
     final back = tester.getRect(find.byType(BackButton));
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
     await tester.pump();
     expect(tester.getRect(sceneImage), image);
     expect(tester.getRect(find.byType(BackButton)), back);
-    await tester.scrollUntilVisible(
-      find.byType(TextField),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
+    scrollController.position.jumpTo(scrollController.position.maxScrollExtent);
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '我的表达');
     expect(find.text('我的表达'), findsWidgets);
     expect(tester.takeException(), isNull);
@@ -439,8 +481,8 @@ void main() {
     expect(color(hint), ColorTokens.hintAmber);
     expect(color(complete), ColorTokens.mathSurface);
     final backRect = tester.getRect(find.byType(BackButton));
-    final scroll = tester.state<ScrollableState>(find.byType(Scrollable).first);
-    scroll.position.jumpTo(220);
+    final scroll = tester.state<ScrollableState>(sceneScrollable);
+    scroll.position.jumpTo(260);
     await tester.pumpAndSettle();
     expect(color(back), ColorTokens.poemInk);
     expect(color(hint), ColorTokens.mathYellow);

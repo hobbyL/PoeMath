@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart'
+    show OverScrollHeaderStretchConfiguration;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -99,164 +101,101 @@ class _PictureStorySceneScaffoldState
           body: LayoutBuilder(
             builder: (context, constraints) {
               // 竖屏铺满宽度；横屏在高度上限内完整居中，键盘不改变题图尺寸。
-              final imageHeight = math.min(
+              final contentImageHeight = math.min(
                 media.size.height * .55,
                 constraints.maxWidth / aspectRatio,
               );
+              final collapsedHeight = kToolbarHeight + media.padding.top;
+              final expandedHeight = math.max(
+                contentImageHeight,
+                collapsedHeight,
+              );
               final imageWidth = media.orientation == Orientation.landscape
-                  ? math.min(constraints.maxWidth, imageHeight * aspectRatio)
+                  ? math.min(
+                      constraints.maxWidth,
+                      contentImageHeight * aspectRatio,
+                    )
                   : constraints.maxWidth;
-              final imageSize = Size(imageWidth, imageHeight);
-              final parallaxFactor = reduceMotion ? 0.0 : .7;
+              final imageSize = Size(imageWidth, contentImageHeight);
               Widget adaptiveAction(Widget child) => PictureStoryImageAction(
                 surfaceKey: _sceneKey,
                 scroll: _scroll,
                 pixels: pixels,
                 viewport: constraints.biggest,
                 imageSize: imageSize,
-                parallaxFactor: parallaxFactor,
+                parallaxFactor: 0,
                 child: child,
               );
-              final sceneImage = SizedBox(
-                height: imageHeight,
-                width: double.infinity,
-                child: AnimatedBuilder(
-                  animation: _scroll,
-                  child: RepaintBoundary(
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        if (imageWidth < constraints.maxWidth)
-                          ExcludeSemantics(
-                            child: IgnorePointer(
-                              child: ClipRect(
-                                child: ImageFiltered(
-                                  imageFilter: ui.ImageFilter.blur(
-                                    sigmaX: SpacingTokens.imageBackdropBlur,
-                                    sigmaY: SpacingTokens.imageBackdropBlur,
-                                    tileMode: TileMode.clamp,
-                                  ),
-                                  child: PictureStoryImageView(
-                                    image: widget.image,
-                                    preview: true,
-                                    fit: BoxFit.cover,
-                                    borderRadius: BorderRadius.zero,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        Center(
-                          child: SizedBox.fromSize(
-                            size: imageSize,
-                            child: PictureStoryImageView(
-                              key: const ValueKey('picture-story-scene-image'),
-                              image: widget.image,
-                              fit: BoxFit.cover,
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  builder: (context, child) {
-                    final offset = _scroll.hasClients ? _scroll.offset : 0.0;
-                    final stretch = math.max(0.0, -offset);
-                    return ClipRect(
-                      clipper: _SceneImageClipper(stretch),
-                      child: Transform.translate(
-                        offset: Offset(
-                          0,
-                          offset.clamp(0.0, imageHeight) * parallaxFactor,
-                        ),
-                        child: Transform.scale(
-                          scale: 1 + stretch / imageHeight,
-                          alignment: Alignment.bottomCenter,
-                          child: child,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              );
-              return Stack(
-                key: _sceneKey,
-                children: [
-                  ScrollConfiguration(
-                    behavior: ScrollConfiguration.of(context)
-                        .copyWith(overscroll: false),
-                    child: widget.slivers != null
-                        ? CustomScrollView(
-                            key: widget.scrollStorageKey,
-                            controller: _scroll,
-                            physics: reduceMotion
-                                ? const ClampingScrollPhysics()
-                                : const BouncingScrollPhysics(
-                                    parent: AlwaysScrollableScrollPhysics(),
-                                  ),
-                            slivers: [
-                              SliverToBoxAdapter(child: sceneImage),
-                              SliverSafeArea(
-                                top: false,
-                                sliver: SliverPadding(
-                                  padding: const EdgeInsets.all(
-                                    SpacingTokens.md,
-                                  ),
-                                  sliver: SliverMainAxisGroup(
-                                    slivers: widget.slivers!,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          )
-                        : SingleChildScrollView(
-                            controller: _scroll,
-                            physics: reduceMotion
-                                ? const ClampingScrollPhysics()
-                                : const BouncingScrollPhysics(
-                                    parent: AlwaysScrollableScrollPhysics(),
-                                  ),
-                            child: Stack(
-                              children: [
-                                sceneImage,
-                                Padding(
-                                  padding: EdgeInsets.only(top: imageHeight),
-                                  child: ColoredCard(
-                                    color: theme.scaffoldBackgroundColor,
-                                    // 页面底图延续到题图下方，内容卡片仍保留
-                                    // 各自的不透明阅读面。
-                                    backgroundOpacity: 0,
-                                    borderRadius: BorderRadius.zero,
-                                    constraints: BoxConstraints(
-                                      minHeight: constraints.maxHeight,
-                                    ),
-                                    padding: const EdgeInsets.all(
-                                      SpacingTokens.md,
-                                    ),
-                                    child: SafeArea(
-                                      top: false,
-                                      child: widget.child!,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                  ),
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: SafeArea(
-                      bottom: false,
-                      child: SizedBox(
-                        height: kToolbarHeight,
-                        child: Row(
+              final header = SliverPersistentHeader(
+                pinned: true,
+                delegate: _PictureStoryHeaderDelegate(
+                  minExtent: collapsedHeight,
+                  maxExtent: expandedHeight,
+                  stretch: !reduceMotion,
+                  builder: (context) => LayoutBuilder(
+                    key: const ValueKey('picture-story-pinned-header'),
+                    builder: (context, _) {
+                      final stretch = _scroll.hasClients
+                          ? math.max(0.0, -_scroll.offset)
+                          : 0.0;
+                      final imageScale = 1 + stretch / contentImageHeight;
+                      return ClipRect(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          clipBehavior: Clip.hardEdge,
                           children: [
-                            SizedBox(
-                              width: kToolbarHeight,
-                              child: Center(
+                            ColoredBox(color: theme.scaffoldBackgroundColor),
+                            if (imageWidth < constraints.maxWidth)
+                              Positioned.fill(
+                                child: ExcludeSemantics(
+                                  child: IgnorePointer(
+                                    child: ImageFiltered(
+                                      imageFilter: ui.ImageFilter.blur(
+                                        sigmaX: SpacingTokens.imageBackdropBlur,
+                                        sigmaY: SpacingTokens.imageBackdropBlur,
+                                        tileMode: TileMode.clamp,
+                                      ),
+                                      child: PictureStoryImageView(
+                                        image: widget.image,
+                                        preview: true,
+                                        fit: BoxFit.cover,
+                                        borderRadius: BorderRadius.zero,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            Align(
+                              alignment: Alignment.topCenter,
+                              child: OverflowBox(
+                                alignment: Alignment.topCenter,
+                                minWidth: imageSize.width,
+                                maxWidth: imageSize.width,
+                                minHeight: imageSize.height,
+                                maxHeight: imageSize.height,
+                                child: Transform.scale(
+                                  scale: imageScale,
+                                  alignment: Alignment.topCenter,
+                                  child: SizedBox.fromSize(
+                                    key: const ValueKey(
+                                      'picture-story-scene-image',
+                                    ),
+                                    size: imageSize,
+                                    child: PictureStoryImageView(
+                                      image: widget.image,
+                                      fit: BoxFit.cover,
+                                      borderRadius: BorderRadius.zero,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: media.padding.top,
+                              left: 0,
+                              child: SizedBox(
+                                width: kToolbarHeight,
+                                height: kToolbarHeight,
                                 child: adaptiveAction(
                                   BackButton(
                                     onPressed:
@@ -279,17 +218,72 @@ class _PictureStorySceneScaffoldState
                                 ),
                               ),
                             ),
-                            const Spacer(),
-                            for (final action in widget.actions)
-                              Padding(
-                                padding: const EdgeInsetsDirectional.only(
-                                  end: SpacingTokens.xs,
+                            if (widget.actions.isNotEmpty)
+                              Positioned(
+                                top: media.padding.top,
+                                right: 0,
+                                height: kToolbarHeight,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    for (final action in widget.actions)
+                                      adaptiveAction(action),
+                                  ],
                                 ),
-                                child: adaptiveAction(action),
                               ),
                           ],
                         ),
+                      );
+                    },
+                  ),
+                ),
+              );
+              final content = widget.slivers != null
+                  ? <Widget>[
+                      SliverSafeArea(
+                        top: false,
+                        sliver: SliverPadding(
+                          padding: const EdgeInsets.all(SpacingTokens.md),
+                          sliver: SliverMainAxisGroup(slivers: widget.slivers!),
+                        ),
                       ),
+                    ]
+                  : <Widget>[
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: collapsedHeight),
+                          child: ColoredCard(
+                            key: const ValueKey('picture-story-body'),
+                            color: theme.scaffoldBackgroundColor,
+                            backgroundOpacity: 0,
+                            borderRadius: BorderRadius.zero,
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight,
+                            ),
+                            padding: const EdgeInsets.all(SpacingTokens.md),
+                            child: SafeArea(top: false, child: widget.child!),
+                          ),
+                        ),
+                      ),
+                    ];
+              return Stack(
+                key: _sceneKey,
+                fit: StackFit.expand,
+                children: [
+                  ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context)
+                        .copyWith(overscroll: false),
+                    child: CustomScrollView(
+                      key:
+                          widget.scrollStorageKey ??
+                          const ValueKey('picture-story-scroll-view'),
+                      controller: _scroll,
+                      physics: reduceMotion
+                          ? const ClampingScrollPhysics()
+                          : const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
+                      slivers: [header, ...content],
                     ),
                   ),
                 ],
@@ -302,17 +296,38 @@ class _PictureStorySceneScaffoldState
   }
 }
 
-/// 下拉时允许图片向上放大到视口顶边，横向仍裁切在屏幕宽度内。
-class _SceneImageClipper extends CustomClipper<Rect> {
-  const _SceneImageClipper(this.stretch);
-
-  final double stretch;
-
-  @override
-  Rect getClip(Size size) =>
-      Rect.fromLTWH(0, -stretch, size.width, size.height + stretch);
+class _PictureStoryHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _PictureStoryHeaderDelegate({
+    required this.minExtent,
+    required this.maxExtent,
+    required this.stretch,
+    required this.builder,
+  });
 
   @override
-  bool shouldReclip(_SceneImageClipper oldClipper) =>
-      oldClipper.stretch != stretch;
+  final double minExtent;
+
+  @override
+  final double maxExtent;
+
+  final bool stretch;
+  final WidgetBuilder builder;
+
+  @override
+  OverScrollHeaderStretchConfiguration? get stretchConfiguration =>
+      stretch ? OverScrollHeaderStretchConfiguration() : null;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) => builder(context);
+
+  @override
+  bool shouldRebuild(covariant _PictureStoryHeaderDelegate oldDelegate) =>
+      minExtent != oldDelegate.minExtent ||
+      maxExtent != oldDelegate.maxExtent ||
+      stretch != oldDelegate.stretch ||
+      builder != oldDelegate.builder;
 }
