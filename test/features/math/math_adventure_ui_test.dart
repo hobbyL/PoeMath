@@ -95,25 +95,29 @@ void main() {
             .firstWhere(
               (image) =>
                   _imageAssetName(image) ==
-                  'assets/images/adventure_map_forest.jpg',
+                  'assets/images/adventure_${subject == AppSubject.math
+                      ? 'ink'
+                      : subject == AppSubject.candy
+                      ? 'storybook'
+                      : subject == AppSubject.space
+                      ? 'space'
+                      : 'pine'}_forest.webp',
             );
+        expect(forestMap.fit, BoxFit.cover);
+        expect(forestMap.repeat, ImageRepeat.noRepeat);
         expect(
           forestMap.colorBlendMode,
-          brightness == Brightness.dark
-              ? BlendMode.srcATop
-              : subject == AppSubject.poem
-              ? null
-              : BlendMode.color,
+          brightness == Brightness.dark ? BlendMode.srcATop : null,
         );
-        expect(find.text('当前关卡 · 开始探索'), findsOneWidget);
-        expect(find.text('未解锁 · 先走完前一站'), findsWidgets);
+        expect(find.text('当前关卡 · 整组全对过关'), findsOneWidget);
+        expect(find.text('未解锁 · 前一站全对后开启'), findsWidgets);
         expect(find.textContaining('走过'), findsNothing);
         expect(find.textContaining('每组'), findsNothing);
         expect(find.textContaining('片风景'), findsNothing);
         await tester.tap(find.byTooltip('找到当前关卡'));
         await tester.pump();
-        expect(find.text('当前关卡 · 开始探索').hitTestable(), findsOneWidget);
-        final node = tester.getSemantics(find.text('当前关卡 · 开始探索'));
+        expect(find.text('当前关卡 · 整组全对过关').hitTestable(), findsOneWidget);
+        final node = tester.getSemantics(find.text('当前关卡 · 整组全对过关'));
         expect(node.label, contains('当前关卡'));
         expect(tester.takeException(), isNull);
         await mount(
@@ -198,7 +202,7 @@ void main() {
       tester.getTopLeft(find.text(route.last.label)).dy,
       greaterThan(navigationBottom),
     );
-    final current = tester.getSemantics(find.text('当前关卡 · 开始探索'));
+    final current = tester.getSemantics(find.text('当前关卡 · 整组全对过关'));
     expect(current.label, contains(route.last.label));
     expect(current.rect.height, greaterThanOrEqualTo(44));
     expect(current.rect.width, greaterThanOrEqualTo(44));

@@ -69,14 +69,24 @@ class MathAdventureRepository {
   Future<MathAdventureCompletion> complete({
     required MathAdventureNode node,
     required DifficultyLevel difficulty,
+    required int totalProblems,
+    required int correctCount,
     required void Function() ensureCurrent,
-  }) => _update(
-    node.grade,
-    node.semester,
-    difficulty,
-    completedSkill: node.skillId,
-    ensureCurrent: ensureCurrent,
-  );
+  }) async {
+    node.validate();
+    if (totalProblems < 1 ||
+        totalProblems > 100 ||
+        correctCount != totalProblems) {
+      throw StateError('整组题目全部答对，才能解锁下一站');
+    }
+    return _update(
+      node.grade,
+      node.semester,
+      difficulty,
+      completedSkill: node.skillId,
+      ensureCurrent: ensureCurrent,
+    );
+  }
 
   Future<MathAdventureCompletion> reconcile(
     int grade,

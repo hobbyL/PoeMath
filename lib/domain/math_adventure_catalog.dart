@@ -77,6 +77,9 @@ class MathAdventureNode {
   static const draftKind = 'mathAdventure';
   String get scope => jsonEncode([grade, semester, skillId]);
   MathSkill get skill => MathSkill.fromId(skillId)!;
+  MathAdventureRegion get region => MathAdventureRegion.values.firstWhere(
+    (region) => region.skills.contains(skill),
+  );
   String get volumeLabel => '$grade 年级$semester册';
   void validate() {
     if (grade < 1 ||

@@ -104,6 +104,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   StreamSubscription<String>? _profileSubscription;
   bool _adventureClaimed = false;
   String? _adventureFeedback;
+  Set<MathAdventureRegion> _adventureSouvenirs = const {};
   bool _leavingAdventure = false;
   bool _exitApproved = false;
   String get _draftKind =>
@@ -920,24 +921,38 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         );
       }
       if (widget.adventureNode case final node?) {
-        final completion = await _adventure!.complete(
-          node: node,
-          difficulty: _request!.difficulty,
-          ensureCurrent: _assertAdventure,
-        );
-        final next = MathAdventureCatalog.current(
-          MathAdventureCatalog.route(
-            grade: node.grade,
-            semester: node.semester,
+        // 用完整的逐题记录判定；续练或结算重试也不能只凭计数解锁。
+        final passed = _problemRecords.every((record) => record.isCorrect);
+        _adventureSouvenirs = const {};
+        if (passed) {
+          final completion = await _adventure!.complete(
+            node: node,
             difficulty: _request!.difficulty,
-          ),
-          completion.progress.completedSkillIds,
-        );
-        _adventureFeedback = completion.newRegions.isNotEmpty
-            ? '收集到${completion.newRegions.map((id) => MathAdventureRegion.fromId(id)!.souvenir).join('、')}！'
-            : next == null
-            ? '本册小路已走完，新的发现都在纪念册里。'
-            : '${node.skill.label}已完成，下一站：${next.label}';
+            totalProblems: _request!.count,
+            correctCount: _problemRecords.where((r) => r.isCorrect).length,
+            ensureCurrent: _assertAdventure,
+          );
+          _adventureSouvenirs = completion.newRegions
+              .map((id) => MathAdventureRegion.fromId(id)!)
+              .toSet();
+          final next = MathAdventureCatalog.current(
+            MathAdventureCatalog.route(
+              grade: node.grade,
+              semester: node.semester,
+              difficulty: _request!.difficulty,
+            ),
+            completion.progress.completedSkillIds,
+          );
+          _adventureFeedback = completion.newRegions.isNotEmpty
+              ? '收集到${_adventureSouvenirs.map((r) => r.souvenir).join('、')}！'
+              : next == null
+              ? '本册小路已走完，新的发现都在纪念册里。'
+              : '${node.skill.label}已通过，下一站：${next.label}';
+        } else {
+          _adventureFeedback =
+              '本组有 ${_problemRecords.where((r) => !r.isCorrect).length} 道错题。'
+              '先看看错题，再挑战一次；整组全对才能解锁下一站。';
+        }
       }
       _assertAdventure();
       _draftDisabled = true;
@@ -1012,6 +1027,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         starsEarned: stars,
         reviewLabel: '看本轮错题（${problems.length - correctCount}）',
         adventureFeedback: _adventureFeedback,
+        adventureNode: widget.adventureNode,
+        adventureSouvenirs: _adventureSouvenirs,
       ),
     );
 
@@ -1059,6 +1076,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         return;
       }
       _adventureFeedback = null;
+      _adventureSouvenirs = const {};
     }
     _answerController.clear();
     _problemRecords.clear();
@@ -1158,6 +1176,24 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (widget.adventureNode case final node?)
+                SafeArea(
+                  top: false,
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.md,
+                      vertical: SpacingTokens.xs,
+                    ),
+                    child: Text(
+                      '${node.region.title} · ${node.skill.label}\n整组全对，解锁下一站',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
               // 进度属于整轮练习，横跨题目和答题操作区。
               SafeArea(
                 top: false,

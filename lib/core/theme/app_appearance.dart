@@ -37,6 +37,16 @@ class AppAppearance extends ThemeExtension<AppAppearance> {
   bool get storybook => visualStyle == AppVisualStyle.storybook;
   bool get space => visualStyle == AppVisualStyle.space;
 
+  /// 地图按主题与区域选取独立画作，不用给同一张地形染色模拟主题。
+  String adventureTerrain(String region) =>
+      'assets/images/adventure_${visualStyle.name}_$region.webp';
+
+  String? get adventureGuide => switch (visualStyle) {
+    AppVisualStyle.pine || AppVisualStyle.ink => null,
+    AppVisualStyle.storybook => 'assets/images/candy_companion.webp',
+    AppVisualStyle.space => 'assets/images/space_companion.webp',
+  };
+
   @override
   AppAppearance copyWith({
     String? heroImage,

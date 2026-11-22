@@ -5,6 +5,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/domain/math_adventure_catalog.dart';
+import 'package:poemath/features/math/adventure/adventure_artwork.dart';
 
 class SessionResultDialog extends StatelessWidget {
   const SessionResultDialog({
@@ -15,6 +17,8 @@ class SessionResultDialog extends StatelessWidget {
     required this.starsEarned,
     this.reviewLabel = '查看错题',
     this.adventureFeedback,
+    this.adventureNode,
+    this.adventureSouvenirs = const {},
   });
 
   final int totalProblems;
@@ -23,6 +27,8 @@ class SessionResultDialog extends StatelessWidget {
   final int starsEarned;
   final String reviewLabel;
   final String? adventureFeedback;
+  final MathAdventureNode? adventureNode;
+  final Set<MathAdventureRegion> adventureSouvenirs;
 
   double get accuracy => totalProblems > 0 ? correctCount / totalProblems : 0.0;
 
@@ -46,7 +52,7 @@ class SessionResultDialog extends StatelessWidget {
     return (text: '多多练习！', icon: Icons.menu_book_rounded);
   }
 
-  bool get _allCorrect => correctCount == totalProblems;
+  bool get _allCorrect => totalProblems > 0 && correctCount == totalProblems;
 
   @override
   Widget build(BuildContext context) {
@@ -54,9 +60,6 @@ class SessionResultDialog extends StatelessWidget {
 
     return AlertDialog(
       scrollable: true,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusLarge),
-      ),
       title: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -66,7 +69,11 @@ class SessionResultDialog extends StatelessWidget {
                 Icon(_grade.icon, color: theme.colorScheme.primary, size: 28),
                 const SizedBox(height: SpacingTokens.sm),
                 Text(
-                  adventureFeedback == null ? _grade.text : '又走过了一站！',
+                  adventureFeedback == null
+                      ? _grade.text
+                      : _allCorrect
+                      ? '这一站，全对通过！'
+                      : '这一站还没通过',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -87,6 +94,38 @@ class SessionResultDialog extends StatelessWidget {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (adventureNode case final node?) ...[
+            Text(
+              '${node.region.title} · ${node.skill.label}',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+          ],
+          if (_allCorrect && adventureSouvenirs.isNotEmpty) ...[
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: SpacingTokens.lg,
+              runSpacing: SpacingTokens.sm,
+              children: [
+                for (final region in adventureSouvenirs)
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AdventureSouvenir(
+                        region: region,
+                        size: SpacingTokens.xxl * 2,
+                      ),
+                      const SizedBox(height: SpacingTokens.xs),
+                      Text(region.souvenir, style: theme.textTheme.titleMedium),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: SpacingTokens.md),
+          ],
           if (adventureFeedback != null) ...[
             Text(adventureFeedback!, textAlign: TextAlign.center),
             const SizedBox(height: SpacingTokens.md),
@@ -134,14 +173,25 @@ class SessionResultDialog extends StatelessWidget {
                   child: Text(reviewLabel, textAlign: TextAlign.center),
                 ),
               if (adventureFeedback != null) ...[
-                FilledButton.tonal(
-                  onPressed: () => Navigator.of(context).pop('retry'),
-                  child: const Text('重玩这一站'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop('map'),
-                  child: const Text('回到探险地图'),
-                ),
+                if (_allCorrect) ...[
+                  FilledButton.tonal(
+                    onPressed: () => Navigator.of(context).pop('retry'),
+                    child: const Text('重玩这一站'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop('map'),
+                    child: const Text('回到探险地图'),
+                  ),
+                ] else ...[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop('map'),
+                    child: const Text('回到探险地图'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop('retry'),
+                    child: const Text('再闯这一站'),
+                  ),
+                ],
               ] else
                 FilledButton(
                   onPressed: () => Navigator.of(context).pop('retry'),

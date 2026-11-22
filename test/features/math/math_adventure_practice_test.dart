@@ -38,6 +38,8 @@ class _FailProgressOnce extends MathAdventureRepository {
   Future<MathAdventureCompletion> complete({
     required MathAdventureNode node,
     required DifficultyLevel difficulty,
+    required int totalProblems,
+    required int correctCount,
     required void Function() ensureCurrent,
   }) async {
     if (fail) {
@@ -47,6 +49,8 @@ class _FailProgressOnce extends MathAdventureRepository {
     return super.complete(
       node: node,
       difficulty: difficulty,
+      totalProblems: totalProblems,
+      correctCount: correctCount,
       ensureCurrent: ensureCurrent,
     );
   }
@@ -148,13 +152,13 @@ void main() {
   }
 
   for (final failure in ['none', 'progress', 'draft']) {
-    testWidgets('探险整组 $failure：全错可推进、失败重开幂等且普通草稿保留', (tester) async {
+    testWidgets('探险整组 $failure：全对推进、失败重开幂等且普通草稿保留', (tester) async {
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());
         await drainHiveWritesForTesting(tester);
       });
       await tester.runAsync(
-        () => saveDraft(_draft(correct: failure != 'none')),
+        () => saveDraft(_draft(correct: true)),
       );
       await mount(
         tester,
@@ -192,6 +196,38 @@ void main() {
         isNull,
       );
       expect(HiveBoxes.mathSessions.length, 1);
+    });
+  }
+
+  for (final failRemove in [false, true]) {
+    testWidgets('错题完成态续练不解锁，清理重试=$failRemove，学习记录仍保留', (tester) async {
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await drainHiveWritesForTesting(tester);
+      });
+      await tester.runAsync(() => saveDraft(_draft()));
+      await mount(tester, drafts: failRemove ? _FailRemoveOnce() : null);
+      if (failRemove) {
+        expect(find.byType(SessionResultDialog), findsNothing);
+        await tester.runAsync(() async {
+          await tester.pumpWidget(const SizedBox.shrink());
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        });
+        await mount(tester);
+      }
+      final progress = MathAdventureRepository().read(1, '上');
+      expect(progress.completedSkillIds, isEmpty);
+      expect(progress.collectedRegionIds, isEmpty);
+      expect(find.text('这一站还没通过'), findsOneWidget);
+      expect(find.text('再闯这一站'), findsOneWidget);
+      expect(find.text('这一站，全对通过！'), findsNothing);
+      expect(HiveBoxes.mathSessions.length, 1);
+      expect(HiveBoxes.mathSessions.values.single.correctCount, 0);
+      expect(PracticeDraftRepository().get('math')!['sessionId'], 'ordinary');
+      expect(
+        PracticeDraftRepository().get(MathAdventureNode.draftKind, scope: _node.scope),
+        isNull,
+      );
     });
   }
 
@@ -344,7 +380,7 @@ void main() {
     expect(drafts.get('math'), isNotNull);
   });
 
-  testWidgets('真实路由两站全错走通、返回保留地图位置、纪念册可达且可重玩', (tester) async {
+  testWidgets('真实路由两站全对走通、返回保留地图位置、纪念册可达且可重玩', (tester) async {
     tester.view.physicalSize = const Size(411, 914);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -396,11 +432,15 @@ void main() {
         reason:
             '$label: ${router.routeInformationProvider.value.uri}, ${find.byType(Text).evaluate().map((e) => (e.widget as Text).data)}',
       );
-      for (var digit = 0; digit < 3; digit++) {
+      final practiceScope = ProviderScope.containerOf(
+        tester.element(find.byType(NumberKeypad)),
+      );
+      final answer = practiceScope.read(currentProblemProvider)!.answerText;
+      for (final digit in answer.split('')) {
         await tester.tap(
           find.descendant(
             of: find.byType(NumberKeypad),
-            matching: find.text('9'),
+            matching: find.text(digit),
           ),
         );
         await tester.pump();

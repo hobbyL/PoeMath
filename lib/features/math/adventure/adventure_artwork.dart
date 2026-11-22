@@ -4,7 +4,6 @@ import 'package:poemath/domain/math_adventure_catalog.dart';
 
 /// Packaged scenery and collectibles stay independent of saved region IDs.
 extension AdventureIllustrations on MathAdventureRegion {
-  String get mapAsset => 'assets/images/adventure_map_$name.jpg';
   String get souvenirAsset => 'assets/images/adventure_souvenir_$name.png';
 }
 

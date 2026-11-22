@@ -50,8 +50,34 @@ void main() {
   }) => repo.complete(
     node: MathAdventureNode(grade: grade, semester: semester, skillId: skill),
     difficulty: difficulty,
+    totalProblems: 10,
+    correctCount: 10,
     ensureCurrent: repo.assertCurrent,
   );
+
+  test('一题错误、全错或空题组均不能写入进度或发放收藏', () async {
+    final box = _ControlledProgressBox(HiveBoxes.mathAdventureProgress);
+    final repo = MathAdventureRepository(box: box);
+    for (final score in [(10, 9), (10, 0), (0, 0), (10, 11)]) {
+      await expectLater(
+        repo.complete(
+          node: const MathAdventureNode(
+            grade: 1, semester: '上', skillId: 'addition',
+          ),
+          difficulty: DifficultyLevel.medium,
+          totalProblems: score.$1,
+          correctCount: score.$2,
+          ensureCurrent: repo.assertCurrent,
+        ),
+        throwsStateError,
+      );
+    }
+    expect(box.writes, 0);
+    expect(repo.read(1, '上').completedSkillIds, isEmpty);
+    expect(repo.read(1, '上').collectedRegionIds, isEmpty);
+    await complete(repo, 'addition');
+    expect(repo.read(1, '上').completedSkillIds, {'addition'});
+  });
 
   test('开放顺序、同路线并发并集、奖励只发一次与真实重开', () async {
     final repo = MathAdventureRepository();

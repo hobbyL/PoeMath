@@ -45,11 +45,6 @@ class AdventureRegionScene extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final night = theme.brightness == Brightness.dark;
-    final mapTint = switch (theme.appearance.visualStyle) {
-      AppVisualStyle.pine => null,
-      AppVisualStyle.ink || AppVisualStyle.space => scheme.primary,
-      AppVisualStyle.storybook => scheme.tertiary,
-    };
     return ColoredCard(
       color: theme.scaffoldBackgroundColor,
       backgroundOpacity: 1,
@@ -79,19 +74,13 @@ class AdventureRegionScene extends StatelessWidget {
                   ).createShader(bounds);
                 },
                 child: Image.asset(
-                  region.mapAsset,
-                  fit: BoxFit.fitWidth,
-                  repeat: ImageRepeat.repeatY,
+                  theme.appearance.adventureTerrain(region.name),
+                  fit: BoxFit.cover,
+                  repeat: ImageRepeat.noRepeat,
                   alignment: Alignment.topCenter,
                   cacheWidth: 1024,
-                  color: night
-                      ? scheme.surface.withValues(alpha: .48)
-                      : mapTint,
-                  colorBlendMode: night
-                      ? BlendMode.srcATop
-                      : mapTint == null
-                      ? null
-                      : BlendMode.color,
+                  color: night ? scheme.surface.withValues(alpha: .48) : null,
+                  colorBlendMode: night ? BlendMode.srcATop : null,
                 ),
               ),
             ),
@@ -129,13 +118,8 @@ class AdventureRegionScene extends StatelessWidget {
                         : '区域纪念物${region.souvenir}，走完${region.title}后解锁',
                     excludeSemantics: true,
                     child: ColoredCard(
-                      color: scheme.surface,
-                      backgroundOpacity: 1,
-                      borderRadius: BorderRadius.circular(
-                        SpacingTokens.radiusLarge,
-                      ),
+                      color: scheme.primary,
                       padding: const EdgeInsets.all(SpacingTokens.md),
-                      border: Border.all(color: scheme.outlineVariant),
                       onTap: onAlbum,
                       child: Row(
                         children: [
@@ -209,8 +193,8 @@ class _Waypoint extends StatelessWidget {
     final state = completed
         ? '已完成 · 再玩一组'
         : current
-        ? '当前关卡 · 开始探索'
-        : '未解锁 · 先走完前一站';
+        ? '当前关卡 · 整组全对过关'
+        : '未解锁 · 前一站全对后开启';
     final face = current
         ? scheme.primary
         : completed
@@ -222,6 +206,16 @@ class _Waypoint extends StatelessWidget {
         ? scheme.onPrimaryContainer
         : scheme.onSurfaceVariant;
     final scaler = MediaQuery.textScalerOf(context);
+    final appearance = theme.appearance;
+    final nodeShape = appearance.space
+        ? BeveledRectangleBorder(
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+          )
+        : appearance.ink
+        ? RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(appearance.cardRadius),
+          )
+        : const CircleBorder();
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
@@ -240,12 +234,9 @@ class _Waypoint extends StatelessWidget {
             first: first,
             completed: completed,
             current: current,
-            road: theme.brightness == Brightness.dark
-                ? scheme.surfaceContainerHighest
-                : ColorTokens.paperSurface,
-            edge: theme.brightness == Brightness.dark
-                ? scheme.outlineVariant
-                : ColorTokens.poemGold,
+            style: appearance.visualStyle,
+            road: scheme.surface,
+            edge: scheme.outlineVariant,
             trail: scheme.primary,
           ),
           child: Stack(
@@ -278,16 +269,16 @@ class _Waypoint extends StatelessWidget {
                               padding: const EdgeInsets.all(SpacingTokens.xs),
                               child: Material(
                                 color: face,
-                                elevation: current ? 6 : 3,
+                                elevation: appearance.storybook ? 2 : 0,
                                 shadowColor: scheme.shadow.withValues(
                                   alpha: .3,
                                 ),
-                                shape: CircleBorder(
+                                shape: nodeShape.copyWith(
                                   side: BorderSide(
                                     color: current
-                                        ? ColorTokens.mathYellow
-                                        : scheme.surface,
-                                    width: SpacingTokens.xs,
+                                        ? scheme.secondary
+                                        : scheme.outlineVariant,
+                                    width: current ? 2 : 1,
                                   ),
                                 ),
                                 child: Center(
@@ -317,18 +308,12 @@ class _Waypoint extends StatelessWidget {
                           ),
                           const SizedBox(height: SpacingTokens.sm),
                           ColoredCard(
-                            color: scheme.surface,
-                            backgroundOpacity: 1,
-                            borderRadius: BorderRadius.circular(
-                              SpacingTokens.radiusLarge,
-                            ),
+                            color: scheme.primary,
+                            backgroundOpacity: current ? .07 : .02,
                             padding: const EdgeInsets.symmetric(
                               horizontal: SpacingTokens.sm,
                               vertical: SpacingTokens.sm,
                             ),
-                            border: current
-                                ? Border.all(color: scheme.primary, width: 2)
-                                : null,
                             child: Column(
                               children: [
                                 Text(
@@ -357,7 +342,9 @@ class _Waypoint extends StatelessWidget {
                   ),
                 ),
               ),
-              if (current && width - labelWidth >= diameter + SpacingTokens.md)
+              if (current &&
+                  appearance.adventureGuide != null &&
+                  width - labelWidth >= diameter + SpacingTokens.md)
                 Positioned(
                   top: SpacingTokens.lg,
                   left: right ? SpacingTokens.sm : null,
@@ -365,7 +352,7 @@ class _Waypoint extends StatelessWidget {
                   child: ExcludeSemantics(
                     child: IgnorePointer(
                       child: Image.asset(
-                        'assets/images/adventure_guide.png',
+                        appearance.adventureGuide!,
                         width: math.min(
                           SpacingTokens.xxl * 2,
                           width - labelWidth - SpacingTokens.md,
@@ -392,11 +379,13 @@ class _RoadPainter extends CustomPainter {
     required this.road,
     required this.edge,
     required this.trail,
+    required this.style,
   });
 
   final double center;
   final bool first, completed, current;
   final Color road, edge, trail;
+  final AppVisualStyle style;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -434,6 +423,32 @@ class _RoadPainter extends CustomPainter {
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
+      if (style != AppVisualStyle.storybook) {
+        final ink = style == AppVisualStyle.pine || style == AppVisualStyle.ink;
+        canvas.drawPath(
+          path,
+          paint
+            ..color = walked ? trail.withValues(alpha: .65) : edge
+            ..strokeWidth = ink ? 2 : 1,
+        );
+        if (!ink) {
+          paint
+            ..color = walked ? trail : edge
+            ..strokeWidth = 3;
+          for (final metric in path.computeMetrics()) {
+            for (double d = 0; d < metric.length; d += SpacingTokens.lg) {
+              canvas.drawPath(
+                metric.extractPath(
+                  d,
+                  math.min(d + SpacingTokens.sm, metric.length),
+                ),
+                paint,
+              );
+            }
+          }
+        }
+        return;
+      }
       canvas.drawPath(
         path,
         paint
@@ -473,6 +488,7 @@ class _RoadPainter extends CustomPainter {
       first != oldDelegate.first ||
       completed != oldDelegate.completed ||
       current != oldDelegate.current ||
+      style != oldDelegate.style ||
       road != oldDelegate.road ||
       edge != oldDelegate.edge ||
       trail != oldDelegate.trail;

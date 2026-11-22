@@ -14,6 +14,7 @@ class MathAdventureAlbumPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final settings = ref.watch(mathAdventureSettingsProvider);
     final records = ref.watch(mathAdventureProgressProvider);
     if (records.hasError) return adventureReadError(ref);
     final progress = records.requireValue;
@@ -21,6 +22,13 @@ class MathAdventureAlbumPage extends ConsumerWidget {
       0,
       (sum, item) => sum + item.collectedRegionIds.length,
     );
+    final volumes = <({int grade, String semester})>[
+      (grade: settings.grade, semester: settings.semester),
+      for (var grade = 1; grade <= 6; grade++)
+        for (final semester in ['上', '下'])
+          if (grade != settings.grade || semester != settings.semester)
+            (grade: grade, semester: semester),
+    ];
     return AppScaffold(
       appBar: AppBar(
         title: const Text('自然纪念册'),
@@ -39,7 +47,7 @@ class MathAdventureAlbumPage extends ConsumerWidget {
           constraints: const BoxConstraints(maxWidth: 720),
           child: ListView.builder(
             padding: const EdgeInsets.all(SpacingTokens.md),
-            itemCount: 13,
+            itemCount: volumes.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) {
                 return Padding(
@@ -54,13 +62,19 @@ class MathAdventureAlbumPage extends ConsumerWidget {
                         style: theme.textTheme.bodyLarge,
                       ),
                       const SizedBox(height: SpacingTokens.sm),
-                      const Text('每走完一片区域，就留下一份自然的礼物。'),
+                      Text(
+                        '当前学习册 · ${settings.grade} 年级${settings.semester}册',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
                     ],
                   ),
                 );
               }
-              final grade = (index - 1) ~/ 2 + 1;
-              final semester = index.isOdd ? '上' : '下';
+              final volume = volumes[index - 1];
+              final grade = volume.grade;
+              final semester = volume.semester;
               final collected =
                   progress
                       .where((p) => p.grade == grade && p.semester == semester)
@@ -68,9 +82,17 @@ class MathAdventureAlbumPage extends ConsumerWidget {
                       ?.collectedRegionIds ??
                   <String>{};
               final targets = MathAdventureCatalog.collectible(grade, semester);
-              final regions = MathAdventureRegion.values.where(
-                (r) => targets.contains(r) || collected.contains(r.id),
-              );
+              final regions =
+                  MathAdventureRegion.values
+                      .where(
+                        (r) => targets.contains(r) || collected.contains(r.id),
+                      )
+                      .toList()
+                    ..sort((a, b) {
+                      final aCollected = collected.contains(a.id);
+                      final bCollected = collected.contains(b.id);
+                      return (bCollected ? 1 : 0).compareTo(aCollected ? 1 : 0);
+                    });
               return Padding(
                 padding: const EdgeInsets.only(bottom: SpacingTokens.xl),
                 child: Column(
