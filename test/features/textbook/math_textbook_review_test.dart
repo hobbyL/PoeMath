@@ -20,6 +20,7 @@ import 'package:poemath/features/textbook/math_textbook_block_editor_page.dart';
 import 'package:poemath/features/textbook/math_textbook_lesson_page.dart';
 import 'package:poemath/features/textbook/math_textbook_learning_editor_page.dart';
 import 'package:poemath/features/textbook/math_textbook_review_page.dart';
+import 'package:poemath/features/textbook/math_textbook_study_page.dart';
 import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_review_content.dart';
@@ -223,6 +224,7 @@ void main() {
     Size size = const Size(420, 860),
     double scale = 1,
     bool knownCatalog = false,
+    bool courseGenerationSupported = true,
     bool settle = true,
   }) async {
     tester.view.physicalSize = size;
@@ -246,6 +248,7 @@ void main() {
                       sourcePath: 'self-owned.pdf',
                       editionLabel: '合成样本',
                       evidencePdfPages: const [1],
+                      supportsMathCourseGeneration: courseGenerationSupported,
                     ),
                   ]
                 : [],
@@ -550,6 +553,85 @@ void main() {
     );
     expect(find.textContaining('已通过'), findsOneWidget);
     expect(courses.current!.lessons.single.review!.reviewer, '测试妈妈');
+  });
+
+  testWidgets('扫描版无课程时不自动整理，并显示原书阅读入口', (tester) async {
+    courses.current = null;
+    await mount(
+      tester,
+      MathTextbookReviewPage(bookId: book.pdfSha256),
+      knownCatalog: true,
+      courseGenerationSupported: false,
+    );
+    expect(generator.bookCalls, 0);
+    expect(
+      find.text('课时学习暂未开放'),
+      findsOneWidget,
+      reason: tester
+          .widgetList<Text>(find.byType(Text))
+          .map((widget) => widget.data)
+          .join(' | '),
+    );
+    expect(find.text('阅读原书'), findsOneWidget);
+    expect(find.text('继续整理'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('扫描版已有课程可保留查看，但隐藏重新整理入口', (tester) async {
+    courses.current = courses.current!.replace(
+      outline: MathTextbookCourseOutline(
+        source: 'bookmarks',
+        organizationVersion: 1,
+        ranges: const [
+          MathTextbookCourseRange(title: '自有分数课', startPage: 1, endPage: 2),
+        ],
+        completedLessonIds: const ['math-1-2'],
+      ),
+    );
+    await mount(
+      tester,
+      MathTextbookReviewPage(bookId: book.pdfSha256),
+      knownCatalog: true,
+      courseGenerationSupported: false,
+    );
+    expect(find.text('自有分数课'), findsOneWidget);
+    expect(generator.bookCalls, 0);
+    expect(find.text('继续整理'), findsNothing);
+    await tester.tap(find.byTooltip('更多'));
+    await tester.pumpAndSettle();
+    expect(find.text('重新整理原书'), findsNothing);
+    expect(find.text('整理一个完整课时'), findsNothing);
+    expect(find.text('查看原书目录'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('扫描版数学学习无课程时明确引导阅读原书', (tester) async {
+    courses.current = null;
+    await mount(
+      tester,
+      MathTextbookBookPage(bookId: book.pdfSha256),
+      knownCatalog: true,
+      courseGenerationSupported: false,
+    );
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MathTextbookBookPage)),
+    );
+    await container.read(textbookCatalogProvider.future);
+    expect(
+      await container.read(mathTextbookCourseProvider(book.pdfSha256).future),
+      isNull,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('课时学习暂未开放'),
+      findsOneWidget,
+      reason: tester
+          .widgetList<Text>(find.byType(Text))
+          .map((widget) => widget.data)
+          .join(' | '),
+    );
+    expect(find.text('阅读原书'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   for (final width in [320.0, 360.0]) {

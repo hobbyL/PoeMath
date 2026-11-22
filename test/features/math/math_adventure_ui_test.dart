@@ -165,6 +165,61 @@ void main() {
     }
   }
 
+  for (final subject in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('$subject/$brightness 横屏地图和纪念册可浏览', (
+        tester,
+      ) async {
+        tester.view.physicalSize = const Size(914, 411);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        await tester.runAsync(
+          () => SettingsRepository().setLearningBackground(5, '上'),
+        );
+        await mount(
+          tester,
+          const MathAdventurePage(),
+          subject: subject,
+          brightness: brightness,
+        );
+        await tester.tap(find.byTooltip('找到当前关卡'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('当前关卡 · 整组全对过关').hitTestable(),
+          findsOneWidget,
+        );
+        final mapScroll = tester
+            .state<ScrollableState>(find.byType(Scrollable).first)
+            .position;
+        mapScroll.jumpTo(mapScroll.maxScrollExtent);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+
+        await mount(
+          tester,
+          const MathAdventureAlbumPage(),
+          subject: subject,
+          brightness: brightness,
+        );
+        expect(find.text('当前学习册 · 5 年级上册'), findsOneWidget);
+        final albumScroll = tester
+            .state<ScrollableState>(find.byType(Scrollable).first)
+            .position;
+        albumScroll.jumpTo(albumScroll.maxScrollExtent);
+        await tester.pumpAndSettle();
+        expect(find.text('6 年级下册'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('大字号下可从顶部定位到最后一片区域的当前关卡', (tester) async {
     tester.view.physicalSize = const Size(320, 900);
     tester.view.devicePixelRatio = 1;

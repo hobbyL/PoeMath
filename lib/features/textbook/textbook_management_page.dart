@@ -150,7 +150,8 @@ class _TextbookManagementPageState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final books = ref.watch(textbookLocalListProvider);
-    final catalog = ref.watch(textbookCatalogProvider).valueOrNull ?? [];
+    final catalog =
+        ref.watch(textbookDownloadCatalogProvider).valueOrNull ?? [];
     final cloudIds = catalog.map((entry) => entry.book.pdfSha256).toSet();
     final paths = {
       for (final book in books)

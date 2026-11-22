@@ -698,6 +698,11 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     final entry = catalog.valueOrNull
         ?.where((value) => value.book.pdfSha256 == widget.bookId)
         .firstOrNull;
+    final downloadableEntry = ref
+        .watch(textbookDownloadCatalogProvider)
+        .valueOrNull
+        ?.where((value) => value.book.pdfSha256 == widget.bookId)
+        .firstOrNull;
     if (book == null) {
       return _detailScaffold(
         body: catalog.isLoading
@@ -832,7 +837,9 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                             ],
                             const SizedBox(height: SpacingTokens.md),
                           ],
-                          if (!available && entry != null && !path.isLoading)
+                          if (!available &&
+                              downloadableEntry != null &&
+                              !path.isLoading)
                             FilledButton.icon(
                               onPressed: downloading
                                   ? null
@@ -840,13 +847,13 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                                         .read(
                                           textbookDownloadsProvider.notifier,
                                         )
-                                        .download(entry),
+                                        .download(downloadableEntry),
                               icon: const Icon(Icons.download_outlined),
                               label: Text(download != null ? '重新下载教材' : '下载教材'),
                             ),
                           if (!available)
                             path.when(
-                              data: (_) => entry != null
+                              data: (_) => downloadableEntry != null
                                   ? const Text('下载完成后可离线阅读，同版重新下载会恢复阅读位置。')
                                   : Column(
                                       crossAxisAlignment:

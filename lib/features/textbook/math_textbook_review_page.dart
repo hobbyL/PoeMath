@@ -52,6 +52,15 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
     if (_opening) return;
     setState(() => _opening = true);
     try {
+      if (!await _supportsCourseGeneration(book.pdfSha256)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('此版本当前只支持原书阅读，课时整理暂未开放')),
+          );
+        }
+        return;
+      }
+      if (!mounted) return;
       assertParentAccess(context);
       final request = await showDialog<({String title, int start, int end})>(
         context: context,
@@ -99,10 +108,18 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
       assertParentAccess(context);
       final entries = await ref.read(textbookCatalogProvider.future);
       if (!mounted) return;
+      final entry = entries
+          .where((value) => value.book.pdfSha256 == book.pdfSha256)
+          .firstOrNull;
       final path = await ref.read(textbookPathProvider(book.pdfSha256).future);
       if (!mounted) return;
-      if (path == null ||
-          !entries.any((entry) => entry.book.pdfSha256 == book.pdfSha256)) {
+      if (entry != null && !entry.supportsMathCourseGeneration) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('此版本当前只支持原书阅读，课时整理暂未开放')));
+        return;
+      }
+      if (path == null || entry == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -216,6 +233,10 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
   }
 
   Future<void> _showMore(Textbook book) async {
+    final supportsCourseGeneration = await _supportsCourseGeneration(
+      book.pdfSha256,
+    );
+    if (!mounted) return;
     final action = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -227,21 +248,51 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
           children: [
             Text('更多', style: Theme.of(sheet).textTheme.titleMedium),
             const SizedBox(height: SpacingTokens.sm),
-            for (final option in const [
-              ('edition', Icons.info_outline, '版次与来源', ''),
-              ('refresh', Icons.refresh, '重新整理原书', '保留人工修改'),
-              ('lesson', Icons.add, '整理一个完整课时', '补充或调整目录未能定位的课时'),
-              ('read', Icons.menu_book_outlined, '查看原书目录', ''),
-              ('history', Icons.fact_check_outlined, '查看作答与家长核对', ''),
-            ])
+            for (final option
+                in <
+                  ({String id, IconData icon, String title, String subtitle})
+                >[
+                  (
+                    id: 'edition',
+                    icon: Icons.info_outline,
+                    title: '版次与来源',
+                    subtitle: '',
+                  ),
+                  if (supportsCourseGeneration) ...[
+                    (
+                      id: 'refresh',
+                      icon: Icons.refresh,
+                      title: '重新整理原书',
+                      subtitle: '保留人工修改',
+                    ),
+                    (
+                      id: 'lesson',
+                      icon: Icons.add,
+                      title: '整理一个完整课时',
+                      subtitle: '补充或调整目录未能定位的课时',
+                    ),
+                  ],
+                  (
+                    id: 'read',
+                    icon: Icons.menu_book_outlined,
+                    title: '查看原书目录',
+                    subtitle: '',
+                  ),
+                  (
+                    id: 'history',
+                    icon: Icons.fact_check_outlined,
+                    title: '查看作答与家长核对',
+                    subtitle: '',
+                  ),
+                ])
               AppTile(
                 flat: true,
                 flatTrailingEdgeAligned: true,
-                icon: option.$2,
+                icon: option.icon,
                 iconColor: Theme.of(sheet).colorScheme.primary,
-                title: option.$3,
-                subtitle: option.$4,
-                onTap: () => Navigator.pop(sheet, option.$1),
+                title: option.title,
+                subtitle: option.subtitle,
+                onTap: () => Navigator.pop(sheet, option.id),
               ),
           ],
         ),
@@ -317,6 +368,10 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
     MathTextbookCourse course,
     MathTextbookLesson lesson,
   ) async {
+    final supportsCourseGeneration = await _supportsCourseGeneration(
+      book.pdfSha256,
+    );
+    if (!mounted) return;
     final action = await showModalBottomSheet<String>(
       context: context,
       useSafeArea: true,
@@ -325,14 +380,15 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppTile(
-              flat: true,
-              icon: Icons.refresh,
-              iconColor: Theme.of(sheet).colorScheme.primary,
-              title: '重新整理此课',
-              subtitle: '保留人工修改与审核，变化稿需比较后采纳',
-              onTap: () => Navigator.pop(sheet, 'refresh'),
-            ),
+            if (supportsCourseGeneration)
+              AppTile(
+                flat: true,
+                icon: Icons.refresh,
+                iconColor: Theme.of(sheet).colorScheme.primary,
+                title: '重新整理此课',
+                subtitle: '保留人工修改与审核，变化稿需比较后采纳',
+                onTap: () => Navigator.pop(sheet, 'refresh'),
+              ),
             AppTile(
               flat: true,
               icon: Icons.delete_outline,
@@ -352,6 +408,9 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
 
   Widget _generationStatus(Textbook book, MathTextbookCourse? course) {
     final progress = ref.watch(mathTextbookGenerationProvider)[book.pdfSha256];
+    final supportsCourseGeneration =
+        ref.read(mathTextbookCourseGenerationSupportProvider(book.pdfSha256)) !=
+        false;
     final outline = course?.outline;
     if (progress == null && outline == null) return const SizedBox.shrink();
     final saved =
@@ -385,8 +444,21 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
       total: total,
       running: running,
       onPause: () => _generation.pause(book.pdfSha256),
-      onResume: _opening ? null : () => _generateBook(book),
+      onResume: _opening || !supportsCourseGeneration
+          ? null
+          : () => _generateBook(book),
     );
+  }
+
+  Future<bool> _supportsCourseGeneration(String bookId) async {
+    try {
+      final entry = (await ref.read(textbookCatalogProvider.future))
+          .where((value) => value.book.pdfSha256 == bookId)
+          .firstOrNull;
+      return entry?.supportsMathCourseGeneration ?? true;
+    } on Object {
+      return false;
+    }
   }
 
   Future<void> _bookReview(Textbook book, MathTextbookCourse course) async {
@@ -469,17 +541,27 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
                 ],
               ),
               data: (data) {
+                final supportsCourseGeneration =
+                    ref.watch(
+                      mathTextbookCourseGenerationSupportProvider(
+                        widget.bookId,
+                      ),
+                    ) !=
+                    false;
                 final needsOrganization =
-                    data == null ||
-                    data.outline != null &&
-                        data.outline!.organizationVersion <
-                            mathTextbookOrganizationVersion;
+                    supportsCourseGeneration &&
+                    (data == null ||
+                        data.outline != null &&
+                            data.outline!.organizationVersion <
+                                mathTextbookOrganizationVersion);
                 if (needsOrganization) _tryAutomaticOrganization(book);
                 if (data != null) {
                   return MathTextbookReviewContent(
                     book: book,
                     course: data,
-                    progress: _generationStatus(book, data),
+                    progress: supportsCourseGeneration
+                        ? _generationStatus(book, data)
+                        : const SizedBox.shrink(),
                     running:
                         _opening || _navigating || progress?.running == true,
                     onLesson: (lesson) => _openLesson(book, lesson),
@@ -490,10 +572,19 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
                 }
                 final path = ref.watch(textbookPathProvider(widget.bookId));
                 final entries = ref.watch(textbookCatalogProvider);
+                final entry = entries.valueOrNull
+                    ?.where((value) => value.book.pdfSha256 == widget.bookId)
+                    .firstOrNull;
+                final readingOnly =
+                    entry?.supportsMathCourseGeneration == false;
                 return AppEmptyState(
-                  icon: Icons.fact_check_outlined,
-                  title: '从原书整理课程草稿',
-                  description: path.isLoading || entries.isLoading
+                  icon: readingOnly
+                      ? Icons.menu_book_outlined
+                      : Icons.fact_check_outlined,
+                  title: readingOnly ? '课时学习暂未开放' : '从原书整理课程草稿',
+                  description: readingOnly
+                      ? '当前版本暂时只支持原书阅读，课时内容尚未开放。'
+                      : path.isLoading || entries.isLoading
                       ? '正在检查本机原书与书目…'
                       : path.hasError || entries.hasError
                       ? '原书或书目读取失败，可从右上角重试整理。'
@@ -505,10 +596,19 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
                       ? '此 PDF 尚无可核验的书目来源，暂不支持自动整理。可阅读原书，或从右上角手动整理课时。'
                       : '在本机逐课整理；完成的课目会逐课显示。无法可靠归类的内容会保留待整理。',
                   actions: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: _generationStatus(book, null),
-                    ),
+                    if (readingOnly)
+                      TextButton.icon(
+                        onPressed: () => context.push(
+                          AppRoutes.textbookReadOf(widget.bookId),
+                        ),
+                        icon: const Icon(Icons.menu_book_outlined),
+                        label: const Text('阅读原书'),
+                      )
+                    else
+                      SizedBox(
+                        width: double.infinity,
+                        child: _generationStatus(book, null),
+                      ),
                   ],
                 );
               },
@@ -519,18 +619,19 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
   void _tryAutomaticOrganization(Textbook book) {
     final path = ref.watch(textbookPathProvider(widget.bookId));
     final entries = ref.watch(textbookCatalogProvider);
+    final entry = entries.valueOrNull
+        ?.where((value) => value.book.pdfSha256 == widget.bookId)
+        .firstOrNull;
     if (_attempted ||
         _navigating ||
+        entry?.supportsMathCourseGeneration == false ||
         ModalRoute.of(context)?.isCurrent == false ||
         !path.hasValue ||
         !entries.hasValue) {
       return;
     }
     _attempted = true;
-    if (path.valueOrNull != null &&
-        entries.valueOrNull!.any(
-          (entry) => entry.book.pdfSha256 == widget.bookId,
-        )) {
+    if (path.valueOrNull != null && entry != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         if (_navigating || ModalRoute.of(context)?.isCurrent == false) {

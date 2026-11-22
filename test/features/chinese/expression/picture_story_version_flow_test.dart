@@ -131,7 +131,9 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         pictureStoryRepositoryProvider.overrideWithValue(repository),
-        learningActivityRepositoryProvider.overrideWithValue(activityRepository),
+        learningActivityRepositoryProvider.overrideWithValue(
+          activityRepository,
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -723,9 +725,15 @@ void main() {
       );
       expect(promptCard.left, closeTo(SpacingTokens.md, .01));
       expect(promptCard.right, closeTo(width - SpacingTokens.md, .01));
+      final sceneImages = find.descendant(
+        of: sceneImage,
+        matching: find.byType(PictureStoryImageView),
+      );
       expect(
-        tester.widget<PictureStoryImageView>(sceneImage).borderRadius,
-        BorderRadius.zero,
+        tester
+            .widgetList<PictureStoryImageView>(sceneImages)
+            .every((image) => image.borderRadius == BorderRadius.zero),
+        isTrue,
       );
       await tester.runAsync(() async {
         for (var index = 0; index < 3; index++) {
@@ -857,6 +865,8 @@ void main() {
       expect(tester.getRect(editButton), editRect);
       final hideButton = find.byTooltip('隐藏题目');
       final hideRect = tester.getRect(hideButton);
+      final header = find.byKey(const ValueKey('picture-story-pinned-header'));
+      final headerBeforeScroll = tester.getRect(header);
       final expandedScroll = tester.state<ScrollableState>(
         find.byType(Scrollable).first,
       );
@@ -865,8 +875,16 @@ void main() {
       expect(tester.getRect(editButton), editRect);
       expect(tester.getRect(hideButton), hideRect);
       expect(
-        expandedImageRect.top - tester.getRect(expandedImage).top,
-        closeTo(36, .01),
+        tester.getRect(header).height,
+        lessThan(headerBeforeScroll.height),
+      );
+      expect(
+        tester.getRect(header).height,
+        greaterThanOrEqualTo(kToolbarHeight),
+      );
+      expect(
+        tester.getRect(expandedImage).top,
+        closeTo(expandedImageRect.top, .01),
       );
       await tester.tap(find.byTooltip('隐藏题目'));
       await tester.pumpAndSettle();

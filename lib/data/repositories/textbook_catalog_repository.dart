@@ -14,7 +14,7 @@ class TextbookCatalogRepository {
     final entries = <TextbookCatalogEntry>[];
     for (final source in sources) {
       final json = jsonDecode(source) as Map<String, dynamic>;
-      if (!const [1, 2].contains(json['schemaVersion'])) {
+      if (!const [1, 2, 3].contains(json['schemaVersion'])) {
         throw const FormatException('教材目录版本不支持');
       }
       entries.addAll(

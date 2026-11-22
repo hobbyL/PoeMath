@@ -35,6 +35,18 @@ TextbookCatalogEntry entryFor(List<int> bytes, {String? sha}) =>
       evidencePdfPages: const [1],
     );
 
+TextbookCatalogEntry mathApiEntryFor(List<int> bytes) {
+  final base = entryFor(bytes);
+  return TextbookCatalogEntry(
+    book: base.book.withSubject(TextbookSubject.math),
+    downloadUrl: Uri.https('www.gostudy.net.cn', '/api/textbooks/math/3/上'),
+    sourceKind: TextbookCatalogSourceKind.mathApi,
+    editionLabel: '教育部审定2024',
+    evidencePdfPages: const [1],
+    supportsMathCourseGeneration: false,
+  );
+}
+
 void main() {
   late Directory directory;
   final bytes = syntheticPdf();
@@ -94,6 +106,51 @@ void main() {
     expect(await File(path!).readAsBytes(), bytes);
     expect(requests, 1);
     expect(Directory('${directory.path}/textbooks').listSync().length, 1);
+  });
+
+  test('数学 API 下载按 SHA 与页数校验，且不跟随重定向或回退到 GitHub', () async {
+    final apiEntry = mathApiEntryFor(bytes);
+    final urls = <Uri>[];
+    final apiFiles = service((request) async {
+      urls.add(request.url);
+      expect(request.followRedirects, isFalse);
+      return http.StreamedResponse(
+        Stream.value(bytes),
+        200,
+        contentLength: bytes.length,
+      );
+    });
+    final imported = await apiFiles.downloadPdf(
+      entry: apiEntry,
+      token: TextbookImportToken(),
+    );
+    expect(imported.sha256, apiEntry.book.pdfSha256);
+    expect(imported.size, apiEntry.book.fileSize);
+    expect(imported.pageCount, apiEntry.book.pageCount);
+    expect(urls, [apiEntry.downloadUrl]);
+    expect(apiEntry.fallbackDownloadUrl, isNull);
+
+    final redirectDirectory = Directory('${directory.path}/redirect');
+    await redirectDirectory.create();
+    final redirectUrls = <Uri>[];
+    final redirectFiles = TextbookFileService(
+      directoryProvider: () async => redirectDirectory,
+      validator: (_) async => 3,
+      clientFactory: () => MockClient.streaming((request, _) async {
+        redirectUrls.add(request.url);
+        expect(request.followRedirects, isFalse);
+        return http.StreamedResponse(
+          const Stream<List<int>>.empty(),
+          302,
+          headers: {'location': 'https://other.example/book.pdf'},
+        );
+      }),
+    );
+    await expectLater(
+      redirectFiles.downloadPdf(entry: apiEntry, token: TextbookImportToken()),
+      throwsA(isA<TextbookFileException>()),
+    );
+    expect(redirectUrls, [apiEntry.downloadUrl]);
   });
 
   test('中断后重新创建服务，从已落盘字节续传并校验完整文件', () async {

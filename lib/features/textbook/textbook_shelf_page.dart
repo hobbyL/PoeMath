@@ -208,7 +208,7 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final catalog = ref.watch(textbookCatalogProvider);
+    final catalog = ref.watch(textbookDownloadCatalogProvider);
     final textStyle = DefaultTextStyle.of(context).style
         .merge(theme.textTheme.bodySmall)
         .copyWith(height: 1.5);

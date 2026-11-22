@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/data/models/textbook_catalog.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
@@ -39,6 +40,53 @@ void main() {
     container.read(selectedGradeProvider.notifier).state = 4;
     container.read(selectedSemesterProvider.notifier).state = '下';
     expect(container.read(currentTextbooksProvider), hasLength(2));
+  });
+
+  test('下载目录只列当前版本，已安装的隐藏旧版仍保留在本机书架', () async {
+    final oldBook = _book('e', 3, '上').withSubject(TextbookSubject.math);
+    final currentBook = _book('f', 3, '上').withSubject(TextbookSubject.math);
+    final repository = TextbookRepository();
+    await repository.addIfAbsent(oldBook);
+    final hidden = TextbookCatalogEntry(
+      book: oldBook,
+      downloadUrl: Uri.https('raw.githubusercontent.com', '/old/book.pdf'),
+      editionLabel: '旧版数学书',
+      evidencePdfPages: const [1],
+      downloadable: false,
+    );
+    final current = TextbookCatalogEntry(
+      book: currentBook,
+      downloadUrl: Uri.https('www.gostudy.net.cn', '/api/textbooks/math/3/上'),
+      editionLabel: '教育部审定2024',
+      evidencePdfPages: const [1],
+      sourceKind: TextbookCatalogSourceKind.mathApi,
+      supportsMathCourseGeneration: false,
+    );
+    final container = ProviderContainer(
+      overrides: [
+        textbookRepositoryProvider.overrideWithValue(repository),
+        textbookCatalogProvider.overrideWith((ref) async => [hidden, current]),
+      ],
+    );
+    addTearDown(container.dispose);
+    final downloads = await container.read(
+      textbookDownloadCatalogProvider.future,
+    );
+    expect(downloads.map((entry) => entry.book.pdfSha256), [
+      currentBook.pdfSha256,
+    ]);
+    final visibleBooks = container
+        .read(textbookListProvider)
+        .map((book) => book.pdfSha256)
+        .toSet();
+    expect(
+      visibleBooks,
+      containsAll([oldBook.pdfSha256, currentBook.pdfSha256]),
+    );
+    expect(await container.read(textbookCatalogProvider.future), [
+      hidden,
+      current,
+    ]);
   });
 
   test('学习背景保存并失效后立即切换册次，重建容器仍一致', () async {

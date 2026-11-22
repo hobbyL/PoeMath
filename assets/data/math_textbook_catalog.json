@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "subject": "math",
-  "sourceVerification": "全部12册经完整文件与原生PDF核验；正文及学习配置仍由家长按课核对",
+  "sourceVerification": "12册经原生PDFium打开和首页渲染；9册封面标注教育部审定2024，3册下册封面仍标注审定2022。新版候选文件和第三方来源仍需家长对照核验。",
   "books": [
     {
       "subject": "math",
@@ -34,7 +34,39 @@
       ],
       "coverAsset": "assets/textbooks/covers/a8e880217c456db68bb363cadba9e235263197d375243a5d0850d4f9131562d4.webp",
       "coverSha256": "c0020e48bb3cfca1b1003aae6aa15c56c07bc2044c1ffea9965d719a220acf0f",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": false,
+      "supportsMathCourseGeneration": true
+    },
+    {
+      "subject": "math",
+      "sha256": "567f546c90bfd5d81e1cb284748156100d9eee94b010c60903599d46710d9bef",
+      "title": "人教版数学",
+      "grade": 1,
+      "semester": "上",
+      "publisher": "人民教育出版社",
+      "editionId": "pep-math-1a-approval-2024",
+      "curriculumStandard": null,
+      "approvalYear": 2024,
+      "editionLabel": "教育部审定2024",
+      "editionNotes": "封面标注教育部审定2024；版权页未载明出版年月或印次，审定年份不等同出版年份。按原书核对册次。",
+      "publicationDate": null,
+      "editionNumber": null,
+      "printingDate": null,
+      "printingNumber": null,
+      "bytes": 5742491,
+      "pageCount": 120,
+      "downloadUrl": "https://www.gostudy.net.cn/api/textbooks/math/1/%E4%B8%8A",
+      "sourceKind": "mathApi",
+      "checkedAt": "2026-11-22T10:12:58.663179Z",
+      "evidencePdfPages": [
+        1
+      ],
+      "coverAsset": "assets/textbooks/covers/567f546c90bfd5d81e1cb284748156100d9eee94b010c60903599d46710d9bef.webp",
+      "coverSha256": "0c7c513c3ed2bf6f9eccb9949e93a1be536fa48d37a53747eff73f7c4923d912",
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": false
     },
     {
       "subject": "math",
@@ -67,7 +99,39 @@
       ],
       "coverAsset": "assets/textbooks/covers/00e450e1c867e901e17aa41231b88ca3d99540747524ed5a7777ed5a0e7fe960.webp",
       "coverSha256": "9074bb5f91c5d1bc18f344c32070ec61a7d6b0d0058ab16fec3c763751f7284a",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": false,
+      "supportsMathCourseGeneration": true
+    },
+    {
+      "subject": "math",
+      "sha256": "7536276ed189d0499f65f630bb07c22c103f58897266d523a03788f6836a1683",
+      "title": "人教版数学",
+      "grade": 1,
+      "semester": "下",
+      "publisher": "人民教育出版社",
+      "editionId": "pep-math-1b-approval-2024",
+      "curriculumStandard": null,
+      "approvalYear": 2024,
+      "editionLabel": "教育部审定2024",
+      "editionNotes": "封面标注教育部审定2024；版权页未载明出版年月或印次，审定年份不等同出版年份。按原书核对册次。",
+      "publicationDate": null,
+      "editionNumber": null,
+      "printingDate": null,
+      "printingNumber": null,
+      "bytes": 4823540,
+      "pageCount": 98,
+      "downloadUrl": "https://www.gostudy.net.cn/api/textbooks/math/1/%E4%B8%8B",
+      "sourceKind": "mathApi",
+      "checkedAt": "2026-11-22T10:12:58.663179Z",
+      "evidencePdfPages": [
+        1
+      ],
+      "coverAsset": "assets/textbooks/covers/7536276ed189d0499f65f630bb07c22c103f58897266d523a03788f6836a1683.webp",
+      "coverSha256": "170b6a18a7d4cc47f6765928685900e0a2496f62a9d929dc83c9e1759b0918ec",
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": false
     },
     {
       "subject": "math",
@@ -100,7 +164,39 @@
       ],
       "coverAsset": "assets/textbooks/covers/a1ee1d8358d960cf72f0eb26930c3b85fc583a9bef3915438bc046ba48187b80.webp",
       "coverSha256": "9a41d3998625f3ae73d06715ba2d9e0d9e390f2f8d6dcd657ace6b61c6b80d76",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": false,
+      "supportsMathCourseGeneration": true
+    },
+    {
+      "subject": "math",
+      "sha256": "ae1f6b9dc0eb365fec72f05eaa35554d2a2bbad8a15598635756b09d6c2bf143",
+      "title": "人教版数学",
+      "grade": 2,
+      "semester": "上",
+      "publisher": "人民教育出版社",
+      "editionId": "pep-math-2a-approval-2024",
+      "curriculumStandard": null,
+      "approvalYear": 2024,
+      "editionLabel": "教育部审定2024",
+      "editionNotes": "封面标注教育部审定2024；版权页未载明出版年月或印次，审定年份不等同出版年份。按原书核对册次。",
+      "publicationDate": null,
+      "editionNumber": null,
+      "printingDate": null,
+      "printingNumber": null,
+      "bytes": 5296283,
+      "pageCount": 108,
+      "downloadUrl": "https://www.gostudy.net.cn/api/textbooks/math/2/%E4%B8%8A",
+      "sourceKind": "mathApi",
+      "checkedAt": "2026-11-22T10:12:58.663179Z",
+      "evidencePdfPages": [
+        1
+      ],
+      "coverAsset": "assets/textbooks/covers/ae1f6b9dc0eb365fec72f05eaa35554d2a2bbad8a15598635756b09d6c2bf143.webp",
+      "coverSha256": "43840e5eb88b5df58c00a781ba350ffda82f9f5f216afe89625fd8d4a20e0228",
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": false
     },
     {
       "subject": "math",
@@ -133,7 +229,39 @@
       ],
       "coverAsset": "assets/textbooks/covers/f8f224ad2c44ffcd50d00c46ae444024cb1772b8c5b1ec2ced08fbb5680113e9.webp",
       "coverSha256": "79db50e066eb45be4c9938448fb1f6c8e02a442431bb74f1752c219b9a401a5b",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": false,
+      "supportsMathCourseGeneration": true
+    },
+    {
+      "subject": "math",
+      "sha256": "f7bad5571165fa22712980994d26ed77c9280d49897359305e9f7b3ea1faf901",
+      "title": "人教版数学",
+      "grade": 2,
+      "semester": "下",
+      "publisher": "人民教育出版社",
+      "editionId": "pep-math-2b-approval-2024",
+      "curriculumStandard": null,
+      "approvalYear": 2024,
+      "editionLabel": "教育部审定2024",
+      "editionNotes": "封面标注教育部审定2024；版权页未载明出版年月或印次，审定年份不等同出版年份。按原书核对册次。",
+      "publicationDate": null,
+      "editionNumber": null,
+      "printingDate": null,
+      "printingNumber": null,
+      "bytes": 5546879,
+      "pageCount": 106,
+      "downloadUrl": "https://www.gostudy.net.cn/api/textbooks/math/2/%E4%B8%8B",
+      "sourceKind": "mathApi",
+      "checkedAt": "2026-11-22T10:12:58.663179Z",
+      "evidencePdfPages": [
+        1
+      ],
+      "coverAsset": "assets/textbooks/covers/f7bad5571165fa22712980994d26ed77c9280d49897359305e9f7b3ea1faf901.webp",
+      "coverSha256": "e97f1425f7efea58bc6ab83b74de71ce28e431cac316f13509cd1f4c899a4ef0",
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": false
     },
     {
       "subject": "math",
@@ -166,7 +294,39 @@
       ],
       "coverAsset": "assets/textbooks/covers/117c0e0545218aadab20001250e937ce60b959681dda7006396f7db6eaf368b6.webp",
       "coverSha256": "7a9c738b49d654507d345b6fa2577f591a6802497a30639df68d4f4920b673b4",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": false,
+      "supportsMathCourseGeneration": true
+    },
+    {
+      "subject": "math",
+      "sha256": "2c93ea01b38ec9eb26ba84f31b1117b5d3de61612a99422090e80027d92d44dd",
+      "title": "人教版数学",
+      "grade": 3,
+      "semester": "上",
+      "publisher": "人民教育出版社",
+      "editionId": "pep-math-3a-approval-2024",
+      "curriculumStandard": null,
+      "approvalYear": 2024,
+      "editionLabel": "教育部审定2024",
+      "editionNotes": "封面标注教育部审定2024；版权页未载明出版年月或印次，审定年份不等同出版年份。按原书核对册次。",
+      "publicationDate": null,
+      "editionNumber": null,
+      "printingDate": null,
+      "printingNumber": null,
+      "bytes": 5387624,
+      "pageCount": 114,
+      "downloadUrl": "https://www.gostudy.net.cn/api/textbooks/math/3/%E4%B8%8A",
+      "sourceKind": "mathApi",
+      "checkedAt": "2026-11-22T10:12:58.663179Z",
+      "evidencePdfPages": [
+        1
+      ],
+      "coverAsset": "assets/textbooks/covers/2c93ea01b38ec9eb26ba84f31b1117b5d3de61612a99422090e80027d92d44dd.webp",
+      "coverSha256": "c011bf3b51425b7bdafcd149b57954bfbc6299fdbf0982382f174806c3c0604b",
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": false
     },
     {
       "subject": "math",
@@ -199,7 +359,39 @@
       ],
       "coverAsset": "assets/textbooks/covers/bc517f7e1d1d5a15705d5bc4bf33b00e9f687b1d2e2a8b1d6917df30eb461be3.webp",
       "coverSha256": "14146bd6f727140c3554e9d15cb3266617e146a49f21a860dca2bd220052b52c",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": false,
+      "supportsMathCourseGeneration": true
+    },
+    {
+      "subject": "math",
+      "sha256": "d55c5657b133cebbc4f136bcd19cf9cc7f5cae96e96ad6c99d0897f1ed91ec3c",
+      "title": "人教版数学",
+      "grade": 3,
+      "semester": "下",
+      "publisher": "人民教育出版社",
+      "editionId": "pep-math-3b-approval-2024",
+      "curriculumStandard": null,
+      "approvalYear": 2024,
+      "editionLabel": "教育部审定2024",
+      "editionNotes": "封面标注教育部审定2024；版权页未载明出版年月或印次，审定年份不等同出版年份。按原书核对册次。",
+      "publicationDate": null,
+      "editionNumber": null,
+      "printingDate": null,
+      "printingNumber": null,
+      "bytes": 5619474,
+      "pageCount": 114,
+      "downloadUrl": "https://www.gostudy.net.cn/api/textbooks/math/3/%E4%B8%8B",
+      "sourceKind": "mathApi",
+      "checkedAt": "2026-11-22T10:12:58.663179Z",
+      "evidencePdfPages": [
+        1
+      ],
+      "coverAsset": "assets/textbooks/covers/d55c5657b133cebbc4f136bcd19cf9cc7f5cae96e96ad6c99d0897f1ed91ec3c.webp",
+      "coverSha256": "f18b3ca1368e69d85ec6f5d729ae7645fc4b74df6d8d264d2a1ddd9a6eb2f5b5",
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": false
     },
     {
       "subject": "math",
@@ -232,7 +424,39 @@
       ],
       "coverAsset": "assets/textbooks/covers/ff30d348d60e2c11f456ec9dd70d5cc7f7da20f4f73192cde729b3b4bb94670d.webp",
       "coverSha256": "018d50aa61b541b82bf828489b40e2cbdaf7ef8108a58c13eb8b02aa78ecda23",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": false,
+      "supportsMathCourseGeneration": true
+    },
+    {
+      "subject": "math",
+      "sha256": "2fff47dd2e1f314f51673cba8dc14c88109da5716a66df0f29a1565355c503ee",
+      "title": "人教版数学",
+      "grade": 4,
+      "semester": "上",
+      "publisher": "人民教育出版社",
+      "editionId": "pep-math-4a-approval-2024",
+      "curriculumStandard": null,
+      "approvalYear": 2024,
+      "editionLabel": "教育部审定2024",
+      "editionNotes": "封面标注教育部审定2024；版权页未载明出版年月或印次，审定年份不等同出版年份。按原书核对册次。",
+      "publicationDate": null,
+      "editionNumber": null,
+      "printingDate": null,
+      "printingNumber": null,
+      "bytes": 13499114,
+      "pageCount": 127,
+      "downloadUrl": "https://www.gostudy.net.cn/api/textbooks/math/4/%E4%B8%8A",
+      "sourceKind": "mathApi",
+      "checkedAt": "2026-11-22T10:12:58.663179Z",
+      "evidencePdfPages": [
+        1
+      ],
+      "coverAsset": "assets/textbooks/covers/2fff47dd2e1f314f51673cba8dc14c88109da5716a66df0f29a1565355c503ee.webp",
+      "coverSha256": "429a6db97ab6a1d57f6f69eab7124b116fb041d4fc03672f5cffde623e8c9195",
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": false
     },
     {
       "subject": "math",
@@ -265,7 +489,9 @@
       ],
       "coverAsset": "assets/textbooks/covers/6f8fc1dc5a5105c91dcd65221232041f9a89de232fb26009bfee42b35f6ebe02.webp",
       "coverSha256": "ee4b029cae08a711cf61f240e3a2768798435be9f25e8d9cd14cbe2c2dad6456",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": true
     },
     {
       "subject": "math",
@@ -298,7 +524,39 @@
       ],
       "coverAsset": "assets/textbooks/covers/1d5af3b39e4e7bec4ef7e59faa9535c1e5b06bc7349977dc6d40a2f6c6200bcb.webp",
       "coverSha256": "0a13fef0fa7f31beb60c9611d2b800f08ca13e75b0d61ea5e5640ca5f1b1a7dd",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": false,
+      "supportsMathCourseGeneration": true
+    },
+    {
+      "subject": "math",
+      "sha256": "946005cf902417e3e327deebc06f8aadd7dc92d34bc26e774c982bc766b11acc",
+      "title": "人教版数学",
+      "grade": 5,
+      "semester": "上",
+      "publisher": "人民教育出版社",
+      "editionId": "pep-math-5a-approval-2024",
+      "curriculumStandard": null,
+      "approvalYear": 2024,
+      "editionLabel": "教育部审定2024",
+      "editionNotes": "封面标注教育部审定2024；版权页未载明出版年月或印次，审定年份不等同出版年份。按原书核对册次。",
+      "publicationDate": null,
+      "editionNumber": null,
+      "printingDate": null,
+      "printingNumber": null,
+      "bytes": 13307313,
+      "pageCount": 126,
+      "downloadUrl": "https://www.gostudy.net.cn/api/textbooks/math/5/%E4%B8%8A",
+      "sourceKind": "mathApi",
+      "checkedAt": "2026-11-22T10:12:58.663179Z",
+      "evidencePdfPages": [
+        1
+      ],
+      "coverAsset": "assets/textbooks/covers/946005cf902417e3e327deebc06f8aadd7dc92d34bc26e774c982bc766b11acc.webp",
+      "coverSha256": "313e7b14686daf2db207b6d36aa59992b9fee674f2f6fc1caab371dc68e02eec",
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": false
     },
     {
       "subject": "math",
@@ -331,7 +589,9 @@
       ],
       "coverAsset": "assets/textbooks/covers/657e1547074668dbb50f2bf37f13c20f292127be64c26c5334190aa34d06de83.webp",
       "coverSha256": "56a8ec0fb2fc978d8f5f27624890e3e833a3a3172a00b56a4dbdda3217c102e6",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": true
     },
     {
       "subject": "math",
@@ -364,7 +624,39 @@
       ],
       "coverAsset": "assets/textbooks/covers/645d45193df5f51f378be9b9f7849442f49a666db388f21136fe718b3b1b3345.webp",
       "coverSha256": "f539a19f396f3f00a3bd45dc47e0355e82f13a33199dd35fce3144743ce3fad5",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": false,
+      "supportsMathCourseGeneration": true
+    },
+    {
+      "subject": "math",
+      "sha256": "9b5d29eb4fd8b63599a8481f9dc18158b6a25fb89244ffb4065659a5b39f2ac4",
+      "title": "人教版数学",
+      "grade": 6,
+      "semester": "上",
+      "publisher": "人民教育出版社",
+      "editionId": "pep-math-6a-approval-2024",
+      "curriculumStandard": null,
+      "approvalYear": 2024,
+      "editionLabel": "教育部审定2024",
+      "editionNotes": "封面标注教育部审定2024；版权页未载明出版年月或印次，审定年份不等同出版年份。按原书核对册次。",
+      "publicationDate": null,
+      "editionNumber": null,
+      "printingDate": null,
+      "printingNumber": null,
+      "bytes": 14204719,
+      "pageCount": 126,
+      "downloadUrl": "https://www.gostudy.net.cn/api/textbooks/math/6/%E4%B8%8A",
+      "sourceKind": "mathApi",
+      "checkedAt": "2026-11-22T10:12:58.663179Z",
+      "evidencePdfPages": [
+        1
+      ],
+      "coverAsset": "assets/textbooks/covers/9b5d29eb4fd8b63599a8481f9dc18158b6a25fb89244ffb4065659a5b39f2ac4.webp",
+      "coverSha256": "686e465c50b63df65a8a91741110577bcf94ad4ee9f79a062c212f30b6fad7e1",
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": false
     },
     {
       "subject": "math",
@@ -397,7 +689,9 @@
       ],
       "coverAsset": "assets/textbooks/covers/7e0e76e739c7ac65013c7eb9bfad0f7ef632b2d05cc8d5a1d0970c4b93aab18b.webp",
       "coverSha256": "c0eee932590526a104cf8e9e2c46308a4adeab4819d5f41088446c24ce93232b",
-      "coverSourcePdfPage": 1
+      "coverSourcePdfPage": 1,
+      "downloadable": true,
+      "supportsMathCourseGeneration": true
     }
   ]
 }

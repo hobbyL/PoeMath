@@ -186,9 +186,14 @@ final textbookLocalListProvider = Provider<List<Textbook>>((ref) {
 final textbookCatalogProvider = FutureProvider<List<TextbookCatalogEntry>>(
   (ref) => const TextbookCatalogRepository().load(),
 );
+final textbookDownloadCatalogProvider =
+    FutureProvider<List<TextbookCatalogEntry>>((ref) async {
+      final catalog = await ref.watch(textbookCatalogProvider.future);
+      return List.unmodifiable(catalog.where((entry) => entry.downloadable));
+    });
 final textbookListProvider = Provider<List<Textbook>>((ref) {
   final local = ref.watch(textbookLocalListProvider);
-  final catalog = ref.watch(textbookCatalogProvider).valueOrNull ?? [];
+  final catalog = ref.watch(textbookDownloadCatalogProvider).valueOrNull ?? [];
   final books = {for (final book in local) book.pdfSha256: book};
   for (final entry in catalog) {
     books.putIfAbsent(entry.book.pdfSha256, () => entry.book);

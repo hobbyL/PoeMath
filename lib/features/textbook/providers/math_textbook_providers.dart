@@ -21,6 +21,15 @@ final mathTextbookRepositoryProvider = Provider<MathTextbookCourseRepository>(
     files: ref.watch(textbookFileServiceProvider),
   ),
 );
+final mathTextbookCourseGenerationSupportProvider =
+    Provider.family<bool?, String>(
+      (ref, bookId) => ref
+          .watch(textbookCatalogProvider)
+          .valueOrNull
+          ?.where((entry) => entry.book.pdfSha256 == bookId)
+          .firstOrNull
+          ?.supportsMathCourseGeneration,
+    );
 
 final mathTextbookProfileProvider = StreamProvider<String>((ref) async* {
   yield ProfileScope.currentId;

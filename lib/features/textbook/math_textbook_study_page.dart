@@ -36,6 +36,7 @@ class MathTextbookBookPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(mathTextbookProfileProvider);
+    final catalog = ref.watch(textbookCatalogProvider);
     final book = ref
         .watch(textbookLocalListProvider)
         .where(
@@ -81,35 +82,61 @@ class MathTextbookBookPage extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    data: (_) => ref
-                        .watch(mathTextbookBookLearningProvider(bookId))
-                        .when(
-                          loading: () =>
-                              const Center(child: CircularProgressIndicator()),
-                          error: (error, _) => AppEmptyState(
-                            icon: Icons.error_outline,
-                            title: '学习记录暂时无法读取',
-                            description: mathTextbookDisplayError(
-                              error,
-                              '请稍后重试。',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => ref.invalidate(
-                                  mathTextbookProgressProvider(bookId),
-                                ),
-                                child: const Text('重试'),
+                    data: (course) {
+                      final entry = catalog.valueOrNull
+                          ?.where((value) => value.book.pdfSha256 == bookId)
+                          .firstOrNull;
+                      if (course == null && catalog.isLoading) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (course == null &&
+                          entry?.supportsMathCourseGeneration == false) {
+                        return AppEmptyState(
+                          icon: Icons.menu_book_outlined,
+                          title: '课时学习暂未开放',
+                          description: '当前版本暂时只支持原书阅读，课时内容尚未开放。',
+                          actions: [
+                            TextButton.icon(
+                              onPressed: () => context.push(
+                                AppRoutes.textbookReadOf(bookId),
                               ),
-                            ],
-                          ),
-                          data: (snapshot) => _content(
-                            context,
-                            snapshot.course,
-                            snapshot.lessons,
-                            mode: mode,
-                            currentPages: currentPages,
-                          ),
-                        ),
+                              icon: const Icon(Icons.menu_book_outlined),
+                              label: const Text('阅读原书'),
+                            ),
+                          ],
+                        );
+                      }
+                      return ref
+                          .watch(mathTextbookBookLearningProvider(bookId))
+                          .when(
+                            loading: () => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                            error: (error, _) => AppEmptyState(
+                              icon: Icons.error_outline,
+                              title: '学习记录暂时无法读取',
+                              description: mathTextbookDisplayError(
+                                error,
+                                '请稍后重试。',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => ref.invalidate(
+                                    mathTextbookProgressProvider(bookId),
+                                  ),
+                                  child: const Text('重试'),
+                                ),
+                              ],
+                            ),
+                            data: (snapshot) => _content(
+                              context,
+                              snapshot.course,
+                              snapshot.lessons,
+                              mode: mode,
+                              currentPages: currentPages,
+                            ),
+                          );
+                    },
                   ),
       ),
     );
