@@ -53,6 +53,7 @@ class TextbookResumeCard extends ConsumerWidget {
     );
     return AppTile(
       flat: theme.appearance.ink,
+      flatTrailingIconInset: theme.appearance.ink,
       icon: Icons.menu_book_outlined,
       iconColor: theme.colorScheme.primary,
       title: '继续读《${book.title}》',

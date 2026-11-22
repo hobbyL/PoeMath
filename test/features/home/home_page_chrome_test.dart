@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/home_page.dart';
@@ -28,6 +29,7 @@ Future<void> _pump(
   int streak = 0,
   UserStats? stats,
   int learnedPoems = 0,
+  int dueReviews = 0,
   ThemeData? theme,
 }) async {
   tester.view.physicalSize = size;
@@ -41,6 +43,7 @@ Future<void> _pump(
         isCheckedInProvider.overrideWithValue(checkedIn),
         if (stats != null) userStatsProvider.overrideWithValue(stats),
         poem.learnedCountProvider.overrideWithValue(learnedPoems),
+        poem.dueReviewCountProvider.overrideWithValue(dueReviews),
       ],
       child: MaterialApp(
         theme: theme,
@@ -157,7 +160,7 @@ void main() {
         ) async {
           await _pump(
             tester,
-            size: landscape ? const Size(914, 411) : const Size(411, 914),
+            size: landscape ? const Size(914, 411) : const Size(411, 640),
             safeInsets: landscape
                 ? EdgeInsets.zero
                 : const EdgeInsets.only(top: 32),
@@ -246,6 +249,19 @@ void main() {
       });
     }
   }
+
+  testWidgets('复习卡片后滚动到视口底部，不留多余占位', (tester) async {
+    await _pump(tester, dueReviews: 1);
+    final scroll = tester.state<ScrollableState>(find.byType(Scrollable).first);
+    const review = ValueKey('home-review-reminder');
+    expect(find.byKey(review), findsOneWidget);
+    scroll.position.jumpTo(scroll.position.maxScrollExtent);
+    await tester.pump();
+    final viewport = tester.getRect(find.byType(SingleChildScrollView).first);
+    final card = tester.getRect(find.byKey(review));
+    expect(viewport.bottom - card.bottom, lessThanOrEqualTo(SpacingTokens.lg));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('顶部背景贴边、前景避开状态栏，不重复应用名', (tester) async {
     await _pump(tester);

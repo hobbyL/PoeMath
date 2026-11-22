@@ -35,10 +35,19 @@ class HomeEntryGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     if (children.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    final entries = theme.appearance.ink
+        ? [
+            for (final child in children)
+              if (child is AppTile)
+                child.copyWith(flatTrailingIconInset: true)
+              else
+                child,
+          ]
+        : children;
     final grid = ResponsiveCardGrid(
       preferredTileWidth: preferredTileWidth,
       divided: theme.appearance.ink,
-      children: children,
+      children: entries,
     );
     return theme.appearance.ink
         ? ColoredCard(

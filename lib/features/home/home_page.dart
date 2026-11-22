@@ -91,13 +91,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       ],
 
       // 复习提醒（有待复习时显示）
-      if (dueReviews > 0) ...[
-        _buildReviewReminder(context, dueReviews),
-        const SizedBox(height: SpacingTokens.lg),
-      ],
-
-      // 底部留白：为底部导航栏预留空间
-      const SizedBox(height: 100),
+      if (dueReviews > 0) ...[_buildReviewReminder(context, dueReviews)],
     ];
     var contentIndex = 0;
     final pageOverlayStyle =
@@ -516,6 +510,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildReviewReminder(BuildContext context, int count) {
     final theme = Theme.of(context);
     return ColoredCard(
+      key: const ValueKey('home-review-reminder'),
       color: theme.colorScheme.error,
       onTap: () => context.push(AppRoutes.poemReview),
       child: Row(

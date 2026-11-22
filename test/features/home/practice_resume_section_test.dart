@@ -184,7 +184,8 @@ void main() {
         expect(
           tester.getTopRight(discard).dx +
               SpacingTokens.sm +
-              (SpacingTokens.minTapTarget - tester.getSize(arrow).width) / 2,
+              SpacingTokens.minTapTarget -
+              tester.getSize(arrow).width,
           closeTo(tester.getTopLeft(arrow).dx, .01),
         );
         expect(
@@ -326,7 +327,8 @@ void main() {
         expect(
           discardRect.right +
               SpacingTokens.sm +
-              (SpacingTokens.minTapTarget - arrowRect.width) / 2,
+              SpacingTokens.minTapTarget -
+              arrowRect.width,
           closeTo(arrowRect.left, .01),
         );
         expect(discardRect.center.dx, greaterThan(cardRect.center.dx));
