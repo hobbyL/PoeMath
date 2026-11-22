@@ -60,6 +60,7 @@ void main() {
       updateUrl: 'https://updates.example.com/latest.json',
       client: MockClient.streaming((request, bodyStream) async {
         expect(request, isA<http.AbortableRequest>());
+        expect(request.followRedirects, isFalse);
         expect(request.headers['Accept'], 'application/json');
         return http.StreamedResponse(
           Stream.value(utf8.encode(_validPayload())),
@@ -154,6 +155,7 @@ void main() {
       temporaryDirectoryProvider: () async => temporaryDirectory,
       client: MockClient.streaming((request, bodyStream) async {
         expect(request, isA<http.AbortableRequest>());
+        expect(request.followRedirects, isFalse);
         return http.StreamedResponse(
           Stream.value([1, 2, 3, 4]),
           200,
@@ -172,6 +174,36 @@ void main() {
     expect(file.path, startsWith(temporaryDirectory.path));
     expect(await file.readAsBytes(), [1, 2, 3, 4]);
     expect(progress.last, (received: 4, total: 4));
+  });
+
+  test('更新清单、版本历史和 APK 请求都拒绝自动重定向', () async {
+    final requests = <http.BaseRequest>[];
+    final client = UpdateClient(
+      updateUrl: 'https://updates.example.com/latest.json',
+      temporaryDirectoryProvider: () async => temporaryDirectory,
+      client: MockClient((request) async {
+        requests.add(request);
+        return http.Response(
+          '',
+          302,
+          headers: const {'location': 'http://attacker.example/update'},
+        );
+      }),
+    );
+
+    await expectLater(client.fetchLatest(), throwsA(isA<UpdateException>()));
+    expect(await client.fetchHistory(), isEmpty);
+    await expectLater(
+      client.downloadApk(_updateInfo()),
+      throwsA(isA<UpdateException>()),
+    );
+
+    expect(requests, hasLength(3));
+    expect(requests.every((request) => !request.followRedirects), isTrue);
+    expect(
+      await Directory('${temporaryDirectory.path}/poemath_update').exists(),
+      isFalse,
+    );
   });
 
   test('持续收到数据时不按总下载时长超时', () async {

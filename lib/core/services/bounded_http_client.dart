@@ -151,8 +151,11 @@ class BoundedHttpClient extends http.BaseClient {
     Map<String, String>? headers,
     Object? body,
     Duration? deadline,
+    bool followRedirects = true,
   }) async {
-    final request = http.Request(method, uri)..headers.addAll(headers ?? {});
+    final request = http.Request(method, uri)
+      ..headers.addAll(headers ?? {})
+      ..followRedirects = followRedirects;
     if (body is String) request.body = body;
     if (body is List<int>) request.bodyBytes = body;
     return http.Response.fromStream(

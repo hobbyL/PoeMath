@@ -147,6 +147,7 @@ class UpdateClient {
         'GET',
         uri,
         headers: const {'Accept': 'application/json'},
+        followRedirects: false,
       );
     } on http.RequestAbortedException {
       throw const UpdateException('检查更新超时');
@@ -198,6 +199,7 @@ class UpdateClient {
         'GET',
         uri,
         headers: const {'Accept': 'application/json'},
+        followRedirects: false,
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return const [];
@@ -267,7 +269,7 @@ class UpdateClient {
       'GET',
       uri,
       abortTrigger: abortTrigger,
-    );
+    )..followRedirects = false;
     final http.StreamedResponse response;
     var awaitingResponse = true;
     try {
