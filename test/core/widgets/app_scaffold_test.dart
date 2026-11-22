@@ -1,10 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/widgets/app_scaffold.dart';
 import 'package:poemath/core/widgets/pine_ink_surface.dart';
 
 void main() {
+  for (final preset in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('AppScaffold 导航栏和状态栏使用相同主题纸色：$preset/$brightness', (
+        tester,
+      ) async {
+        final theme = AppTheme.resolve(subject: preset, brightness: brightness);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: AppScaffold(
+              appBar: AppBar(title: const Text('主题子页')),
+              body: const SizedBox.expand(),
+            ),
+          ),
+        );
+        final style = tester.binding.renderViews.first.debugLayer!
+            .find<SystemUiOverlayStyle>(const Offset(120, 8));
+        expect(style?.statusBarColor, theme.scaffoldBackgroundColor);
+        expect(
+          style?.statusBarIconBrightness,
+          brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('页面底图保留原生正文约束、安全区和键盘避让', (tester) async {
     addTearDown(tester.view.reset);
     tester.view.devicePixelRatio = 1;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 
 /// 共享 Material 交互与排版基线；色板、字族和外观由预设提供。
@@ -16,6 +17,16 @@ class AppThemeBuilder {
     final primary = scheme.primary;
     final surface = scheme.surface;
     final ink = scheme.onSurface;
+    final statusBarStyle = SystemUiOverlayStyle(
+      statusBarColor: page,
+      statusBarIconBrightness: brightness == Brightness.dark
+          ? Brightness.light
+          : Brightness.dark,
+      statusBarBrightness: brightness == Brightness.dark
+          ? Brightness.dark
+          : Brightness.light,
+      systemStatusBarContrastEnforced: false,
+    );
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(appearance.controlRadius),
     );
@@ -45,6 +56,7 @@ class AppThemeBuilder {
         scrolledUnderElevation: 0,
         centerTitle: true,
         titleTextStyle: text.titleLarge,
+        systemOverlayStyle: statusBarStyle,
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

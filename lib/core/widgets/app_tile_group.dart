@@ -28,7 +28,7 @@ class AppTileGroup extends StatelessWidget {
         children: [
           for (final (index, child) in children.indexed) ...[
             if (index > 0) const Divider(height: 0),
-            child.copyWith(flat: true),
+            child.copyWith(flat: true, flatTrailingIconInset: true),
           ],
         ],
       ),

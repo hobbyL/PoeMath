@@ -57,6 +57,7 @@ class AppTile extends StatelessWidget {
     this.flat = false,
     this.flatLeadingEdgeAligned = false,
     this.flatTrailingEdgeAligned = false,
+    this.flatTrailingIconInset = false,
     this.selected = false,
     this.crossAxisAlignment = CrossAxisAlignment.center,
     this.layout = AppTileLayout.row,
@@ -152,6 +153,10 @@ class AppTile extends StatelessWidget {
   /// 普通列表行中将尾部图形贴到内容区右边界；整行仍保留 44dp 点击高度。
   final bool flatTrailingEdgeAligned;
 
+  /// Flat grouped rows keep the tap slot while aligning the default arrow to
+  /// the row's symmetric end inset.
+  final bool flatTrailingIconInset;
+
   /// 普通列表行（[flat]）的选中状态，提供主题高亮和辅助技术选中语义。
   final bool selected;
 
@@ -161,7 +166,7 @@ class AppTile extends StatelessWidget {
   /// 海报式入口将图标置于文字上方，保留相同点击和尾部控件规则。
   final AppTileLayout layout;
 
-  AppTile copyWith({bool? flat}) => AppTile(
+  AppTile copyWith({bool? flat, bool? flatTrailingIconInset}) => AppTile(
     key: key,
     icon: icon,
     leading: leading,
@@ -189,6 +194,7 @@ class AppTile extends StatelessWidget {
     flat: flat ?? this.flat,
     flatLeadingEdgeAligned: flatLeadingEdgeAligned,
     flatTrailingEdgeAligned: flatTrailingEdgeAligned,
+    flatTrailingIconInset: flatTrailingIconInset ?? this.flatTrailingIconInset,
     selected: selected,
     crossAxisAlignment: crossAxisAlignment,
     layout: layout,
@@ -296,6 +302,16 @@ class AppTile extends StatelessWidget {
                   height: SpacingTokens.minTapTarget,
                   child: Align(
                     widthFactor: 1,
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: trailingContent,
+                  ),
+                )
+              : flatTrailingIconInset &&
+                    trailing == null &&
+                    trailingAction == null
+              ? SizedBox.square(
+                  dimension: SpacingTokens.minTapTarget,
+                  child: Align(
                     alignment: AlignmentDirectional.centerEnd,
                     child: trailingContent,
                   ),
@@ -471,7 +487,9 @@ class AppTile extends StatelessWidget {
                 padding: EdgeInsetsDirectional.fromSTEB(
                   flatLeadingEdgeAligned ? 0 : SpacingTokens.sm,
                   SpacingTokens.xs,
-                  flatTrailingEdgeAligned ? 0 : SpacingTokens.sm,
+                  flatTrailingEdgeAligned || flatLeadingEdgeAligned
+                      ? 0
+                      : SpacingTokens.sm,
                   SpacingTokens.xs,
                 ),
                 child: content,

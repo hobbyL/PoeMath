@@ -7,6 +7,44 @@ import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_tile.dart';
 
 void main() {
+  for (final flat in [false, true]) {
+    testWidgets('卡片箭头和左侧图标与各自边缘保持相同间距 flat=$flat', (tester) async {
+      final theme = AppTheme.resolve(
+        subject: AppSubject.poem,
+        brightness: Brightness.light,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(SpacingTokens.xl),
+              child: SizedBox(
+                width: 320,
+                child: AppTile(
+                  flat: flat,
+                  flatTrailingIconInset: flat,
+                  icon: Icons.history_outlined,
+                  iconColor: theme.colorScheme.primary,
+                  title: '学习记录',
+                  subtitle: '',
+                  onTap: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final tile = tester.getRect(find.byType(AppTile));
+      final icon = tester.getRect(find.byIcon(Icons.history_outlined));
+      final arrow = tester.getRect(find.byIcon(Icons.chevron_right));
+      final edgeInset = flat ? SpacingTokens.sm : SpacingTokens.md;
+      expect(icon.left - tile.left, closeTo(edgeInset, .01));
+      expect(tile.right - arrow.right, closeTo(edgeInset, .01));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('两行摘要与换行时间保持左右布局，未配置的列表行保留单行默认值', (tester) async {
     final theme = AppTheme.resolve(
       subject: AppSubject.poem,
