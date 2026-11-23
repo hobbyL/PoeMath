@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PoeMath textbook catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "repository", "books"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+    "books": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/book"}
+    }
+  },
+  "$defs": {
+    "book": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject", "grade", "semester", "title", "publisher", "editionId",
+        "curriculumStandard", "approvalYear", "editionLabel", "editionNotes",
+        "publicationDate", "editionNumber", "printingDate", "printingNumber",
+        "sha256", "bytes", "pageCount", "downloadUrl", "sourceRepository",
+        "sourceCommit", "sourcePath", "gitBlobSha", "checkedAt",
+        "evidencePdfPages", "coverPath", "coverSha256", "coverSourcePdfPage",
+        "downloadable", "supportsMathCourseGeneration",
+        "redistributionPermissionVerified", "redistributionEvidence"
+      ],
+      "properties": {
+        "subject": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
+        "grade": {"type": "integer", "minimum": 1, "maximum": 12},
+        "semester": {"enum": ["上", "下"]},
+        "title": {"type": "string", "minLength": 1},
+        "publisher": {"type": "string", "minLength": 1},
+        "editionId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
+        "curriculumStandard": {"type": ["string", "null"]},
+        "approvalYear": {"type": ["integer", "null"], "minimum": 1900, "maximum": 2099},
+        "editionLabel": {"type": "string", "minLength": 1},
+        "editionNotes": {"type": "string", "minLength": 1},
+        "publicationDate": {"type": ["string", "null"]},
+        "editionNumber": {"type": ["integer", "null"], "minimum": 1},
+        "printingDate": {"type": ["string", "null"]},
+        "printingNumber": {"type": ["integer", "null"], "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "pageCount": {"type": "integer", "minimum": 1},
+        "downloadUrl": {"type": "string", "format": "uri"},
+        "sourceRepository": {"type": "string"},
+        "sourceCommit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "sourcePath": {"type": "string", "minLength": 1},
+        "gitBlobSha": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "checkedAt": {"type": "string", "format": "date-time"},
+        "evidencePdfPages": {"type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 1, "uniqueItems": true},
+        "coverPath": {"type": "string", "minLength": 1},
+        "coverSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "coverSourcePdfPage": {"const": 1},
+        "downloadable": {"type": "boolean"},
+        "supportsMathCourseGeneration": {"type": "boolean"},
+        "redistributionPermissionVerified": {"type": "boolean"},
+        "redistributionEvidence": {"type": "string"}
+      }
+    }
+  }
+}

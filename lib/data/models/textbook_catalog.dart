@@ -15,6 +15,7 @@ class TextbookCatalogEntry {
     this.sourcePath,
     this.sourceBlobSha,
     this.coverAsset,
+    this.coverPath,
     this.coverSha256,
     this.publicationDate,
     this.editionNumber,
@@ -23,6 +24,8 @@ class TextbookCatalogEntry {
     this.approvalYear,
     this.downloadable = true,
     this.supportsMathCourseGeneration = true,
+    this.redistributionPermissionVerified = false,
+    this.redistributionEvidence,
   });
 
   final Textbook book;
@@ -35,6 +38,7 @@ class TextbookCatalogEntry {
   final List<int> evidencePdfPages;
   final String? sourceBlobSha;
   final String? coverAsset;
+  final String? coverPath;
   final String? coverSha256;
   final String? publicationDate;
   final int? editionNumber;
@@ -43,6 +47,44 @@ class TextbookCatalogEntry {
   final int? approvalYear;
   final bool downloadable;
   final bool supportsMathCourseGeneration;
+  final bool redistributionPermissionVerified;
+  final String? redistributionEvidence;
+
+  TextbookCatalogEntry withDownloadable(bool value) => TextbookCatalogEntry(
+    book: book,
+    downloadUrl: downloadUrl,
+    editionLabel: editionLabel,
+    evidencePdfPages: evidencePdfPages,
+    sourceKind: sourceKind,
+    sourceRepository: sourceRepository,
+    sourceCommit: sourceCommit,
+    sourcePath: sourcePath,
+    sourceBlobSha: sourceBlobSha,
+    coverAsset: coverAsset,
+    coverPath: coverPath,
+    coverSha256: coverSha256,
+    publicationDate: publicationDate,
+    editionNumber: editionNumber,
+    printingDate: printingDate,
+    printingNumber: printingNumber,
+    approvalYear: approvalYear,
+    downloadable: value,
+    supportsMathCourseGeneration: supportsMathCourseGeneration,
+    redistributionPermissionVerified: redistributionPermissionVerified,
+    redistributionEvidence: redistributionEvidence,
+  );
+
+  Uri? get coverUrl {
+    final path = coverPath;
+    final repository = sourceRepository;
+    final commit = sourceCommit;
+    if (path == null || repository == null || commit == null) return null;
+    final encodedPath = path.split('/').map(Uri.encodeComponent).join('/');
+    return Uri.parse(
+      'https://raw.githubusercontent.com/$repository/$commit/$encodedPath',
+    );
+  }
+
   Uri? get fallbackDownloadUrl =>
       sourceKind != TextbookCatalogSourceKind.githubRaw ||
           sourceBlobSha == null ||
@@ -53,7 +95,10 @@ class TextbookCatalogEntry {
           '/repos/$sourceRepository/git/blobs/$sourceBlobSha',
         );
 
-  factory TextbookCatalogEntry.fromJson(Map<String, dynamic> json) {
+  factory TextbookCatalogEntry.fromJson(
+    Map<String, dynamic> json, {
+    String? expectedRepository,
+  }) {
     final uri = Uri.parse(json['downloadUrl'] as String);
     final rawSourceKind = json['sourceKind'];
     final sourceKind = switch (rawSourceKind) {
@@ -88,16 +133,32 @@ class TextbookCatalogEntry {
     final edition = json['editionLabel'] as String;
     final blob = json['gitBlobSha'] as String?;
     final cover = json['coverAsset'] as String?;
+    final coverPath = json['coverPath'] as String?;
     final coverHash = json['coverSha256'] as String?;
     final approvalYear = json['approvalYear'] as int?;
     final rawDownloadable = json['downloadable'];
     final rawGeneration = json['supportsMathCourseGeneration'];
+    final rawPermission = json['redistributionPermissionVerified'];
+    final permissionEvidence = json['redistributionEvidence'] as String?;
     if (rawDownloadable != null && rawDownloadable is! bool ||
-        rawGeneration != null && rawGeneration is! bool) {
+        rawGeneration != null && rawGeneration is! bool ||
+        rawPermission != null && rawPermission is! bool) {
       throw const FormatException('教材目录状态无效');
     }
     final downloadable = rawDownloadable as bool? ?? true;
     final supportsMathCourseGeneration = rawGeneration as bool? ?? true;
+    final redistributionPermissionVerified = rawPermission as bool? ?? false;
+    bool validRelativePath(String? value) =>
+        value != null &&
+        value.isNotEmpty &&
+        !value.startsWith('/') &&
+        !value.contains('\\') &&
+        value
+            .split('/')
+            .every(
+              (segment) =>
+                  segment.isNotEmpty && segment != '.' && segment != '..',
+            );
     final sourceValid = switch (sourceKind) {
       TextbookCatalogSourceKind.githubRaw =>
         uri.scheme == 'https' &&
@@ -108,10 +169,10 @@ class TextbookCatalogEntry {
             !uri.hasFragment &&
             repository != null &&
             repository.trim().isNotEmpty &&
+            (expectedRepository == null || repository == expectedRepository) &&
             commit != null &&
             RegExp(r'^[a-f0-9]{40}$').hasMatch(commit) &&
-            path != null &&
-            path.isNotEmpty &&
+            validRelativePath(path) &&
             uri.pathSegments.join('/') == '$repository/$commit/$path' &&
             (blob == null || RegExp(r'^[a-f0-9]{40}$').hasMatch(blob)),
       TextbookCatalogSourceKind.mathApi =>
@@ -139,11 +200,20 @@ class TextbookCatalogEntry {
         pages.any((page) => page < 1 || page > book.pageCount) ||
         subject != 'math' && !supportsMathCourseGeneration ||
         (cover != null &&
-            (cover != 'assets/textbooks/covers/${book.pdfSha256}.webp' ||
+            (coverPath != null ||
+                cover != 'assets/textbooks/covers/${book.pdfSha256}.webp' ||
                 coverHash == null ||
                 !RegExp(r'^[a-f0-9]{64}$').hasMatch(coverHash) ||
                 json['coverSourcePdfPage'] != 1)) ||
-        (cover == null && coverHash != null) ||
+        (coverPath != null &&
+            (cover != null ||
+                sourceKind != TextbookCatalogSourceKind.githubRaw ||
+                !validRelativePath(coverPath) ||
+                coverPath != 'covers/${book.pdfSha256}.webp' ||
+                coverHash == null ||
+                !RegExp(r'^[a-f0-9]{64}$').hasMatch(coverHash) ||
+                json['coverSourcePdfPage'] != 1)) ||
+        (cover == null && coverPath == null && coverHash != null) ||
         approvalYear != null && (approvalYear < 1900 || approvalYear > 2099)) {
       throw const FormatException('教材目录信息无效');
     }
@@ -158,6 +228,7 @@ class TextbookCatalogEntry {
       evidencePdfPages: List.unmodifiable(pages),
       sourceBlobSha: blob,
       coverAsset: cover,
+      coverPath: coverPath,
       coverSha256: coverHash,
       publicationDate: json['publicationDate'] as String?,
       editionNumber: json['editionNumber'] as int?,
@@ -166,6 +237,8 @@ class TextbookCatalogEntry {
       approvalYear: approvalYear,
       downloadable: downloadable,
       supportsMathCourseGeneration: supportsMathCourseGeneration,
+      redistributionPermissionVerified: redistributionPermissionVerified,
+      redistributionEvidence: permissionEvidence,
     );
   }
 }
