@@ -801,6 +801,16 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                                                 layout,
                                               )
                                             : const SizedBox.shrink()
+                                      : entry?.coverUrl != null
+                                      ? Image.network(
+                                          entry!.coverUrl.toString(),
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) =>
+                                              TextbookCoverPlaceholder(
+                                                title: book.title,
+                                                status: '下载后可翻页查看',
+                                              ),
+                                        )
                                       : entry?.coverAsset != null
                                       ? Image.asset(
                                           entry!.coverAsset!,

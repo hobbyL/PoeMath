@@ -9,6 +9,7 @@ import 'package:hive/hive.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
@@ -282,6 +283,7 @@ void main() {
     Size? size,
     List<TextbookCatalogEntry> catalog = const [],
     TextbookCoverRenderer? coverRenderer,
+    ThemeData? theme,
   }) async {
     tester.view.physicalSize = size ?? const Size(360, 800);
     tester.view.devicePixelRatio = 1;
@@ -307,6 +309,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          theme: theme,
           builder: large
               ? (context, child) => MediaQuery(
                   data: MediaQuery.of(context)
@@ -649,7 +652,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('下载页不含提示与筛选，窄屏大字的封面卡片可下载且不提前登记', (tester) async {
+  testWidgets('下载页学科切换位于导航栏，窄屏大字封面卡片仍可下载', (tester) async {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await pump(
@@ -657,6 +660,14 @@ void main() {
       const TextbookShelfPage(),
       large: true,
       catalog: [catalogEntry],
+    );
+    expect(find.text('教材下载'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byType(SegmentedButton<TextbookSubject>),
+      ),
+      findsOneWidget,
     );
     expect(find.text('导入本地 PDF'), findsNothing);
     expect(find.text('选一本教材，下载后离线阅读'), findsNothing);
@@ -696,6 +707,43 @@ void main() {
     expect(card.bottom - actionIcon.bottom, closeTo(8, 0.01));
     expect(card.bottom - status.bottom, closeTo(8, 0.01));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('下载页导航分段按钮适配四主题明暗模式及窄屏大字', (tester) async {
+    for (final subject in AppSubject.values) {
+      for (final brightness in Brightness.values) {
+        await pump(
+          tester,
+          const TextbookShelfPage(),
+          large: true,
+          size: const Size(320, 800),
+          catalog: [catalogEntry],
+          theme: AppTheme.resolve(subject: subject, brightness: brightness),
+        );
+
+        final appBar = find.byType(AppBar);
+        final selector = find.descendant(
+          of: appBar,
+          matching: find.byType(SegmentedButton<TextbookSubject>),
+        );
+        expect(selector, findsOneWidget);
+        expect(find.text('教材下载'), findsNothing);
+        final appBarBounds = tester.getRect(appBar);
+        final selectorBounds = tester.getRect(selector);
+        expect(selectorBounds.top, greaterThanOrEqualTo(appBarBounds.top));
+        expect(selectorBounds.bottom, lessThanOrEqualTo(appBarBounds.bottom));
+
+        await tester.tap(
+          find.descendant(of: selector, matching: find.text('数学')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<SegmentedButton<TextbookSubject>>(selector).selected,
+          {TextbookSubject.math},
+        );
+        expect(tester.takeException(), isNull);
+      }
+    }
   });
 
   testWidgets('未下载书籍直接显示真实封面，网格先横向再换行且可滚动到最后一册', (tester) async {

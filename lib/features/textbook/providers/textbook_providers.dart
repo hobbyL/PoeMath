@@ -183,9 +183,26 @@ final textbookLocalListProvider = Provider<List<Textbook>>((ref) {
         book,
   ];
 });
-final textbookCatalogProvider = FutureProvider<List<TextbookCatalogEntry>>(
-  (ref) => const TextbookCatalogRepository().load(),
+final textbookCatalogRemoteConfigProvider =
+    Provider<TextbookCatalogRemoteConfig>(
+      (ref) => const TextbookCatalogRemoteConfig.disabled(),
+    );
+final textbookCatalogRepositoryProvider = Provider<TextbookCatalogRepository>(
+  (ref) => TextbookCatalogRepository(
+    config: ref.watch(textbookCatalogRemoteConfigProvider),
+  ),
 );
+final textbookCatalogProvider = FutureProvider<List<TextbookCatalogEntry>>(
+  (ref) => ref.watch(textbookCatalogRepositoryProvider).load(),
+);
+final textbookCatalogRefreshProvider = FutureProvider.autoDispose<void>((
+  ref,
+) async {
+  final refreshed = await ref
+      .watch(textbookCatalogRepositoryProvider)
+      .refreshRemote();
+  if (refreshed) ref.invalidate(textbookCatalogProvider);
+});
 final textbookDownloadCatalogProvider =
     FutureProvider<List<TextbookCatalogEntry>>((ref) async {
       final catalog = await ref.watch(textbookCatalogProvider.future);

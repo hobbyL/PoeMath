@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -80,7 +82,16 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
               label: book.title,
               image: true,
               excludeSemantics: true,
-              child: entry.coverAsset == null
+              child: entry.coverUrl != null
+                  ? Image.network(
+                      entry.coverUrl.toString(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => TextbookCoverPlaceholder(
+                        title: book.title,
+                        status: book.volumeLabel,
+                      ),
+                    )
+                  : entry.coverAsset == null
                   ? TextbookCoverPlaceholder(
                       title: book.title,
                       status: book.volumeLabel,
@@ -209,48 +220,76 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final catalog = ref.watch(textbookDownloadCatalogProvider);
+    final catalogRefresh = ref.watch(textbookCatalogRefreshProvider);
+    final labelStyle = theme.textTheme.labelLarge!;
+    final labelHeight =
+        MediaQuery.textScalerOf(context).scale(labelStyle.fontSize!) *
+        (labelStyle.height ?? 1);
+    final toolbarHeight = math.max(
+      kToolbarHeight,
+      labelHeight + SpacingTokens.sm * 4,
+    );
     final textStyle = DefaultTextStyle.of(context).style
         .merge(theme.textTheme.bodySmall)
         .copyWith(height: 1.5);
     return AppScaffold(
       backgroundScene: PineInkScene.study,
-      appBar: AppBar(title: const Text('教材下载')),
+      appBar: AppBar(
+        centerTitle: true,
+        toolbarHeight: toolbarHeight,
+        title: SegmentedButton<TextbookSubject>(
+          showSelectedIcon: false,
+          style: SegmentedButton.styleFrom(
+            minimumSize: const Size(0, SpacingTokens.xxl),
+            padding: const EdgeInsets.all(SpacingTokens.sm),
+          ),
+          segments: const [
+            ButtonSegment(
+              value: TextbookSubject.chinese,
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('语文', maxLines: 1),
+              ),
+            ),
+            ButtonSegment(
+              value: TextbookSubject.math,
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('数学', maxLines: 1),
+              ),
+            ),
+          ],
+          selected: {_subject},
+          onSelectionChanged: (values) =>
+              setState(() => _subject = values.single),
+        ),
+        actions: [
+          IconButton(
+            tooltip: '刷新教材目录',
+            onPressed: () => ref.invalidate(textbookCatalogRefreshProvider),
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              sliver: SliverToBoxAdapter(
-                child: SegmentedButton<TextbookSubject>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(
-                      value: TextbookSubject.chinese,
-                      label: Text('语文'),
-                    ),
-                    ButtonSegment(
-                      value: TextbookSubject.math,
-                      label: Text('数学'),
-                    ),
-                  ],
-                  selected: {_subject},
-                  onSelectionChanged: (values) =>
-                      setState(() => _subject = values.single),
-                ),
-              ),
-            ),
             catalog.when(
               data: (catalogEntries) {
                 final entries = catalogEntries
                     .where((entry) => entry.book.subject == _subject)
                     .toList();
-                return entries.isEmpty
-                    ? const SliverFillRemaining(
+                return entries.isEmpty && catalogRefresh.isLoading
+                    ? const SliverToBoxAdapter(child: LinearProgressIndicator())
+                    : entries.isEmpty
+                    ? SliverFillRemaining(
                         hasScrollBody: false,
                         child: AppEmptyState(
                           icon: Icons.download_outlined,
                           title: '暂无可下载书籍',
-                          description: '可先在书籍管理中导入本地 PDF。',
+                          description: catalogRefresh.hasError
+                              ? '目录暂时无法读取，可重试。'
+                              : '当前没有已整理且可下载的书目。',
                         ),
                       )
                     : TextbookCoverGrid(
@@ -272,8 +311,10 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
                       children: [
                         const Text('教材目录暂时无法读取'),
                         TextButton(
-                          onPressed: () =>
-                              ref.invalidate(textbookCatalogProvider),
+                          onPressed: () {
+                            ref.invalidate(textbookCatalogProvider);
+                            ref.invalidate(textbookCatalogRefreshProvider);
+                          },
                           child: const Text('重新加载目录'),
                         ),
                       ],

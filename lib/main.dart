@@ -14,6 +14,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/app_bootstrap.dart';
 import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
 import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/data/repositories/textbook_catalog_repository.dart';
+import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 
 /// 挂载全局错误处理，让 release 包的未捕获异常进入诊断缓冲。
 ///
@@ -74,5 +76,14 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   installGlobalErrorHandlers();
   registerAssetLicenses();
-  runApp(const ProviderScope(child: AppBootstrap()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        textbookCatalogRemoteConfigProvider.overrideWithValue(
+          TextbookCatalogRemoteConfig.publicLibrary,
+        ),
+      ],
+      child: const AppBootstrap(),
+    ),
+  );
 }
