@@ -526,6 +526,42 @@ String mathTextbookSectionTitle(MathTextbookBlock block) {
   return title.length > 200 ? '${title.substring(0, 199)}…' : title;
 }
 
+bool isReadableMathTextbookDisplayTitle(String value) {
+  if (value.trim().isEmpty || RegExp(r'[\r\n]').hasMatch(value)) return false;
+  final readable = value.replaceAll(
+    RegExp(
+      r'[\s\d零〇一二三四五六七八九十百千万~～（）()\[\]【】{}<>《》:：,，.。;；!?！？、·…⋯_+=×÷/\\—-]+',
+    ),
+    '',
+  );
+  return readable.isNotEmpty;
+}
+
+Map<String, String> mathTextbookExampleSections(MathTextbookLesson lesson) {
+  var section = isReadableMathTextbookDisplayTitle(lesson.title)
+      ? lesson.title.trim()
+      : '';
+  final sections = <String, String>{};
+  for (final block in lesson.blocks) {
+    if (block.kind == MathTextbookBlockKind.sourcePage ||
+        isMathTextbookFooter(block)) {
+      continue;
+    }
+    if (block.kind == MathTextbookBlockKind.example) {
+      sections[block.id] = section;
+      continue;
+    }
+    if (block.kind != MathTextbookBlockKind.heading ||
+        isMathTextbookExampleStepHeading(block.text) ||
+        isMathTextbookPracticeHeading(block.text)) {
+      continue;
+    }
+    final heading = block.text.trim();
+    if (isReadableMathTextbookDisplayTitle(heading)) section = heading;
+  }
+  return Map.unmodifiable(sections);
+}
+
 String _knowledgeSummary(MathTextbookBlock block) {
   var text = block.text.trim();
   if (block.exerciseNumber != null) {
@@ -580,6 +616,7 @@ List<MathTextbookKnowledgePoint> mathTextbookStudyNotes(
         .where((point) => point.summary.trim().isNotEmpty)
         .toList();
   }
+  final exampleSections = mathTextbookExampleSections(lesson);
   final notes = <MathTextbookKnowledgePoint>[];
   for (final point in learning.knowledgePoints) {
     final statements = <String>{};
@@ -613,9 +650,24 @@ List<MathTextbookKnowledgePoint> mathTextbookStudyNotes(
       }
     }
     if (statements.isEmpty) continue;
-    final title = point.title
+    var title = point.title
         .replaceFirst(RegExp(r'\s*·\s*例\s*[^·]+$'), '')
         .trim();
+    if (!isReadableMathTextbookDisplayTitle(title)) {
+      final example = lesson.blocks
+          .where(
+            (block) =>
+                block.kind == MathTextbookBlockKind.example &&
+                point.blockIds.contains(block.id),
+          )
+          .firstOrNull;
+      final section = example == null ? null : exampleSections[example.id];
+      if (section != null && section.isNotEmpty) {
+        title = section;
+      } else if (example != null) {
+        title = mathTextbookSectionTitle(example);
+      }
+    }
     final index = notes.indexWhere((note) => note.title == title);
     if (index < 0) {
       notes.add(
@@ -648,6 +700,7 @@ MathTextbookLearning seedMathTextbookLearning(
     lesson,
     unitTitle: unitTitle,
     legacyLayout: legacyLayout,
+    legacyExampleTitles: legacyLayout,
     classifyPracticeSections: !legacyLayout,
     excludeIntroductions: !legacyLayout,
   ).toJson(),
@@ -664,17 +717,22 @@ MathTextbookLesson resolveMathTextbookLearningSections(
     return lesson;
   }
   final digest = textbookContentDigest(learning.toJson());
-  final reproducible = [false, true].any(
-    (classify) =>
-        textbookContentDigest(
-          _seedMathTextbookLearning(
-            lesson,
-            unitTitle: learning.unitTitle,
-            classifyPracticeSections: classify,
-          ).toJson(),
-        ) ==
-        digest,
-  );
+  final reproducible = [
+    for (final classify in [false, true])
+      for (final excludeIntroductions in [false, true])
+        for (final legacyLayout in [false, true])
+          for (final legacyExampleTitles in [false, true])
+            textbookContentDigest(
+              _seedMathTextbookLearning(
+                lesson,
+                unitTitle: learning.unitTitle,
+                legacyLayout: legacyLayout,
+                legacyExampleTitles: legacyExampleTitles,
+                classifyPracticeSections: classify,
+                excludeIntroductions: excludeIntroductions,
+              ).toJson(),
+            ),
+  ].contains(digest);
   if (!reproducible) return lesson;
   final corrected = _seedMathTextbookLearning(
     lesson,
@@ -685,8 +743,43 @@ MathTextbookLesson resolveMathTextbookLearningSections(
   // Do not make a valid saved course unreadable if the extra question groups
   // exceed the learning schema's limit. Generation still validates this limit.
   if (corrected.exercises.length > 1000) return lesson;
-  if (textbookContentDigest(corrected.toJson()) == digest) return lesson;
-  return lesson.edit(learning: corrected);
+  final sections = mathTextbookExampleSections(lesson);
+  final knowledgePoints = corrected.knowledgePoints.map((point) {
+    final titleWithoutExample = point.title
+        .replaceFirst(RegExp(r'\s*·\s*例\s*[^·]+$'), '')
+        .trim();
+    if (isReadableMathTextbookDisplayTitle(titleWithoutExample)) return point;
+    final example = lesson.blocks
+        .where(
+          (block) =>
+              block.kind == MathTextbookBlockKind.example &&
+              point.blockIds.contains(block.id),
+        )
+        .firstOrNull;
+    if (example == null) return point;
+    final section = sections[example.id] ?? '';
+    final exampleTitle = mathTextbookSectionTitle(example);
+    final title = section.isEmpty ? exampleTitle : '$section · $exampleTitle';
+    final boundedTitle = title.length <= 200
+        ? title
+        : '${title.substring(0, 199)}…';
+    return MathTextbookKnowledgePoint(
+      id: point.id,
+      title: boundedTitle,
+      summary: point.summary,
+      blockIds: point.blockIds,
+    );
+  }).toList();
+  final normalized = MathTextbookLearning(
+    unitTitle: corrected.unitTitle,
+    knowledgePoints: knowledgePoints,
+    exercises: corrected.exercises,
+    practicePlans: corrected.practicePlans,
+    coverageConfirmed: corrected.coverageConfirmed,
+    noExercises: corrected.noExercises,
+  );
+  if (textbookContentDigest(normalized.toJson()) == digest) return lesson;
+  return lesson.edit(learning: normalized);
 }
 
 /// Reconstruct an exact older automatic configuration solely to validate and
@@ -711,14 +804,17 @@ MathTextbookLesson? mathTextbookLessonBeforeIntroductionFix(
     return null;
   }
   for (final classify in [true, false]) {
-    final previous = lesson.edit(
-      learning: _seedMathTextbookLearning(
-        lesson,
-        unitTitle: learning.unitTitle,
-        classifyPracticeSections: classify,
-      ),
-    );
-    if (previous.contentDigest(bookId) == digest) return previous;
+    for (final legacyExampleTitles in [false, true]) {
+      final previous = lesson.edit(
+        learning: _seedMathTextbookLearning(
+          lesson,
+          unitTitle: learning.unitTitle,
+          classifyPracticeSections: classify,
+          legacyExampleTitles: legacyExampleTitles,
+        ),
+      );
+      if (previous.contentDigest(bookId) == digest) return previous;
+    }
   }
   return null;
 }
@@ -727,12 +823,16 @@ MathTextbookLearning _seedMathTextbookLearning(
   MathTextbookLesson lesson, {
   String unitTitle = '',
   bool legacyLayout = false,
+  bool legacyExampleTitles = false,
   required bool classifyPracticeSections,
   bool excludeIntroductions = false,
 }) {
   final knowledge = <MathTextbookKnowledgePoint>[];
   final exercises = <MathTextbookExercise>[];
-  var section = lesson.title;
+  var section =
+      legacyExampleTitles || isReadableMathTextbookDisplayTitle(lesson.title)
+      ? lesson.title
+      : '';
   var practice = false;
   MathTextbookBlock? practiceHeading;
   MathTextbookRegion? previousPracticeSource;
@@ -759,7 +859,9 @@ MathTextbookLearning _seedMathTextbookLearning(
         practiceHeading = isPractice ? block : null;
         previousPracticeSource = null;
       }
-      if (!isPractice) {
+      if (!isPractice &&
+          (legacyExampleTitles ||
+              isReadableMathTextbookDisplayTitle(block.text))) {
         section = block.text.trim();
       }
       continue;
@@ -830,8 +932,17 @@ MathTextbookLearning _seedMathTextbookLearning(
         (legacyLayout || block.kind != MathTextbookBlockKind.example)) {
       continue;
     }
-    final title = block.kind == MathTextbookBlockKind.example
-        ? '$section · ${mathTextbookSectionTitle(block)}'
+    final sectionTitle = block.kind == MathTextbookBlockKind.example
+        ? mathTextbookSectionTitle(block)
+        : '';
+    final title = legacyExampleTitles
+        ? block.kind == MathTextbookBlockKind.example
+              ? '$section · $sectionTitle'
+              : section
+        : block.kind == MathTextbookBlockKind.example
+        ? section.isEmpty
+              ? sectionTitle
+              : '$section · $sectionTitle'
         : section;
     knowledge.add(
       MathTextbookKnowledgePoint(

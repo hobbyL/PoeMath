@@ -323,7 +323,7 @@ void main() {
   });
 
   for (final (version, reviewed) in [
-    for (final version in [0, 1])
+    for (final version in [0, 1, 2])
       for (final reviewed in [false, true]) (version, reviewed),
   ]) {
     test(

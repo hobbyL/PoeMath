@@ -490,6 +490,27 @@ void main() {
     expect(outline.directoryPages, [3]);
   });
 
+  test('平铺目录的范围标题保持原样且不猜测单元归属', () {
+    final outline = planMathTextbookCourse(
+      const TextbookTocResult(
+        source: TextbookTocSource.text,
+        entries: [
+          TextbookTocEntry(title: '分类与整理', page: 1),
+          TextbookTocEntry(title: '1～6 的表内乘法', page: 2),
+          TextbookTocEntry(title: '7～9 的表内乘、除法', page: 3),
+        ],
+      ),
+      3,
+    );
+
+    expect(outline.ranges.map((range) => range.title), [
+      '分类与整理',
+      '1～6 的表内乘法',
+      '7～9 的表内乘、除法',
+    ]);
+    expect(outline.ranges.map((range) => range.unitTitle), ['', '', '']);
+  });
+
   test('第一课无法定位时保留其原页，不能把首个已定位课之前的正文丢掉', () {
     final outline = planMathTextbookCourse(
       const TextbookTocResult(

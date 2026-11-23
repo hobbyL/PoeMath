@@ -86,6 +86,55 @@ void main() {
     ]);
   });
 
+  test('学一学例题标题跳过多行 OCR 碎片，沿用最近的有效小节标题', () {
+    final source = mathMisclassifiedPracticeFixture();
+    final originalExample = source.blocks.firstWhere(
+      (block) => block.kind == MathTextbookBlockKind.example,
+    );
+    final example = MathTextbookBlock.fromJson({
+      ...originalExample.toJson(),
+      'exerciseNumber': '5',
+    });
+    MathTextbookBlock heading(String id, String text) => MathTextbookBlock(
+      id: id,
+      kind: MathTextbookBlockKind.heading,
+      spans: [MathTextbookSpan.text(text)],
+      sources: example.sources,
+    );
+    final lesson = source.edit(
+      title: '～ 9 的表内乘、除法',
+      blocks: [
+        heading('section-title', '7 ～ 9的乘法口诀'),
+        heading('bad-ocr-heading', '）\n）\n八八（\n）'),
+        example,
+        ...source.blocks.where((block) => block != originalExample),
+      ],
+    );
+    final legacy = lesson.edit(
+      learning: seedMathTextbookLearning(lesson, legacyLayout: true),
+    );
+    expect(
+      legacy.learning!.knowledgePoints
+          .firstWhere((point) => point.blockIds.contains(example.id))
+          .title,
+      '）\n）\n八八（\n） · 例 5',
+    );
+
+    final examples = mathTextbookWorkedExamples(legacy);
+    expect(examples.first.title, '7 ～ 9的乘法口诀 · 例 5');
+    expect(examples.last.title, '认识角 · 例 2');
+    final repaired = resolveMathTextbookLearningSections(legacy);
+    final notes = mathTextbookStudyNotes(repaired);
+    expect(notes.map((note) => note.title), contains('7 ～ 9的乘法口诀'));
+    expect(notes.map((note) => note.title), isNot(contains('）\n）\n八八（\n）')));
+    expect(
+      repaired.learning!.knowledgePoints
+          .firstWhere((point) => point.blockIds.contains(example.id))
+          .title,
+      '7 ～ 9的乘法口诀 · 例 5',
+    );
+  });
+
   TextbookPageText pageWithLine(String line, {int page = 1}) =>
       TextbookPageText(
         page: page,

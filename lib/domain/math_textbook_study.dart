@@ -4,6 +4,8 @@ import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
 import 'package:poemath/domain/math_textbook_content_organizer.dart';
 
+final _exampleTitleSuffix = RegExp(r'\s*·\s*例\s*[^·]+$');
+
 class MathTextbookWorkedExample {
   const MathTextbookWorkedExample({
     required this.id,
@@ -19,6 +21,7 @@ List<MathTextbookWorkedExample> mathTextbookWorkedExamples(
   MathTextbookLesson lesson,
 ) {
   final examples = <MathTextbookWorkedExample>[];
+  final sections = mathTextbookExampleSections(lesson);
   var collecting = false;
   for (final block in lesson.blocks) {
     if (block.kind == MathTextbookBlockKind.sourcePage ||
@@ -29,19 +32,25 @@ List<MathTextbookWorkedExample> mathTextbookWorkedExamples(
       final point = lesson.learning?.knowledgePoints
           .where((point) => point.blockIds.contains(block.id))
           .firstOrNull;
+      final pointTitle = point?.title.trim() ?? '';
+      final exampleTitle = mathTextbookSectionTitle(block);
+      final hasPointTitle = isReadableMathTextbookDisplayTitle(
+        pointTitle.replaceFirst(_exampleTitleSuffix, '').trim(),
+      );
+      final section = sections[block.id] ?? '';
+      final title = hasPointTitle
+          ? pointTitle
+          : section.isEmpty
+          ? exampleTitle
+          : '$section · $exampleTitle';
       examples.add(
-        MathTextbookWorkedExample(
-          id: block.id,
-          title:
-              point?.title ??
-              '${lesson.title} · ${mathTextbookSectionTitle(block)}',
-          blocks: [block],
-        ),
+        MathTextbookWorkedExample(id: block.id, title: title, blocks: [block]),
       );
       collecting = true;
-    } else if (block.kind == MathTextbookBlockKind.exercise ||
-        block.kind == MathTextbookBlockKind.heading &&
-            !isMathTextbookExampleStepHeading(block.text)) {
+    } else if (block.kind == MathTextbookBlockKind.heading &&
+        !isMathTextbookExampleStepHeading(block.text)) {
+      collecting = false;
+    } else if (block.kind == MathTextbookBlockKind.exercise) {
       collecting = false;
     } else if (collecting) {
       final previous = examples.removeLast();

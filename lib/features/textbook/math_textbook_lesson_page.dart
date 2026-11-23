@@ -381,6 +381,7 @@ class _MathTextbookLessonPageState extends ConsumerState<MathTextbookLessonPage>
   Future<void> _editLearning({
     MathTextbookLearningSection section = MathTextbookLearningSection.all,
     bool startAdding = false,
+    String? startEditingKnowledgePointId,
   }) async {
     if (_saving || _lesson == null) return;
     try {
@@ -394,6 +395,7 @@ class _MathTextbookLessonPageState extends ConsumerState<MathTextbookLessonPage>
               lesson: _lesson!,
               section: section,
               startAdding: startAdding,
+              startEditingKnowledgePointId: startEditingKnowledgePointId,
             ),
           ),
         ),
@@ -550,7 +552,15 @@ class _MathTextbookLessonPageState extends ConsumerState<MathTextbookLessonPage>
           title: row.$2,
           subtitle: row.$3,
           subtitleMaxLines: 2,
-          onTap: _saving ? null : () => _editLearning(section: section),
+          onTap: _saving
+              ? null
+              : () => _editLearning(
+                  section: section,
+                  startEditingKnowledgePointId:
+                      section == MathTextbookLearningSection.knowledge
+                      ? row.$1
+                      : null,
+                ),
         ),
     ],
   );

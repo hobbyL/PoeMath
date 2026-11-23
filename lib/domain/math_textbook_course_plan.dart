@@ -5,7 +5,7 @@ import 'package:poemath/data/models/textbook_toc.dart';
 
 export 'math_textbook_content_organizer.dart' show seedMathTextbookLearning;
 
-const mathTextbookOrganizationVersion = 2;
+const mathTextbookOrganizationVersion = 3;
 
 /// 目录只提供待核区间；不把目录标题等同于已确认的知识点或答案。
 MathTextbookCourseOutline planMathTextbookCourse(

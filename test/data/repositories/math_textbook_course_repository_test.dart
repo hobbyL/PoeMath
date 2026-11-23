@@ -2,12 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/data/models/textbook_course.dart'
+    show textbookContentDigest;
 import 'package:poemath/data/repositories/math_textbook_course_repository.dart';
+import 'package:poemath/domain/math_textbook_content_organizer.dart';
 
 import '../../helpers/math_textbook_fixture.dart';
 import '../../helpers/math_textbook_learning_fixture.dart';
@@ -66,6 +70,119 @@ void main() {
     await expectLater(repository.load(book), throwsFormatException);
     await originalFile.writeAsString(original);
     expect((await repository.load(book))!.toJson(), prepared.toJson());
+  });
+
+  test('读取时兼容当前稿与待比较稿的例题 OCR 标题，且不重写课程文件', () async {
+    final source = mathMisclassifiedPracticeFixture();
+    final originalExample = source.blocks.firstWhere(
+      (block) => block.kind == MathTextbookBlockKind.example,
+    );
+    final example = MathTextbookBlock.fromJson({
+      ...originalExample.toJson(),
+      'exerciseNumber': '5',
+    });
+    MathTextbookBlock heading(String id, String title) => MathTextbookBlock(
+      id: id,
+      kind: MathTextbookBlockKind.heading,
+      spans: [MathTextbookSpan.text(title)],
+      sources: example.sources,
+    );
+    final draft = source.edit(
+      title: '～ 9 的表内乘、除法',
+      blocks: [
+        heading('valid-section', '7 ～ 9的乘法口诀'),
+        heading('ocr-heading', '）\n）\n八八（\n）'),
+        example,
+        ...source.blocks.where((block) => block != originalExample),
+      ],
+    );
+    final old = draft.edit(
+      learning: MathTextbookLearning.fromJson({
+        ...seedMathTextbookLearning(draft, legacyLayout: true).toJson(),
+        'knowledgePoints': [
+          for (final point in seedMathTextbookLearning(
+            draft,
+            legacyLayout: true,
+          ).knowledgePoints)
+            if (point.blockIds.contains(example.id))
+              {...point.toJson(), 'title': '）\n）\n八八（\n） · 例 5'}
+            else
+              point.toJson(),
+        ],
+      }),
+    );
+    final saved = await repository.saveGenerated(
+      book,
+      old,
+      generation: 0,
+      authorize: authorize,
+    );
+    final pendingDraft = draft.edit(
+      blocks: [
+        heading('valid-section', '7 ～ 9 的乘法口诀（新整理）'),
+        ...draft.blocks.where((block) => block.id != 'valid-section'),
+      ],
+    );
+    final pendingBaseline = seedMathTextbookLearning(
+      pendingDraft,
+      legacyLayout: true,
+    );
+    final pendingLearning = MathTextbookLearning.fromJson({
+      ...pendingBaseline.toJson(),
+      'knowledgePoints': [
+        for (final point in pendingBaseline.knowledgePoints)
+          if (point.blockIds.contains(example.id))
+            {...point.toJson(), 'title': '）\n）\n八八（\n） · 例 5'}
+          else
+            point.toJson(),
+      ],
+    });
+    final pending = pendingDraft.edit(learning: pendingLearning);
+
+    final file = File(
+      '${root.path}/textbooks/math-courses/${book.pdfSha256}.json',
+    );
+    final bytesBeforeRead = utf8.encode(
+      jsonEncode({
+        ...saved.toJson(),
+        'pendingLessons': [pending.toJson()],
+      }),
+    );
+    await file.writeAsBytes(bytesBeforeRead);
+    final staleCourse = MathTextbookCourse.fromJson(
+      jsonDecode(utf8.decode(bytesBeforeRead)),
+    );
+    final files = TextbookFileService(directoryProvider: () async => root);
+    final staleKey = textbookContentDigest({
+      'kind': 'math-course',
+      'version': 1,
+      'source': sha256.convert(bytesBeforeRead).toString(),
+    });
+    await files
+        .contentCache(book)
+        .mathData<MathTextbookCourse>(
+          staleKey,
+          decode: MathTextbookCourse.fromJson,
+          encode: (course) => course.toJson(),
+          load: () async => staleCourse,
+        );
+    repository = MathTextbookCourseRepository(
+      directoryProvider: () async => root,
+      files: files,
+    );
+    final loaded = (await repository.load(book))!;
+    for (final (lesson, expectedTitle) in [
+      (loaded.lessons.single, '7 ～ 9的乘法口诀 · 例 5'),
+      (loaded.pendingLessons.single, '7 ～ 9 的乘法口诀（新整理） · 例 5'),
+    ]) {
+      expect(
+        lesson.learning!.knowledgePoints
+            .firstWhere((point) => point.blockIds.contains(example.id))
+            .title,
+        expectedTitle,
+      );
+    }
+    expect(await file.readAsBytes(), bytesBeforeRead);
   });
 
   for (final large in [false, true]) {

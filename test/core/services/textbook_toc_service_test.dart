@@ -85,6 +85,52 @@ void main() {
     );
   });
 
+  test('数字范围不被拆成课号，居中排版的一级目录统一层级', () async {
+    final rows = <(String, double, double)>[('目录', 0.2, 0.05)];
+    const contents = [
+      ('分类与整理', 1),
+      ('1 ～ 6的表内乘法', 10),
+      ('1～6的表内除法', 30),
+      ('校园小导游', 49),
+      ('厘米和米', 55),
+      ('身体上的尺子', 68),
+      ('7～9的表内乘、除法', 73),
+      ('复习与关联', 91),
+    ];
+    for (final (index, item) in contents.indexed) {
+      final (title, printedPage) = item;
+      final top = 0.15 + index * 0.075;
+      rows
+        ..add((title, 0.54 - title.length * 0.012 / 2, top))
+        ..add((printedPage.toString(), 0.86, top));
+    }
+    final toc = page(rows);
+    final service = TextbookTocService(
+      pageCount: 107,
+      loadOutline: () async => [],
+      loadPage: (number) async => number == 5 ? toc : const TextbookTocPage(''),
+    );
+
+    final entries = (await service.scan().last).result!.entries;
+
+    expect(
+      entries.map((entry) => entry.title),
+      contents.map(
+        (item) => item.$1.replaceAllMapped(
+          RegExp(r'\s*([～~])\s*'),
+          (match) => match[1]!,
+        ),
+      ),
+    );
+    expect(
+      entries
+          .where((entry) => entry.title.startsWith(RegExp(r'[17]～')))
+          .map((entry) => entry.lessonNumber),
+      everyElement(isNull),
+    );
+    expect(entries.map((entry) => entry.level), everyElement(0));
+  });
+
   for (final (name, body) in [
     (
       '正文行内数字不形成目录续页',

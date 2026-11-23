@@ -8,6 +8,11 @@ final _spaces = RegExp(r'\s+');
 final _han = RegExp(r'[\u3400-\u9FFF]');
 final _pinyin = RegExp(r'[A-Za-z\u00C0-\u024F\u0300-\u036F\u1E00-\u1EFF]');
 final _leaders = RegExp(r'(?:[.．…·•⋯_—\-]\s*){2,}');
+// A number is a lesson prefix only with an explicit punctuation/space separator.
+// Never split a range such as 1～6, even if PDF text extraction inserts spaces.
+final _lessonNumberPrefix = RegExp(
+  r'^\s*[◎*＊★☆]?\s*(\d+)(?!\s*[~～〜\-‐‑‒–—―－−至到])(?:[.、．]\s*|\s+)',
+);
 final _number = RegExp(r'^\d{1,5}$');
 final _tocHeading = RegExp(r'^(目录|目錄|目次|contents|tableofcontents)$');
 final _unit = RegExp(r'^第[一二三四五六七八九十百零〇0-9]+单元(?:[·•・]?\s*(?:识字|阅读))?$');
@@ -306,12 +311,12 @@ List<TextbookTocEntry> _hierarchy(List<TextbookTocEntry> entries) {
 String _cleanTitle(String value, {bool stripNumber = true}) {
   var title = value.replaceAll(_leaders, ' ');
   if (stripNumber) {
-    title = title.replaceFirst(RegExp(r'^\s*[◎*＊★☆]?\s*\d+[.、．\s]*'), '');
+    title = title.replaceFirst(_lessonNumberPrefix, '');
   }
   return title
       .replaceFirst(RegExp(r'^\s*[◎*＊★☆]\s*'), '')
       .replaceAll(RegExp(r'(?<=[\u3400-\u9FFF])\s+(?=[\u3400-\u9FFF])'), '')
-      .replaceAllMapped(RegExp(r'\s*([（）：，、])\s*'), (match) => match[1]!)
+      .replaceAllMapped(RegExp(r'\s*([（）：，、~～〜])\s*'), (match) => match[1]!)
       .trim();
 }
 
@@ -412,10 +417,12 @@ class _Candidate {
     this.top,
     this.column, {
     this.lessonNumber,
+    this.titleRight,
   });
   final String title;
   final int? printedPage;
   final int? lessonNumber;
+  final double? titleRight;
   bool get isGroup => _isGroup(title);
   final double left;
   final double top;
@@ -448,7 +455,7 @@ List<_Candidate> _candidates(List<_Row> rows) {
           )) {
         final raw = pending.map((part) => part.text).join(' ');
         final title = _cleanTitle(raw);
-        final number = RegExp(r'^\s*[◎*＊★☆]?\s*(\d+)').firstMatch(raw);
+        final number = _lessonNumberPrefix.firstMatch(raw);
         if (title.isNotEmpty && title.length <= 100 && int.parse(value) > 0) {
           result.add(
             _Candidate(
@@ -460,6 +467,7 @@ List<_Candidate> _candidates(List<_Row> rows) {
               lessonNumber: number == null
                   ? null
                   : int.tryParse(number[1]!.replaceAll(_spaces, '')),
+              titleRight: pending.last.right,
             ),
           );
         }
@@ -477,6 +485,7 @@ List<_Candidate> _candidates(List<_Row> rows) {
           pending.first.left,
           row.top,
           pending.last.right,
+          titleRight: pending.last.right,
         ),
       );
     }
@@ -553,11 +562,35 @@ List<_Candidate> _entries(List<_Row> rows) {
   for (final column in columns) {
     final group = result.where((entry) => entry.column == column).toList();
     final left = group.map((entry) => entry.left).reduce(math.min);
+    // Textbook contents sometimes center every flat heading. Their left edge
+    // varies with title length, so it is not evidence of a nested level.
+    if (_isCenteredFlatDirectory(group)) {
+      for (final entry in group) {
+        entry.level = 0;
+      }
+      continue;
+    }
     for (final entry in group) {
       entry.level = ((entry.left - left) / 0.025).floor().clamp(0, 3);
     }
   }
   return result;
+}
+
+bool _isCenteredFlatDirectory(List<_Candidate> entries) {
+  final items = entries
+      .where((entry) => entry.printedPage != null && entry.titleRight != null)
+      .toList();
+  if (items.length < 4 ||
+      entries.any((entry) => entry.isGroup || entry.lessonNumber != null)) {
+    return false;
+  }
+  final lefts = items.map((entry) => entry.left).toList();
+  final centers = [
+    for (final entry in items) (entry.left + entry.titleRight!) / 2,
+  ]..sort();
+  return lefts.reduce(math.max) - lefts.reduce(math.min) >= 0.035 &&
+      centers.last - centers.first <= 0.03;
 }
 
 /// A wrapped title can surround a vertically centred lesson/page number.

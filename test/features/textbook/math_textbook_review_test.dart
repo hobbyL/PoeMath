@@ -818,6 +818,16 @@ void main() {
     await visible(tester, find.text('合并数量'));
     await tester.tap(find.text('合并数量'));
     await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(input('知识点名称')).controller!.text, '合并数量');
+    await tester.tap(find.byTooltip('返回'));
+    await tester.pumpAndSettle();
+    expect(find.text('原书范围与待整理内容'), findsOneWidget);
+    await visible(tester, find.text('知识点 · 1'));
+    await tester.tap(find.widgetWithText(TextButton, '添加').first);
+    await tester.pumpAndSettle();
+    expect(input('知识点名称'), findsOneWidget);
+    await tester.tap(find.byTooltip('返回'));
+    await tester.pumpAndSettle();
     expect(find.text('知识点'), findsOneWidget);
     expect(find.textContaining('教材原题与题组'), findsNothing);
     expect(input('所属单元'), findsNothing);
@@ -849,6 +859,100 @@ void main() {
       lesson.learning!.exercises.single.toJson(),
     );
     expect(courses.current!.lessons.single.review, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('内容审核中每个知识点都直接打开对应条目的编辑表单', (tester) async {
+    final original = mathLearningFixture();
+    final points = [
+      {
+        ...original.learning!.knowledgePoints.single.toJson(),
+        'title': '第一个知识点',
+      },
+      {
+        'id': 'kp-2',
+        'title': '第二个知识点',
+        'summary': '第二个知识点的说明。',
+        'blockIds': ['example'],
+      },
+      {
+        'id': 'kp-3',
+        'title': '第三个知识点',
+        'summary': '第三个知识点的说明。',
+        'blockIds': ['example'],
+      },
+    ];
+    final lesson = original.edit(
+      learning: MathTextbookLearning.fromJson({
+        ...original.learning!.toJson(),
+        'knowledgePoints': points,
+      }),
+    );
+    courses.current = courses.current!.replace(lessons: [lesson]);
+    await mount(
+      tester,
+      MathTextbookLessonPage(bookId: book.pdfSha256, lessonId: lesson.id),
+    );
+
+    for (final (id, title) in [
+      ('kp', '第一个知识点'),
+      ('kp-2', '第二个知识点'),
+      ('kp-3', '第三个知识点'),
+    ]) {
+      final row = find.byKey(ValueKey('math-lesson-content-$id'));
+      await visible(tester, row);
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      final titleField = input('知识点名称');
+      expect(tester.widget<TextField>(titleField).controller!.text, title);
+
+      await tester.tap(find.byTooltip('返回'));
+      await tester.pumpAndSettle();
+      expect(find.text('知识点名称'), findsNothing);
+      expect(find.text('原书范围与待整理内容'), findsOneWidget);
+      expect(find.text('知识点 · 3'), findsOneWidget);
+    }
+
+    expect(courses.saves, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('从审核详情直达知识点表单，应用后直接返回并更新课时草稿', (tester) async {
+    final original = mathLearningFixture();
+    final lesson = original.edit(
+      learning: MathTextbookLearning.fromJson({
+        ...original.learning!.toJson(),
+        'knowledgePoints': [
+          for (final point in original.learning!.knowledgePoints)
+            point.toJson(),
+          {
+            'id': 'kp-second',
+            'title': '待修改知识点',
+            'summary': '用于验证直接应用后的返回。',
+            'blockIds': ['example'],
+          },
+        ],
+      }),
+    );
+    courses.current = courses.current!.replace(lessons: [lesson]);
+    await mount(
+      tester,
+      MathTextbookLessonPage(bookId: book.pdfSha256, lessonId: lesson.id),
+    );
+
+    final row = find.byKey(const ValueKey('math-lesson-content-kp-second'));
+    await visible(tester, row);
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    await tester.enterText(input('知识点名称'), '已应用的知识点');
+    await tester.tap(find.text('应用这一项'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已应用的知识点'), findsOneWidget);
+    expect(find.text('知识点名称'), findsNothing);
+    expect(find.text('原书范围与待整理内容'), findsOneWidget);
+    expect(find.textContaining('有未保存修改'), findsOneWidget);
+    expect(courses.saves, 0);
     expect(tester.takeException(), isNull);
   });
 
@@ -887,14 +991,9 @@ void main() {
         size: Size(width, 640),
         scale: narrow ? 2 : 1,
       );
-      if (narrow) {
-        await openSource(tester);
-        await visible(tester, find.text('知识点、教材原题与本课巩固'));
-        await tester.tap(find.text('知识点、教材原题与本课巩固'));
-      } else {
-        await visible(tester, find.text('合并数量'));
-        await tester.tap(find.text('合并数量'));
-      }
+      await openSource(tester);
+      await visible(tester, find.text('知识点、教材原题与本课巩固'));
+      await tester.tap(find.text('知识点、教材原题与本课巩固'));
       await tester.pumpAndSettle();
       if (narrow) {
         await tester.enterText(input('所属单元'), '固定底部的测试单元');
@@ -988,6 +1087,118 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('无单元归属的一级目录条目与审核分组左边缘对齐', (tester) async {
+    final reviewBook = mathTextbookFixture(pages: 4);
+    final course = MathTextbookCourse.forBook(reviewBook).replace(
+      outline: MathTextbookCourseOutline(
+        source: 'text',
+        organizationVersion: mathTextbookOrganizationVersion,
+        ranges: const [
+          MathTextbookCourseRange(title: '1～6 的表内乘法', startPage: 1, endPage: 1),
+          MathTextbookCourseRange(
+            title: '7～9 的表内乘、除法',
+            startPage: 2,
+            endPage: 2,
+          ),
+          MathTextbookCourseRange(
+            title: '第一单元',
+            unitTitle: '第一单元',
+            startPage: 3,
+            endPage: 3,
+          ),
+          MathTextbookCourseRange(
+            title: '第一课',
+            unitTitle: '第一单元',
+            startPage: 4,
+            endPage: 4,
+          ),
+        ],
+      ),
+    );
+    await mount(
+      tester,
+      Scaffold(
+        body: MathTextbookReviewContent(
+          book: reviewBook,
+          course: course,
+          progress: const SizedBox.shrink(),
+          running: false,
+          onLesson: (_) {},
+          onUnitActions: (_) {},
+          onBookReview: () {},
+        ),
+      ),
+    );
+
+    final unassignedHeader = find.text('待确认归属的内容');
+    final headerLeft = tester.getTopLeft(unassignedHeader).dx;
+    for (final title in ['1～6 的表内乘法', '7～9 的表内乘、除法']) {
+      expect(tester.getTopLeft(find.text(title)).dx, closeTo(headerLeft, .01));
+    }
+    final unitHeader = find.text('第一单元');
+    final childLesson = find.text('第一课');
+    expect(
+      tester.getTopLeft(childLesson).dx,
+      greaterThan(tester.getTopLeft(unitHeader).dx),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('待比较大纲显示新标题和单元归属，同时标出保留的旧稿', (tester) async {
+    final reviewBook = mathTextbookFixture(pages: 1);
+    final base = mathLessonFixture(start: 1, end: 1, title: '～ 6 的表内乘法');
+    final learning = seedMathTextbookLearning(base);
+    MathTextbookLearning learningWithUnit(String unit) => MathTextbookLearning(
+      unitTitle: unit,
+      knowledgePoints: learning.knowledgePoints,
+      exercises: learning.exercises,
+      practicePlans: learning.practicePlans,
+      coverageConfirmed: learning.coverageConfirmed,
+      noExercises: learning.noExercises,
+    );
+    final current = base.edit(learning: learningWithUnit('旧单元'));
+    final candidate = current.edit(
+      title: '1～6 的表内乘法',
+      learning: learningWithUnit(''),
+    );
+    final course = MathTextbookCourse.forBook(reviewBook).replace(
+      lessons: [current],
+      pendingLessons: [candidate],
+      outline: MathTextbookCourseOutline(
+        source: 'text',
+        organizationVersion: mathTextbookOrganizationVersion,
+        ranges: const [
+          MathTextbookCourseRange(title: '1～6 的表内乘法', startPage: 1, endPage: 1),
+        ],
+      ),
+    );
+    await mount(
+      tester,
+      Scaffold(
+        body: MathTextbookReviewContent(
+          book: reviewBook,
+          course: course,
+          progress: const SizedBox.shrink(),
+          running: false,
+          onLesson: (_) {},
+          onUnitActions: (_) {},
+          onBookReview: () {},
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('math-review-unit-待确认归属的内容')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('math-review-unit-旧单元')), findsNothing);
+    expect(find.text('1～6 的表内乘法'), findsOneWidget);
+    expect(find.textContaining('当前草稿：～ 6 的表内乘法'), findsOneWidget);
+    expect(find.textContaining('原单元：旧单元'), findsOneWidget);
+    expect(find.textContaining('有新整理结果待比较'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final largeText in [false, true]) {
     testWidgets('同名的单课单元合并后，课时入口与菜单分别响应（大字：$largeText）', (tester) async {
       const title = '100 以内的加法和减法（二）';
@@ -1045,7 +1256,7 @@ void main() {
         scale: largeText ? 2 : 1,
       );
       expect(find.text(title), findsOneWidget);
-      expect(find.text('有新整理结果待比较'), findsOneWidget);
+      expect(find.textContaining('有新整理结果待比较'), findsOneWidget);
       final unit = find.byKey(const ValueKey('math-review-unit-$title'));
       final more = find.descendant(
         of: unit,
@@ -1093,7 +1304,7 @@ void main() {
         tester.getRect(arrow).right,
         closeTo(tester.getRect(icon).right, .01),
       );
-      await tester.tap(find.text(title));
+      await tester.tap(find.text('待比较的新稿'));
       await tester.pumpAndSettle();
       expect(opened, [lesson.id]);
       expect(actions, isEmpty);

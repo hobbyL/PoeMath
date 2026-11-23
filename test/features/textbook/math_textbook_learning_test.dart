@@ -1607,6 +1607,55 @@ void defineMathTextbookLearningTests({
     expect(find.widgetWithText(AppTile, '本课巩固'), findsOneWidget);
   });
 
+  testWidgets('学一学例题卡片隐藏 OCR 碎片标题并使用有效小节名', (tester) async {
+    final source = mathMisclassifiedPracticeFixture();
+    final originalExample = source.blocks.firstWhere(
+      (block) => block.kind == MathTextbookBlockKind.example,
+    );
+    final example = MathTextbookBlock.fromJson({
+      ...originalExample.toJson(),
+      'exerciseNumber': '5',
+    });
+    MathTextbookBlock heading(String id, String text) => MathTextbookBlock(
+      id: id,
+      kind: MathTextbookBlockKind.heading,
+      spans: [MathTextbookSpan.text(text)],
+      sources: example.sources,
+    );
+    final draft = source.edit(
+      title: '～ 9 的表内乘、除法',
+      blocks: [
+        heading('section-title', '7 ～ 9的乘法口诀'),
+        heading('bad-ocr-heading', '）\n）\n八八（\n）'),
+        example,
+        ...source.blocks.where((block) => block != originalExample),
+      ],
+    );
+    final lessonWithGeneratedLearning = draft.edit(
+      learning: seedMathTextbookLearning(draft),
+    );
+    await tester.runAsync(
+      () => install(lessonWithGeneratedLearning, approve: false),
+    );
+    await mount(
+      tester,
+      AppRoutes.mathTextbookBookOf(
+        book.pdfSha256,
+        mode: AppRoutes.mathTextbookLearnMode,
+      ),
+    );
+
+    await waitFor(
+      tester,
+      () => find
+          .widgetWithText(AppTile, '7 ～ 9的乘法口诀 · 例 5')
+          .evaluate()
+          .isNotEmpty,
+    );
+    expect(find.textContaining('八八'), findsNothing);
+    expect(find.text('例题与解题过程'), findsNWidgets(2));
+  });
+
   testWidgets('长摘要以简短入口呈现，双倍字号打开完整知识要点，不展示例题截图', (tester) async {
     final source = mathLearningFixture();
     final knowledge = source.learning!.knowledgePoints.single;

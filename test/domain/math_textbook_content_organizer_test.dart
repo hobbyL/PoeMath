@@ -38,6 +38,66 @@ MathTextbookLesson _lesson(
 );
 
 void main() {
+  test('读取旧自动稿时修复例题知识点 OCR 标题但保留人工内容', () {
+    final source = mathMisclassifiedPracticeFixture();
+    final example = source.blocks.firstWhere(
+      (block) => block.kind == MathTextbookBlockKind.example,
+    );
+    MathTextbookBlock heading(String id, String title) => MathTextbookBlock(
+      id: id,
+      kind: MathTextbookBlockKind.heading,
+      spans: [MathTextbookSpan.text(title)],
+      sources: example.sources,
+    );
+    final draft = source.edit(
+      title: '～ 9 的表内乘、除法',
+      blocks: [
+        heading('valid-section', '7 ～ 9的乘法口诀'),
+        heading('ocr-heading', '）\n）\n八八（\n）'),
+        example,
+        ...source.blocks.where((block) => block != example),
+      ],
+    );
+    final old = draft.edit(
+      learning: seedMathTextbookLearning(draft, legacyLayout: true),
+    );
+    final before = old.toJson();
+    final oldPoint = old.learning!.knowledgePoints.firstWhere(
+      (point) => point.blockIds.contains(example.id),
+    );
+    expect(oldPoint.title, contains('八八'));
+
+    final resolved = resolveMathTextbookLearningSections(old);
+    final point = resolved.learning!.knowledgePoints.firstWhere(
+      (point) => point.blockIds.contains(example.id),
+    );
+    expect(point.title, '7 ～ 9的乘法口诀 · 例 1');
+    expect(old.toJson(), before);
+    expect(resolveMathTextbookLearningSections(resolved), same(resolved));
+
+    final editedLearning = MathTextbookLearning.fromJson({
+      ...old.learning!.toJson(),
+      'knowledgePoints': [
+        for (final value in old.learning!.knowledgePoints)
+          {
+            ...value.toJson(),
+            if (value.id == oldPoint.id) 'summary': '家长补充了审核内容。',
+          },
+      ],
+    });
+    final manuallyEdited = old.edit(learning: editedLearning);
+    expect(
+      resolveMathTextbookLearningSections(manuallyEdited),
+      same(manuallyEdited),
+    );
+    final reviewed = old.approve(
+      pdfSha256: 'a' * 64,
+      reviewer: '家长',
+      editingMilliseconds: 1000,
+    );
+    expect(resolveMathTextbookLearningSections(reviewed), same(reviewed));
+  });
+
   test('编号章节导入图不再生成原题，已有自动配置只修正分类', () {
     final old = mathChapterIntroductionFixture();
     final before = old.toJson();

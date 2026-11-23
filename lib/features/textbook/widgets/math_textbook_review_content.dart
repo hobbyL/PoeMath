@@ -5,6 +5,13 @@ import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/features/textbook/widgets/textbook_review_layout.dart';
 
+const _unassignedMathTextbookUnit = '待确认归属的内容';
+typedef _MathTextbookReviewEntry = ({
+  MathTextbookCourseRange? range,
+  MathTextbookLesson? lesson,
+  MathTextbookLesson? candidate,
+});
+
 class MathTextbookReviewContent extends StatelessWidget {
   const MathTextbookReviewContent({
     super.key,
@@ -32,28 +39,61 @@ class MathTextbookReviewContent extends StatelessWidget {
     final lessons = {
       for (final lesson in course.currentLessons) lesson.id: lesson,
     };
+    final candidates = {
+      for (final lesson in course.pendingLessons) lesson.id: lesson,
+    };
     final retainedIds = course.outline?.retainedLessonIds.toSet() ?? <String>{};
     final retained = course.lessons
         .where((lesson) => retainedIds.contains(lesson.id))
         .toList();
-    final entries =
-        <({MathTextbookCourseRange? range, MathTextbookLesson? lesson})>[
-          for (final range
-              in course.outline?.ranges ?? <MathTextbookCourseRange>[])
-            (range: range, lesson: lessons.remove(range.lessonId)),
-          for (final lesson in lessons.values) (range: null, lesson: lesson),
-        ];
-    final groups =
-        <
-          String,
-          List<({MathTextbookCourseRange? range, MathTextbookLesson? lesson})>
-        >{};
-    for (final entry in entries) {
-      final unit = entry.lesson?.learning?.unitTitle.trim();
-      final title = unit != null && unit.isNotEmpty
-          ? unit
+    final entries = <_MathTextbookReviewEntry>[
+      for (final range in course.outline?.ranges ?? <MathTextbookCourseRange>[])
+        (
+          range: range,
+          lesson: lessons.remove(range.lessonId),
+          candidate: candidates[range.lessonId],
+        ),
+      for (final lesson in lessons.values)
+        (range: null, lesson: lesson, candidate: candidates[lesson.id]),
+    ];
+    final groups = <String, List<_MathTextbookReviewEntry>>{};
+    String entryTitle(_MathTextbookReviewEntry entry) =>
+        entry.candidate?.title ?? entry.lesson?.title ?? entry.range!.title;
+    String entryUnit(_MathTextbookReviewEntry entry) {
+      if (entry.candidate != null) {
+        final proposed = entry.candidate!.learning?.unitTitle.trim() ?? '';
+        return proposed.isNotEmpty
+            ? proposed
+            : entry.range?.unitTitle.trim() ?? '';
+      }
+      final current = entry.lesson?.learning?.unitTitle.trim();
+      return current != null && current.isNotEmpty
+          ? current
           : entry.range?.unitTitle.trim() ?? '';
-      (groups[title.isEmpty ? '待确认归属的内容' : title] ??= []).add(entry);
+    }
+
+    String pendingSubtitle(_MathTextbookReviewEntry entry) {
+      final candidate = entry.candidate;
+      if (candidate == null) return '';
+      final details = <String>[];
+      final current = entry.lesson;
+      final currentTitle = current?.title.trim() ?? '';
+      if (currentTitle.isNotEmpty && currentTitle != candidate.title.trim()) {
+        details.add('当前草稿：$currentTitle');
+      }
+      final currentUnit = current?.learning?.unitTitle.trim() ?? '';
+      final proposedUnit = candidate.learning?.unitTitle.trim() ?? '';
+      if (currentUnit.isNotEmpty && currentUnit != proposedUnit) {
+        details.add('原单元：$currentUnit');
+      }
+      return ['有新整理结果待比较', ...details].join(' · ');
+    }
+
+    for (final entry in entries) {
+      final title = entryUnit(entry);
+      (groups[title.isEmpty ? _unassignedMathTextbookUnit : title] ??= []).add(
+        entry,
+      );
     }
     final approved = entries
         .where((entry) => entry.lesson?.isApproved(book.pdfSha256) == true)
@@ -68,11 +108,7 @@ class MathTextbookReviewContent extends StatelessWidget {
             Builder(
               builder: (context) {
                 final matching = group.value
-                    .where(
-                      (entry) =>
-                          (entry.lesson?.title ?? entry.range!.title).trim() ==
-                          group.key,
-                    )
+                    .where((entry) => entryTitle(entry).trim() == group.key)
                     .toList();
                 final merged = matching.length == 1 ? matching.single : null;
                 final mergedLesson = merged?.lesson;
@@ -80,11 +116,7 @@ class MathTextbookReviewContent extends StatelessWidget {
                   for (final entry in group.value)
                     if (entry.lesson != null) entry.lesson!,
                 ];
-                final mergedPending =
-                    merged != null &&
-                    course.pendingLessons.any(
-                      (lesson) => lesson.id == mergedLesson?.id,
-                    );
+                final mergedPending = merged?.candidate != null;
                 final summary =
                     '${group.value.where((entry) => entry.lesson?.isApproved(book.pdfSha256) == true).length}/${group.value.length} 课已通过';
                 final showDivider = group.key != groups.keys.first;
@@ -114,7 +146,7 @@ class MathTextbookReviewContent extends StatelessWidget {
                               subtitle: merged != null && mergedLesson == null
                                   ? '待整理'
                                   : mergedPending
-                                  ? '有新整理结果待比较'
+                                  ? pendingSubtitle(merged!)
                                   : '',
                               trailing: const SizedBox.shrink(),
                               onTap: mergedLesson != null
@@ -181,16 +213,15 @@ class MathTextbookReviewContent extends StatelessWidget {
                           builder: (context) {
                             final lesson = entry.lesson;
                             final id = lesson?.id ?? entry.range!.lessonId;
-                            final pending = course.pendingLessons.any(
-                              (lesson) => lesson.id == id,
-                            );
                             return AppTile(
                               key: ValueKey('math-review-lesson-$id'),
                               flat: true,
+                              flatLeadingEdgeAligned:
+                                  group.key == _unassignedMathTextbookUnit,
                               flatTrailingEdgeAligned: true,
                               iconColor: color,
-                              title: lesson?.title ?? entry.range!.title,
-                              subtitle: pending ? '有新整理结果待比较' : '',
+                              title: entryTitle(entry),
+                              subtitle: pendingSubtitle(entry),
                               trailingText: lesson == null
                                   ? '待整理'
                                   : lesson.isApproved(book.pdfSha256)

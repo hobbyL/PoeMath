@@ -35,11 +35,13 @@ class MathTextbookLearningEditorPage extends StatefulWidget {
     required this.lesson,
     this.section = MathTextbookLearningSection.all,
     this.startAdding = false,
+    this.startEditingKnowledgePointId,
   });
   final Textbook book;
   final MathTextbookLesson lesson;
   final MathTextbookLearningSection section;
   final bool startAdding;
+  final String? startEditingKnowledgePointId;
   @override
   State<MathTextbookLearningEditorPage> createState() =>
       _MathTextbookLearningEditorPageState();
@@ -71,7 +73,25 @@ class _MathTextbookLearningEditorPageState
     _plans = [...?learning?.practicePlans];
     _coverage = learning?.coverageConfirmed ?? false;
     _noExercises = learning?.noExercises ?? false;
-    if (widget.startAdding) {
+    if (widget.startEditingKnowledgePointId case final knowledgePointId?) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final point = _knowledge
+            .where((value) => value.id == knowledgePointId)
+            .firstOrNull;
+        if (point != null) {
+          unawaited(
+            _edit(
+              _LearningFormKind.knowledge,
+              point.toJson(),
+              closeEditorAfterForm: true,
+            ),
+          );
+        } else {
+          Navigator.pop(context);
+        }
+      });
+    } else if (widget.startAdding) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final kind = _sectionKind;
@@ -98,8 +118,9 @@ class _MathTextbookLearningEditorPageState
 
   Future<void> _edit(
     _LearningFormKind kind,
-    Map<String, dynamic>? initial,
-  ) async {
+    Map<String, dynamic>? initial, {
+    bool closeEditorAfterForm = false,
+  }) async {
     assertParentAccess(context);
     final result = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
@@ -113,7 +134,11 @@ class _MathTextbookLearningEditorPageState
         ),
       ),
     );
-    if (!mounted || result == null) return;
+    if (!mounted) return;
+    if (result == null) {
+      if (closeEditorAfterForm) Navigator.pop(context);
+      return;
+    }
     assertParentAccess(context);
     _change(() {
       switch (kind) {
@@ -146,6 +171,7 @@ class _MathTextbookLearningEditorPageState
           break;
       }
     });
+    if (closeEditorAfterForm && mounted) _apply();
   }
 
   Future<void> _remove(_LearningFormKind kind, String id) async {

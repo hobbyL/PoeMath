@@ -25,9 +25,18 @@ MathTextbookCourse _decodeCourse(Uint8List bytes) {
           ? lesson
           : resolveMathTextbookLearningSections(lesson),
   ];
+  final pendingLessons = [
+    for (final lesson in course.pendingLessons)
+      retained.contains(lesson.id)
+          ? lesson
+          : resolveMathTextbookLearningSections(lesson),
+  ];
   if (lessons.indexed.every(
-    (entry) => identical(entry.$2, course.lessons[entry.$1]),
-  )) {
+        (entry) => identical(entry.$2, course.lessons[entry.$1]),
+      ) &&
+      pendingLessons.indexed.every(
+        (entry) => identical(entry.$2, course.pendingLessons[entry.$1]),
+      )) {
     return course;
   }
   // Read-time compatibility never rewrites the authored file/edit revision.
@@ -40,7 +49,7 @@ MathTextbookCourse _decodeCourse(Uint8List bytes) {
     semester: course.semester,
     revision: course.revision,
     lessons: lessons,
-    pendingLessons: course.pendingLessons,
+    pendingLessons: pendingLessons,
     outline: course.outline,
   );
 }
@@ -122,7 +131,9 @@ class MathTextbookCourseRepository {
     if (cache.revision != cacheRevision) throw StateError('原书缓存已失效');
     final key = textbookContentDigest({
       'kind': 'math-course',
-      'version': 1,
+      // Decoded course compatibility projections change independently from
+      // the authored file digest. Bump this when read-time repair rules change.
+      'version': 2,
       'source': sha256.convert(data).toString(),
     });
     final previous = _prepared;

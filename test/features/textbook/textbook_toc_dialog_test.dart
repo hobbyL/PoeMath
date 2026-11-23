@@ -111,6 +111,37 @@ void main() {
     expect(find.byType(TextbookTocDrawer), findsNothing);
   });
 
+  testWidgets('一级目录左边缘统一，子目录仍按层级缩进', (tester) async {
+    await open(
+      tester,
+      (_) => Stream.value(
+        _ready(
+          const TextbookTocResult(
+            source: TextbookTocSource.text,
+            entries: [
+              TextbookTocEntry(title: '分类与整理'),
+              TextbookTocEntry(title: '1～6的表内乘法'),
+              TextbookTocEntry(title: '同一单元的练习', level: 1),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final first = tester.getRect(
+      find.byKey(const ValueKey('textbook-toc-entry-0')),
+    );
+    final second = tester.getRect(
+      find.byKey(const ValueKey('textbook-toc-entry-1')),
+    );
+    final child = tester.getRect(
+      find.byKey(const ValueKey('textbook-toc-entry-2')),
+    );
+
+    expect(second.left, closeTo(first.left, 0.01));
+    expect(child.left, greaterThan(first.left));
+  });
+
   testWidgets('打开目录时选中当前页最近的深层目录并将长列表目标滚入视口', (tester) async {
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1;
