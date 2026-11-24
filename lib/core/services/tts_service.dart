@@ -354,7 +354,13 @@ class TtsService {
   /// 返回 `List<Map<String, String>>`，每个 Map 至少包含 name 和 locale。
   /// 仅返回 locale 以 "zh" 开头的音色（zh-CN, zh-TW, zh-HK 等）。
   /// 按 name+locale 去重，避免 Android 上返回多个完全相同的条目。
-  Future<List<Map<String, String>>> getChineseVoices() async {
+  Future<List<Map<String, String>>> getChineseVoices() =>
+      getVoices(language: 'zh');
+
+  /// 音色请求显式按语言筛选；不改变当前中文朗读偏好。
+  Future<List<Map<String, String>>> getVoices({
+    required String language,
+  }) async {
     await _ensureInitialized();
     final Object? voices = await _runEngineOperation<Object?>(
       '获取系统音色失败',
@@ -370,14 +376,22 @@ class TtsService {
     for (final voice in voices) {
       if (voice is! Map<Object?, Object?>) continue;
       final locale = (voice['locale'] ?? '').toString();
-      if (!locale.startsWith('zh')) continue;
+      if (locale.split(RegExp('[-_]')).first.toLowerCase() !=
+          language.toLowerCase()) {
+        continue;
+      }
 
       final name = (voice['name'] ?? '').toString();
       final key = '$name|$locale';
       if (seen.contains(key)) continue;
       seen.add(key);
 
-      chineseVoices.add({'name': name, 'locale': locale});
+      chineseVoices.add({
+        'name': name,
+        'locale': locale,
+        if (voice['network_required'] != null)
+          'network_required': voice['network_required'].toString(),
+      });
     }
 
     // 按 locale → name 排序，zh-CN 优先
@@ -727,6 +741,9 @@ class TtsService {
     List<String> texts, {
     required String bookId,
     required NarrationAudioCache cache,
+    Map<String, String>? systemVoice,
+    double? speechSpeed,
+    bool systemOnly = false,
     void Function(NarrationState state, int sessionId)? onState,
     void Function(int index, int sessionId)? onSegmentStart,
     void Function(int index, NarrationAudioIdentity identity, int sessionId)?
@@ -756,13 +773,15 @@ class TtsService {
     final String style;
     final bool cloudEnabled;
     try {
-      speed = _settings.ttsSpeed;
-      voice = _settings.ttsVoice == null
+      speed = speechSpeed ?? _settings.ttsSpeed;
+      voice = systemVoice != null
+          ? Map<String, String>.unmodifiable(systemVoice)
+          : _settings.ttsVoice == null
           ? null
           : Map<String, String>.unmodifiable(_settings.ttsVoice!);
       cloudVoice = _settings.ttsCloudVoice;
       style = _settings.ttsCloudStyle;
-      cloudEnabled = _settings.ttsCloudEnabled;
+      cloudEnabled = !systemOnly && _settings.ttsCloudEnabled;
     } on Object catch (error) {
       _isSpeaking = false;
       throw TtsException('读取朗读设置失败', cause: error);

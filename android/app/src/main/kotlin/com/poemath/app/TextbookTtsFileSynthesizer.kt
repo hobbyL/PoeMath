@@ -103,7 +103,8 @@ class TextbookTtsFileSynthesizer(private val context: Context) : MethodChannel.M
 
     private fun identity(voice: Map<*, *>?, speed: Double): String {
         val tts = engine ?: throw IllegalStateException()
-        val language = tts.setLanguage(Locale.forLanguageTag(voice?.get("locale")?.toString() ?: "zh-CN"))
+        val requestedLocale = Locale.forLanguageTag(voice?.get("locale")?.toString() ?: "zh-CN")
+        val language = tts.setLanguage(requestedLocale)
         if (language < 0) throw IllegalStateException("missing language")
         val name = voice?.get("name")?.toString()
         if (name != null) {
@@ -115,6 +116,10 @@ class TextbookTtsFileSynthesizer(private val context: Context) : MethodChannel.M
         }
         tts.setPitch(1.0f)
         val actual = tts.voice ?: throw IllegalStateException("no voice")
+        if (actual.locale.language != requestedLocale.language ||
+            (name != null && actual.name != name)) {
+            throw IllegalStateException("voice language mismatch")
+        }
         val packageName = tts.defaultEngine ?: "default"
         val info = context.packageManager.getPackageInfo(packageName, 0)
         val version = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else {
