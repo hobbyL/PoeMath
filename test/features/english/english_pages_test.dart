@@ -703,6 +703,14 @@ void main() {
             text: '${lesson.unitTitle} · ${lesson.title}',
           ),
           (
+            page: EnglishLessonPage(
+              bookId: book.pdfSha256,
+              lessonId: lesson.id,
+              sourceContent: true,
+            ),
+            text: '${lesson.unitTitle} · ${lesson.title}',
+          ),
+          (
             page: EnglishStudyPage(
               bookId: book.pdfSha256,
               lessonId: lesson.id,

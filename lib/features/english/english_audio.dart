@@ -113,6 +113,7 @@ class EnglishAudio extends ChangeNotifier {
     _pcm = null;
     recording = false;
     busy = false;
+    message = '';
     await narration?.cancel();
     await player?.dispose();
     await subscription?.cancel();

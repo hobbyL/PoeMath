@@ -11,8 +11,13 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/models/english_course.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/data/models/textbook_page_text.dart';
+import 'package:poemath/domain/english_course_parser.dart';
+import 'package:poemath/features/english/english_audio.dart';
 import 'package:poemath/features/english/english_providers.dart';
+import 'package:poemath/features/english/english_widgets.dart';
 import 'package:poemath/features/textbook/widgets/textbook_subject_dialog.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/data/models/textbook_course.dart';
@@ -43,7 +48,8 @@ class TextbookDetailPage extends ConsumerStatefulWidget {
   ConsumerState<TextbookDetailPage> createState() => _TextbookDetailPageState();
 }
 
-class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
+class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage>
+    with WidgetsBindingObserver {
   late final TextbookRepository _repo;
   late final String _profileId;
   int _saveRevision = 0;
@@ -55,14 +61,17 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   bool _turning = false;
   int _previewPage = 1;
   int _previewRevision = 0;
+  int _englishTapRevision = 0;
   TextbookGoToPage? _goToPage;
   TextbookSearch? _search;
   TextbookTocLoader? _toc;
   TextbookPageNumberService? _pageNumbers;
+  EnglishAudio? _englishAudio;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _repo = ref.read(textbookRepositoryProvider);
     _profileId = ProfileScope.currentId;
     _previewPage = _repo.reading(_profileId, widget.bookId).page;
@@ -72,6 +81,8 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   void didUpdateWidget(covariant TextbookDetailPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.bookId == widget.bookId) return;
+    unawaited(_englishAudio?.stop());
+    _englishAudio = null;
     _previewPage = _repo.reading(_profileId, widget.bookId).page;
     _previewRevision++;
     _saveRevision++;
@@ -85,6 +96,22 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     _search = null;
     _toc = null;
     _pageNumbers = null;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      _englishTapRevision++;
+      unawaited(_englishAudio?.stop());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _englishTapRevision++;
+    unawaited(_englishAudio?.stop());
+    super.dispose();
   }
 
   Future<void> _savePreviewPage(Textbook book, int page) async {
@@ -354,6 +381,16 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
 
   Widget _preview(String path, Textbook book, TextbookPageLayout layout) {
     final revision = _previewRevision;
+    final canSpeakEnglish =
+        book.subject == TextbookSubject.english && !widget.manage;
+    final englishCourse = canSpeakEnglish
+        ? ref.watch(englishCourseProvider(book.pdfSha256)).valueOrNull
+        : null;
+    final audio = canSpeakEnglish
+        ? ref.watch(englishAudioProvider(englishAudioKey(book.pdfSha256)))
+        : null;
+    final voice = canSpeakEnglish ? ref.watch(englishVoiceProvider) : null;
+    _englishAudio = audio;
     final previous = layout.previous(_previewPage, book.pageCount);
     final next = layout.next(_previewPage, book.pageCount);
     final canTurn = !_turning && _previewVisible && _goToPage != null;
@@ -365,10 +402,29 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
         if (mounted && _previewVisible && revision == _previewRevision) {
           final nextPage = page.clamp(1, book.pageCount);
           if (nextPage == _previewPage) return;
+          _englishTapRevision++;
+          unawaited(audio?.stop());
           setState(() => _previewPage = nextPage);
           unawaited(_savePreviewPage(book, nextPage));
         }
       },
+      onPageTap: audio == null
+          ? null
+          : (page, position, pageText) {
+              final tapRevision = ++_englishTapRevision;
+              unawaited(
+                _speakEnglishAt(
+                  context,
+                  englishCourse,
+                  page,
+                  position,
+                  pageText,
+                  audio,
+                  voice,
+                  tapRevision,
+                ),
+              );
+            },
       onReady: (goToPage) {
         if (mounted && _previewVisible && revision == _previewRevision) {
           setState(() => _goToPage = goToPage);
@@ -405,6 +461,37 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
           widget.previewBuilder?.call(context, options) ??
           ref.watch(textbookPreviewBuilderProvider)(context, options),
     );
+  }
+
+  Future<void> _speakEnglishAt(
+    BuildContext context,
+    EnglishCourse? course,
+    int page,
+    Offset position,
+    Future<TextbookPageText> pageText,
+    EnglishAudio audio,
+    Map<String, String>? voice,
+    int tapRevision,
+  ) async {
+    try {
+      final layout = await pageText;
+      if (!mounted || !context.mounted || tapRevision != _englishTapRevision) {
+        return;
+      }
+      final text =
+          _englishSentenceAt(course, page, position) ??
+          _englishLineAt(layout, position);
+      if (text == null) return;
+      final played = await audio.speak(text, voice);
+      if (!played &&
+          !audio.busy &&
+          context.mounted &&
+          audio.message.isNotEmpty) {
+        englishMessage(context, StateError(audio.message));
+      }
+    } on Object catch (error) {
+      if (context.mounted) englishMessage(context, error);
+    }
   }
 
   Widget _pageControls(Textbook book, {required bool available}) => SafeArea(
@@ -607,6 +694,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                           AppRoutes.englishBookOf(
                             widget.bookId,
                             lesson: lesson.id,
+                            action: 'content',
                           ),
                         )
                       : null,
@@ -614,12 +702,6 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                     '${lessons.length > 1 ? '${lesson.title} · ' : ''}学一学',
                   ),
                 ),
-              TextButton(
-                onPressed: !_turning && _previewVisible
-                    ? () => _openRoute(AppRoutes.englishBookOf(widget.bookId))
-                    : null,
-                child: const Text('全书课程'),
-              ),
             ],
           ],
         );
@@ -950,4 +1032,72 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
       ),
     );
   }
+}
+
+const _englishTapTolerance = .04;
+
+String? _englishSentenceAt(EnglishCourse? course, int page, Offset position) {
+  if (course == null) return null;
+  final matches = <({String text, double area, double distance})>[];
+  for (final lesson in course.lessons) {
+    if (!lesson.containsPage(page)) continue;
+    for (final target in lesson.targets) {
+      if (target.kind != EnglishTargetKind.sentence || !target.hasSpeech) {
+        continue;
+      }
+      for (final source in target.sources) {
+        final area =
+            (source.right - source.left) * (source.bottom - source.top);
+        final distance = _englishSourceHitDistance(source, position);
+        if (source.page == page && area < .5 && distance != null) {
+          matches.add((text: target.text, area: area, distance: distance));
+        }
+      }
+    }
+  }
+  matches.sort((a, b) {
+    final distance = a.distance.compareTo(b.distance);
+    return distance == 0 ? a.area.compareTo(b.area) : distance;
+  });
+  return matches.firstOrNull?.text;
+}
+
+String? _englishLineAt(TextbookPageText page, Offset position) {
+  if (page.glyphs.isEmpty) return null;
+  final matches =
+      englishPageLines(page)
+          .where((line) => RegExp('[A-Za-z]').hasMatch(line.text))
+          .where(
+            (line) => _englishSourceHitDistance(line.source, position) != null,
+          )
+          .toList()
+        ..sort((a, b) {
+          final firstDistance = _englishSourceHitDistance(a.source, position)!;
+          final secondDistance = _englishSourceHitDistance(b.source, position)!;
+          final distance = firstDistance.compareTo(secondDistance);
+          if (distance != 0) return distance;
+          final first =
+              (a.source.right - a.source.left) *
+              (a.source.bottom - a.source.top);
+          final second =
+              (b.source.right - b.source.left) *
+              (b.source.bottom - b.source.top);
+          return first.compareTo(second);
+        });
+  return matches.firstOrNull?.text;
+}
+
+double? _englishSourceHitDistance(EnglishSource source, Offset position) {
+  final dx = position.dx < source.left
+      ? source.left - position.dx
+      : position.dx > source.right
+      ? position.dx - source.right
+      : 0.0;
+  final dy = position.dy < source.top
+      ? source.top - position.dy
+      : position.dy > source.bottom
+      ? position.dy - source.bottom
+      : 0.0;
+  if (dx > _englishTapTolerance || dy > _englishTapTolerance) return null;
+  return dx * dx + dy * dy;
 }

@@ -12,6 +12,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/english_course.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/features/english/english_audio.dart';
 import 'package:poemath/domain/english_course_parser.dart';
 import 'package:poemath/features/english/english_providers.dart';
 import 'package:poemath/features/english/english_widgets.dart';
@@ -246,15 +247,47 @@ const double _englishReviewPageCardMaxWidth = 560;
 const double _englishReviewGridMaxWidth = 1200;
 const double _englishReviewTargetMinColumnWidth = 280;
 
-class EnglishLessonPage extends ConsumerWidget {
+class EnglishLessonPage extends ConsumerStatefulWidget {
   const EnglishLessonPage({
     super.key,
     required this.bookId,
     required this.lessonId,
     this.review = false,
+    this.sourceContent = false,
   });
   final String bookId, lessonId;
-  final bool review;
+  final bool review, sourceContent;
+
+  @override
+  ConsumerState<EnglishLessonPage> createState() => _EnglishLessonPageState();
+}
+
+class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
+    with WidgetsBindingObserver {
+  EnglishAudio? _audio;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.sourceContent) {
+      _audio = ref.read(englishAudioProvider(englishAudioKey(widget.bookId)));
+      WidgetsBinding.instance.addObserver(this);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) unawaited(_audio?.stop());
+  }
+
+  @override
+  void dispose() {
+    if (_audio != null) {
+      WidgetsBinding.instance.removeObserver(this);
+      unawaited(_audio!.stop());
+    }
+    super.dispose();
+  }
 
   Future<void> _adopt(
     BuildContext context,
@@ -296,14 +329,18 @@ class EnglishLessonPage extends ConsumerWidget {
               authorized();
             },
           );
-      ref.invalidate(englishCourseProvider(bookId));
+      ref.invalidate(englishCourseProvider(widget.bookId));
     } on Object catch (e) {
       if (context.mounted) englishMessage(context, e);
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final bookId = widget.bookId,
+        lessonId = widget.lessonId,
+        review = widget.review,
+        sourceContent = widget.sourceContent;
     final theme = Theme.of(context);
     final currentLesson = ref
         .watch(englishCourseProvider(bookId))
@@ -312,8 +349,10 @@ class EnglishLessonPage extends ConsumerWidget {
     return AppScaffold(
       appBar: AppBar(
         title: Text(
-          review && currentLesson != null
+          (review || sourceContent) && currentLesson != null
               ? '${currentLesson.unitTitle} · ${currentLesson.title}'
+              : sourceContent
+              ? '学一学'
               : review
               ? '课时内容审核'
               : '课时学习',
@@ -353,7 +392,7 @@ class EnglishLessonPage extends ConsumerWidget {
             final candidate = course.pending
                 .where((l) => l.id == lessonId)
                 .firstOrNull;
-            if (review) {
+            if (review || sourceContent) {
               return _reviewContent(
                 context,
                 ref,
@@ -362,6 +401,7 @@ class EnglishLessonPage extends ConsumerWidget {
                 lesson,
                 candidate,
                 theme,
+                readOnlyContent: sourceContent,
               );
             }
             return ListView(
@@ -458,9 +498,15 @@ class EnglishLessonPage extends ConsumerWidget {
     EnglishCourse course,
     EnglishLesson lesson,
     EnglishLesson? candidate,
-    ThemeData theme,
-  ) {
+    ThemeData theme, {
+    bool readOnlyContent = false,
+  }) {
+    final bookId = widget.bookId, lessonId = widget.lessonId;
     final pageImage = ref.watch(englishReviewPageImageBuilderProvider);
+    final audio = readOnlyContent
+        ? ref.watch(englishAudioProvider(englishAudioKey(widget.bookId)))
+        : null;
+    final voice = readOnlyContent ? ref.watch(englishVoiceProvider) : null;
     final cardNumbers =
         ref
             .watch(englishTargetCardNumberProvider((bookId, lessonId)))
@@ -475,6 +521,11 @@ class EnglishLessonPage extends ConsumerWidget {
       for (final (index, target) in lesson.targets.indexed) target.id: index,
     };
     for (final target in lesson.targets) {
+      if (readOnlyContent &&
+          !target.approved &&
+          target.kind != EnglishTargetKind.sentence) {
+        continue;
+      }
       final lessonSources = target.sources
           .where((value) => lesson.containsPage(value.page))
           .toList();
@@ -526,7 +577,9 @@ class EnglishLessonPage extends ConsumerWidget {
     }
     final pages = pageNumbers.toList()..sort();
     return SingleChildScrollView(
-      key: PageStorageKey('english-review-$bookId-$lessonId'),
+      key: PageStorageKey(
+        '${readOnlyContent ? 'english-study-source' : 'english-review'}-$bookId-$lessonId',
+      ),
       padding: const EdgeInsets.all(SpacingTokens.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -552,7 +605,9 @@ class EnglishLessonPage extends ConsumerWidget {
                               _englishReviewPageCardMaxWidth,
                             ),
                             child: ColoredCard(
-                              key: ValueKey('english-review-source-$page'),
+                              key: ValueKey(
+                                '${readOnlyContent ? 'english-study' : 'english-review'}-source-$page',
+                              ),
                               color: theme.colorScheme.primary,
                               padding: EdgeInsets.zero,
                               clipBehavior: Clip.antiAlias,
@@ -613,6 +668,10 @@ class EnglishLessonPage extends ConsumerWidget {
                                                                     column],
                                                                 row + column,
                                                                 theme,
+                                                                readOnlyContent:
+                                                                    readOnlyContent,
+                                                                audio: audio,
+                                                                voice: voice,
                                                               ),
                                                       ),
                                                     ],
@@ -635,37 +694,49 @@ class EnglishLessonPage extends ConsumerWidget {
               ),
             ),
           ),
-          if (candidate case final candidateLesson?) ...[
-            const SizedBox(height: SpacingTokens.md),
-            ColoredCard(
-              color: theme.colorScheme.secondary,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '当前 ${lesson.targets.length} 项 / 候选 ${candidateLesson.targets.length} 项',
-                  ),
-                  ExpansionTile(
-                    title: const Text('对照候选内容'),
-                    children: [
-                      for (final target in candidateLesson.targets)
-                        Padding(
-                          padding: const EdgeInsets.all(SpacingTokens.sm),
-                          child: Text(
-                            '${target.kind.label} · ${target.text}\n${target.meaning}',
-                          ),
-                        ),
-                    ],
-                  ),
-                  TextButton(
-                    onPressed: () =>
-                        _adopt(context, ref, book, course, candidateLesson),
-                    child: const Text('采用此候选稿'),
-                  ),
-                ],
-              ),
+          if (readOnlyContent &&
+              !lesson.targets.any(
+                (target) =>
+                    target.approved ||
+                    target.kind == EnglishTargetKind.sentence,
+              ))
+            const AppEmptyState(
+              icon: Icons.pending_actions,
+              title: '本课还没有开放学习的内容',
+              description: '待家长核对后，这里会显示原书图文。',
             ),
-          ],
+          if (!readOnlyContent)
+            if (candidate case final candidateLesson?) ...[
+              const SizedBox(height: SpacingTokens.md),
+              ColoredCard(
+                color: theme.colorScheme.secondary,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '当前 ${lesson.targets.length} 项 / 候选 ${candidateLesson.targets.length} 项',
+                    ),
+                    ExpansionTile(
+                      title: const Text('对照候选内容'),
+                      children: [
+                        for (final target in candidateLesson.targets)
+                          Padding(
+                            padding: const EdgeInsets.all(SpacingTokens.sm),
+                            child: Text(
+                              '${target.kind.label} · ${target.text}\n${target.meaning}',
+                            ),
+                          ),
+                      ],
+                    ),
+                    TextButton(
+                      onPressed: () =>
+                          _adopt(context, ref, book, course, candidateLesson),
+                      child: const Text('采用此候选稿'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
         ],
       ),
     );
@@ -675,10 +746,19 @@ class EnglishLessonPage extends ConsumerWidget {
     BuildContext context,
     EnglishTarget target,
     int index,
-    ThemeData theme,
-  ) => AppTile(
+    ThemeData theme, {
+    bool readOnlyContent = false,
+    EnglishAudio? audio,
+    Map<String, String>? voice,
+  }) => AppTile(
     flat: true,
-    icon: target.approved ? Icons.check_circle_outline : Icons.edit_note,
+    icon: readOnlyContent && target.kind == EnglishTargetKind.sentence
+        ? Icons.volume_up_outlined
+        : readOnlyContent
+        ? Icons.auto_stories_outlined
+        : target.approved
+        ? Icons.check_circle_outline
+        : Icons.edit_note,
     iconColor: theme.colorScheme.primary,
     title: '${index + 1}. ${target.text}',
     titleWrap: true,
@@ -688,13 +768,33 @@ class EnglishLessonPage extends ConsumerWidget {
       target.approved ? '已核对' : '待核对',
     ].join(' · '),
     subtitleMaxLines: 3,
-    onTap: () => context.push(
-      AppRoutes.englishBookOf(
-        bookId,
-        lesson: lessonId,
-        target: target.id,
-        review: true,
-      ),
-    ),
+    onTap: readOnlyContent
+        ? target.kind == EnglishTargetKind.sentence &&
+                  target.hasSpeech &&
+                  audio != null
+              ? () => unawaited(
+                  _speakSentence(context, audio, voice, target.text),
+                )
+              : null
+        : () => context.push(
+            AppRoutes.englishBookOf(
+              widget.bookId,
+              lesson: widget.lessonId,
+              target: target.id,
+              review: true,
+            ),
+          ),
   );
+
+  Future<void> _speakSentence(
+    BuildContext context,
+    EnglishAudio audio,
+    Map<String, String>? voice,
+    String text,
+  ) async {
+    final played = await audio.speak(text, voice);
+    if (!played && !audio.busy && context.mounted && audio.message.isNotEmpty) {
+      englishMessage(context, StateError(audio.message));
+    }
+  }
 }

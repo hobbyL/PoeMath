@@ -13,13 +13,21 @@ import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
+import 'package:poemath/core/services/english_recording_store.dart';
+import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_catalog.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
+import 'package:poemath/data/models/textbook_page_text.dart';
 import 'package:poemath/data/models/math_textbook_course.dart';
+import 'package:poemath/data/models/english_course.dart';
 import 'package:poemath/domain/math_textbook_course_plan.dart';
 import 'package:poemath/domain/math_textbook_progress.dart';
+import 'package:poemath/features/english/english_course_page.dart';
+import 'package:poemath/features/english/english_audio.dart';
+import 'package:poemath/features/english/english_providers.dart';
+import 'package:poemath/features/english/english_widgets.dart';
 import 'package:poemath/features/textbook/widgets/textbook_toc_dialog.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
@@ -42,6 +50,8 @@ import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
 
 import '../../helpers/textbook_fixture.dart';
 import '../../helpers/math_textbook_fixture.dart';
+import '../../helpers/english_fixture.dart';
+import '../../helpers/narration_fakes.dart';
 import '../../helpers/textbook_page_number_fixture.dart';
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
@@ -351,6 +361,251 @@ void main() {
     editionLabel: '英语测试版',
     evidencePdfPages: const [1],
   );
+
+  testWidgets('英语课本详情移除全书课程入口，学一学直达当前课时图文', (tester) async {
+    final english = textbookFixture(
+      title: '自有英语测试教材',
+      subject: TextbookSubject.english,
+    );
+    final lesson = englishLesson(
+      targets: [
+        EnglishTarget(
+          id: 'card-one',
+          kind: EnglishTargetKind.sentence,
+          text: 'Who is he?',
+          sources: const [
+            EnglishSource(2, left: .12, top: .2, right: .5, bottom: .28),
+          ],
+        ).approve(),
+        EnglishTarget(
+          id: 'unreviewed',
+          kind: EnglishTargetKind.sentence,
+          text: 'Draft sentence',
+          sources: const [
+            EnglishSource(2, left: .12, top: .5, right: .6, bottom: .58),
+          ],
+        ),
+      ],
+    ).change({'endPage': 2});
+    final course = englishCourse(book: english, lessons: [lesson]);
+    final narrationSynth = NarrationSynth();
+    final narrationPlayers = <RecordingNarrationPlayer>[];
+    final tts = TtsService(
+      NarrationSettings(),
+      flutterTts: NarrationEngine(),
+      fileSynthesizer: narrationSynth,
+      narrationPlayerFactory: () {
+        final player = RecordingNarrationPlayer()..automatic = true;
+        narrationPlayers.add(player);
+        return player;
+      },
+    );
+    final narrationCache = MemoryNarrationCache();
+    EnglishAudio createAudio() => EnglishAudio(
+      bookId: english.pdfSha256,
+      tts: tts,
+      cache: narrationCache,
+      store: EnglishRecordingStore(),
+    );
+    TextbookViewerOptions? viewerOptions;
+    addTearDown(tts.dispose);
+    repo.books[english.pdfSha256] = english;
+    repo.readings['default:${english.pdfSha256}'] = const TextbookReading(
+      page: 2,
+    );
+    files.paths[english.pdfSha256] = '/english-detail.pdf';
+    final router = createAppRouter(
+      initialLocation: AppRoutes.textbookDetailOf(english.pdfSha256),
+    );
+    addTearDown(router.dispose);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await drainHiveWritesForTesting(tester);
+    });
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          textbookRepositoryProvider.overrideWithValue(repo),
+          textbookFileServiceProvider.overrideWithValue(files),
+          textbookPrintedPageProvider.overrideWith(
+            (ref, key) async => key.page,
+          ),
+          textbookCourseProvider(english.pdfSha256)
+              .overrideWith((ref) async => null),
+          englishCourseProvider(english.pdfSha256)
+              .overrideWith((ref) async => course),
+          englishAudioProvider(englishAudioKey(english.pdfSha256))
+              .overrideWith((ref) => createAudio()),
+          englishVoiceProvider.overrideWithValue(const {
+            'locale': 'en-US',
+            'name': 'English',
+          }),
+          englishTargetCardNumberProvider.overrideWith(
+            (ref, key) async => {'card-one': 1, 'unreviewed': 2},
+          ),
+          englishReviewPageImageBuilderProvider.overrideWithValue(
+            (book, page) => SizedBox(
+              key: ValueKey('english-source-page-$page'),
+              height: 120,
+            ),
+          ),
+          textbookPreviewBuilderProvider.overrideWithValue((_, options) {
+            viewerOptions = options;
+            return _Viewer(options);
+          }),
+        ],
+        child: MaterialApp.router(
+          routerConfig: router,
+          theme: AppTheme.resolve(
+            subject: AppSubject.poem,
+            brightness: Brightness.light,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('全书课程'), findsNothing);
+    expect(find.text('学一学'), findsOneWidget);
+    expect(
+      textbookPageTapPosition(
+        const Offset(50, 25),
+        const Size(100, 100),
+        sourceStart: .5,
+        sourceEnd: 1,
+      ),
+      const Offset(.75, .25),
+    );
+    viewerOptions!.onPageTap!(
+      2,
+      const Offset(.3, .24),
+      Future.value(
+        const TextbookPageText(
+          page: 2,
+          text: 'Who is he?',
+          width: 100,
+          height: 100,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(narrationPlayers.expand((player) => player.audio), hasLength(1));
+    expect(narrationSynth.texts, ['Who is he?']);
+    viewerOptions!.onPageTap!(
+      2,
+      const Offset(.53, .24),
+      Future.value(
+        const TextbookPageText(
+          page: 2,
+          text: 'Who is he?',
+          width: 100,
+          height: 100,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(narrationPlayers.expand((player) => player.audio), hasLength(2));
+    expect(
+      narrationPlayers.expand((player) => player.audio).last.format,
+      'wav',
+    );
+    expect(narrationSynth.texts, ['Who is he?']);
+    viewerOptions!.onPageTap!(
+      2,
+      const Offset(.75, .72),
+      Future.value(
+        const TextbookPageText(
+          page: 2,
+          text: 'Hello.',
+          width: 100,
+          height: 100,
+          glyphs: [
+            TextbookPageGlyph(
+              text: 'H',
+              index: 0,
+              left: .65,
+              top: .7,
+              right: .68,
+              bottom: .74,
+            ),
+            TextbookPageGlyph(
+              text: 'e',
+              index: 1,
+              left: .68,
+              top: .7,
+              right: .71,
+              bottom: .74,
+            ),
+            TextbookPageGlyph(
+              text: 'l',
+              index: 2,
+              left: .71,
+              top: .7,
+              right: .74,
+              bottom: .74,
+            ),
+            TextbookPageGlyph(
+              text: 'l',
+              index: 3,
+              left: .74,
+              top: .7,
+              right: .77,
+              bottom: .74,
+            ),
+            TextbookPageGlyph(
+              text: 'o',
+              index: 4,
+              left: .77,
+              top: .7,
+              right: .8,
+              bottom: .74,
+            ),
+            TextbookPageGlyph(
+              text: '.',
+              index: 5,
+              left: .8,
+              top: .7,
+              right: .83,
+              bottom: .74,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(narrationPlayers.expand((player) => player.audio), hasLength(3));
+    expect(narrationSynth.texts, ['Who is he?', 'Hello.']);
+    await tester.tap(find.text('学一学'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EnglishLessonPage), findsOneWidget);
+    expect(find.text('Unit 1 Garden · Lesson 1'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('english-study-source-2')),
+      findsOneWidget,
+    );
+    expect(find.text('1. Who is he?'), findsOneWidget);
+    expect(find.text('2. Draft sentence'), findsOneWidget);
+    expect(find.textContaining('待核对'), findsOneWidget);
+    await tester.tap(find.text('1. Who is he?'));
+    await tester.pumpAndSettle();
+    expect(narrationPlayers.expand((player) => player.audio), hasLength(4));
+    expect(narrationSynth.texts, ['Who is he?', 'Hello.']);
+    expect(
+      course
+          .lesson(lesson.id)!
+          .targets
+          .singleWhere((target) => target.id == 'unreviewed')
+          .approved,
+      isFalse,
+    );
+    expect(find.byTooltip('补充内容'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   Future<GoRouter> pumpMathShelf(
     WidgetTester tester,

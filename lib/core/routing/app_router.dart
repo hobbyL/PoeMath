@@ -189,6 +189,14 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.home}) {
         builder: (_, s) => EnglishCoursePage(bookId: s.pathParameters['id']!),
       ),
       GoRoute(
+        path: AppRoutes.englishLessonContent,
+        builder: (_, s) => EnglishLessonPage(
+          bookId: s.pathParameters['id']!,
+          lessonId: s.pathParameters['lesson']!,
+          sourceContent: true,
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.englishLesson,
         builder: (_, s) => EnglishLessonPage(
           bookId: s.pathParameters['id']!,

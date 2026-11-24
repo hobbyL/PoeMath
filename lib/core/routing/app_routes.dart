@@ -17,6 +17,8 @@ class AppRoutes {
       Uri(path: englishTab, queryParameters: {'section': section}).toString();
   static const englishCourse = '/english/book/:id';
   static const englishLesson = '/english/book/:id/lesson/:lesson';
+  static const englishLessonContent =
+      '/english/book/:id/lesson/:lesson/content';
   static const englishStudy = '/english/book/:id/lesson/:lesson/study';
   static const englishSpeaking = '/english/book/:id/lesson/:lesson/speaking';
   static const englishPracticeHub = '/english/book/:id/practice';

@@ -100,6 +100,41 @@ void main() {
     audio.dispose();
     tts.dispose();
   });
+  test('停止准备中的英语示范会清除过期准备提示', () async {
+    final players = <RecordingNarrationPlayer>[];
+    final tts = TtsService(
+      NarrationSettings(),
+      flutterTts: NarrationEngine(),
+      fileSynthesizer: _Synth(),
+      narrationPlayerFactory: () {
+        final player = RecordingNarrationPlayer();
+        players.add(player);
+        return player;
+      },
+    );
+    final audio = EnglishAudio(
+      bookId: englishBook().pdfSha256,
+      tts: tts,
+      cache: MemoryNarrationCache(),
+      store: EnglishRecordingStore(directory: () async => root),
+    );
+    final pending = audio.speak(
+      'Hello there.',
+      {'locale': 'en-US', 'name': 'English'},
+    );
+    while (players.isEmpty || players.single.audio.isEmpty) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    expect(audio.message, '准备英语示范');
+
+    await audio.stop();
+
+    expect(await pending, isFalse);
+    expect(audio.busy, isFalse);
+    expect(audio.message, isEmpty);
+    audio.dispose();
+    tts.dispose();
+  });
   test('录音拒绝可重试、未保存回听、保存幂等、停后台不会自动续录', () async {
     final recorders = <_Recorder>[], players = <RecordingNarrationPlayer>[];
     final tts = TtsService(NarrationSettings(), flutterTts: NarrationEngine());

@@ -159,7 +159,15 @@ class _TextbookPdfPreviewState extends State<TextbookPdfPreview> {
     super.dispose();
   }
 
-  void _tapPage(Offset point, Size size, int number, int pageCount) {
+  void _tapPage(
+    PdfDocument document,
+    Offset point,
+    Size size,
+    int number,
+    int pageCount, {
+    double start = 0,
+    double end = 1,
+  }) {
     if (_navigationTarget != null ||
         !_controller.hasClients ||
         _controller.position.isScrollingNotifier.value ||
@@ -167,13 +175,34 @@ class _TextbookPdfPreviewState extends State<TextbookPdfPreview> {
       return;
     }
     final pages = _layout.pages(_layout.spreadIndex(_page), pageCount);
-    switch (textbookPageCornerAt(point, Offset.zero & size)) {
+    final corner = textbookPageCornerAt(point, Offset.zero & size);
+    if (corner == null) {
+      widget.options.onPageTap?.call(
+        number,
+        textbookPageTapPosition(
+          point,
+          size,
+          sourceStart: start,
+          sourceEnd: end,
+        ),
+        loadTextbookPdfPage(
+          document: document,
+          number: number,
+          cache: widget.options.contentCache,
+          checkAvailable: () {
+            if (!mounted || !identical(_readyDocument, document)) {
+              throw StateError('教材预览已关闭');
+            }
+          },
+        ),
+      );
+      return;
+    }
+    switch (corner) {
       case TextbookPageCorner.previous:
         if (number == pages.first) widget.options.onPreviousPage?.call();
       case TextbookPageCorner.next:
         if (number == pages.last) widget.options.onNextPage?.call();
-      case null:
-        break;
     }
   }
 
@@ -262,10 +291,13 @@ class _TextbookPdfPreviewState extends State<TextbookPdfPreview> {
                   behavior: HitTestBehavior.opaque,
                   excludeFromSemantics: true,
                   onTapUp: (details) => _tapPage(
+                    document,
                     details.localPosition,
                     Size(pageImage.width!, pageImage.height!),
                     number,
                     document.pages.length,
+                    start: start,
+                    end: end,
                   ),
                   child: TextbookCurlPageImage(
                     image: pageImage,

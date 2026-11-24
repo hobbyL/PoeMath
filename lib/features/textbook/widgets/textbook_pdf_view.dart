@@ -8,6 +8,7 @@ import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/core/services/textbook_pdf_page_loader.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/data/models/textbook_page_text.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_corner.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_layout.dart';
@@ -15,6 +16,22 @@ import 'package:poemath/features/textbook/widgets/textbook_pdf_toc.dart';
 import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
 
 typedef TextbookGoToPage = Future<void> Function(int page);
+typedef TextbookPageTap = void Function(
+  int page,
+  Offset normalizedPosition,
+  Future<TextbookPageText> pageText,
+);
+
+Offset textbookPageTapPosition(
+  Offset localPosition,
+  Size pageSize, {
+  double sourceStart = 0,
+  double sourceEnd = 1,
+}) => Offset(
+  (sourceStart + localPosition.dx / pageSize.width * (sourceEnd - sourceStart))
+      .clamp(0.0, 1.0),
+  (localPosition.dy / pageSize.height).clamp(0.0, 1.0),
+);
 typedef TextbookViewerBuilder = Widget Function(
   BuildContext context,
   TextbookViewerOptions options,
@@ -31,6 +48,7 @@ class TextbookViewerOptions {
     this.onSearchReady,
     this.onTocReady,
     this.onPageNumbersReady,
+    this.onPageTap,
     this.contentCache,
     this.onPreviousPage,
     this.onNextPage,
@@ -44,6 +62,7 @@ class TextbookViewerOptions {
   final ValueChanged<TextbookSearch>? onSearchReady;
   final ValueChanged<TextbookTocLoader>? onTocReady;
   final ValueChanged<TextbookPageNumberService>? onPageNumbersReady;
+  final TextbookPageTap? onPageTap;
   final TextbookContentCache? contentCache;
   final VoidCallback? onPreviousPage;
   final VoidCallback? onNextPage;
