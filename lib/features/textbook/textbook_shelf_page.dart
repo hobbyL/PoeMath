@@ -258,6 +258,13 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
                 child: Text('数学', maxLines: 1),
               ),
             ),
+            ButtonSegment(
+              value: TextbookSubject.english,
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('英语', maxLines: 1),
+              ),
+            ),
           ],
           selected: {_subject},
           onSelectionChanged: (values) =>

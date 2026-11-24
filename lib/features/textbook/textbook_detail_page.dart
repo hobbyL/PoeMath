@@ -12,6 +12,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/features/english/english_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_subject_dialog.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/data/models/textbook_course.dart';
@@ -144,12 +145,13 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
       if (!mounted || selected == null) return;
       subject = selected;
     }
-    if (subject == TextbookSubject.english) return;
     await _openRoute(
-      subject == TextbookSubject.math
+      subject == TextbookSubject.english
+          ? AppRoutes.englishBookOf(widget.bookId, review: true)
+          : subject == TextbookSubject.math
           ? AppRoutes.mathTextbookReviewOf(widget.bookId)
           : AppRoutes.textbookReviewOf(widget.bookId),
-      suspendPreview: subject == TextbookSubject.math,
+      suspendPreview: subject != TextbookSubject.chinese,
     );
   }
 
@@ -579,6 +581,49 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     Textbook book,
   ) {
     if (book.subject != TextbookSubject.chinese) {
+      if (book.subject == TextbookSubject.english) {
+        final course = ref
+            .watch(englishCourseProvider(widget.bookId))
+            .valueOrNull;
+        final lessons =
+            course?.lessons.where((l) => pages.any(l.containsPage)).toList() ??
+            [];
+        return Wrap(
+          alignment: WrapAlignment.center,
+          spacing: SpacingTokens.xs,
+          runSpacing: SpacingTokens.xs,
+          children: [
+            if (widget.manage)
+              TextButton.icon(
+                onPressed: !_turning && _previewVisible ? _review : null,
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('整理与审核英语课时'),
+              )
+            else ...[
+              for (final lesson in lessons)
+                TextButton(
+                  onPressed: !_turning && _previewVisible
+                      ? () => _openRoute(
+                          AppRoutes.englishBookOf(
+                            widget.bookId,
+                            lesson: lesson.id,
+                          ),
+                        )
+                      : null,
+                  child: Text(
+                    '${lessons.length > 1 ? '${lesson.title} · ' : ''}学一学',
+                  ),
+                ),
+              TextButton(
+                onPressed: !_turning && _previewVisible
+                    ? () => _openRoute(AppRoutes.englishBookOf(widget.bookId))
+                    : null,
+                child: const Text('全书课程'),
+              ),
+            ],
+          ],
+        );
+      }
       if (book.subject == TextbookSubject.math && !widget.manage) {
         const entries = <({String mode, String label})>[
           (mode: AppRoutes.mathTextbookLearnMode, label: '学一学'),
@@ -616,7 +661,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
           ],
         );
       }
-      if (!widget.manage || book.subject == TextbookSubject.english) {
+      if (!widget.manage) {
         return const SizedBox.shrink();
       }
       return TextButton.icon(
@@ -726,13 +771,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
       onSubject: widget.manage && !_turning && _previewVisible
           ? () => confirmTextbookSubject(context, ref, book)
           : null,
-      onReview:
-          widget.manage &&
-              book.subject != TextbookSubject.english &&
-              !_turning &&
-              _previewVisible
-          ? _review
-          : null,
+      onReview: widget.manage && !_turning && _previewVisible ? _review : null,
       onToc:
           available &&
               !_turning &&

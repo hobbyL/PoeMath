@@ -335,6 +335,22 @@ void main() {
     editionLabel: '2022课标修订',
     evidencePdfPages: const [1],
   );
+  final englishBook = textbookFixture(
+    id: List.filled(64, 'e').join(),
+    title: '英语测试教材',
+    subject: TextbookSubject.english,
+  );
+  final englishCatalogEntry = TextbookCatalogEntry(
+    book: englishBook,
+    downloadUrl: Uri.parse(
+      'https://raw.githubusercontent.com/test/books/english-sample.pdf',
+    ),
+    sourceRepository: 'test/books',
+    sourceCommit: List.filled(40, 'b').join(),
+    sourcePath: 'english-sample.pdf',
+    editionLabel: '英语测试版',
+    evidencePdfPages: const [1],
+  );
 
   Future<GoRouter> pumpMathShelf(
     WidgetTester tester,
@@ -717,7 +733,7 @@ void main() {
           const TextbookShelfPage(),
           large: true,
           size: const Size(320, 800),
-          catalog: [catalogEntry],
+          catalog: [catalogEntry, englishCatalogEntry],
           theme: AppTheme.resolve(subject: subject, brightness: brightness),
         );
 
@@ -741,6 +757,16 @@ void main() {
           tester.widget<SegmentedButton<TextbookSubject>>(selector).selected,
           {TextbookSubject.math},
         );
+        await tester.tap(
+          find.descendant(of: selector, matching: find.text('英语')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<SegmentedButton<TextbookSubject>>(selector).selected,
+          {TextbookSubject.english},
+        );
+        expect(find.text('英语测试教材'), findsOneWidget);
+        expect(find.text(book.title), findsNothing);
         expect(tester.takeException(), isNull);
       }
     }

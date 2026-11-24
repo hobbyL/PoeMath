@@ -6,6 +6,13 @@
 // 依赖：go_router / AppRoutes / MainShell / 各页面。
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poemath/features/english/english_tab_page.dart';
+import 'package:poemath/features/english/english_course_page.dart';
+import 'package:poemath/features/english/english_target_editor.dart';
+import 'package:poemath/features/english/english_study_page.dart';
+import 'package:poemath/features/english/english_practice_page.dart';
+import 'package:poemath/features/english/english_history_page.dart';
+import 'package:poemath/features/english/english_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/widgets.dart';
@@ -160,6 +167,15 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.home}) {
             ),
           ),
           GoRoute(
+            path: AppRoutes.englishTab,
+            pageBuilder: (context, state) => NoTransitionPage<void>(
+              key: state.pageKey,
+              child: EnglishTabPage(
+                section: state.uri.queryParameters['section'],
+              ),
+            ),
+          ),
+          GoRoute(
             path: AppRoutes.profile,
             pageBuilder: (context, state) => NoTransitionPage<void>(
               key: state.pageKey,
@@ -167,6 +183,107 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.home}) {
             ),
           ),
         ],
+      ),
+      GoRoute(
+        path: AppRoutes.englishCourse,
+        builder: (_, s) => EnglishCoursePage(bookId: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.englishLesson,
+        builder: (_, s) => EnglishLessonPage(
+          bookId: s.pathParameters['id']!,
+          lessonId: s.pathParameters['lesson']!,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.englishStudy,
+        builder: (_, s) => EnglishStudyPage(
+          bookId: s.pathParameters['id']!,
+          lessonId: s.pathParameters['lesson']!,
+          kind: s.uri.queryParameters['kind'],
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.englishSpeaking,
+        builder: (_, s) => EnglishSpeakingPage(
+          key: ValueKey('${s.uri}:${ProfileScope.revision}'),
+          bookId: s.pathParameters['id']!,
+          lessonId: s.pathParameters['lesson']!,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.englishPracticeHub,
+        builder: (_, s) => EnglishPracticeHubPage(
+          bookId: s.pathParameters['id']!,
+          lessonId: s.uri.queryParameters['lesson'],
+          due: s.uri.queryParameters['due'] == '1',
+          retry: s.uri.queryParameters['retry'] == '1',
+          targetKey: s.uri.queryParameters['targetKey'],
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.englishPractice,
+        builder: (_, s) => EnglishPracticePage(
+          key: ValueKey('${s.uri}:${ProfileScope.revision}'),
+          bookId: s.pathParameters['id']!,
+          kind: s.pathParameters['kind']!,
+          lessonId: s.uri.queryParameters['lesson'],
+          due: s.uri.queryParameters['due'] == '1',
+          retry: s.uri.queryParameters['retry'] == '1',
+          targetKey: s.uri.queryParameters['targetKey'],
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.englishHistory,
+        builder: (_, s) => EnglishHistoryPage(bookId: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.englishRecord,
+        builder: (_, s) => EnglishHistoryPage(
+          bookId: s.pathParameters['id']!,
+          attemptId: s.pathParameters['attempt']!,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.englishSource,
+        builder: (_, s) => EnglishSourcePage(
+          bookId: s.pathParameters['id']!,
+          page: int.tryParse(s.pathParameters['page'] ?? '') ?? 1,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.englishReview,
+        builder: (_, s) => ParentAccessBoundary(
+          child: EnglishCoursePage(
+            bookId: s.pathParameters['id']!,
+            review: true,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.englishReviewLesson,
+        builder: (_, s) => ParentAccessBoundary(
+          child: EnglishLessonPage(
+            bookId: s.pathParameters['id']!,
+            lessonId: s.pathParameters['lesson']!,
+            review: true,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.englishTargetEdit,
+        builder: (_, s) => ParentAccessBoundary(
+          child: EnglishTargetEditor(
+            bookId: s.pathParameters['id']!,
+            lessonId: s.pathParameters['lesson']!,
+            targetId: s.pathParameters['target']!,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.englishVoice,
+        builder: (_, s) =>
+            const ParentAccessBoundary(child: EnglishVoicePage()),
       ),
       // ============ 语文教材（学习详情全屏，返回语文 Tab） ============
       GoRoute(

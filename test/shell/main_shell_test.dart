@@ -1,6 +1,6 @@
 // test/shell/main_shell_test.dart
 //
-// MainShell 4-Tab 点击测试：点击 tab 后应正确切换页面；
+// MainShell 5-Tab 点击测试：点击 tab 后应正确切换页面；
 // 主题由用户在设置页手动切换，tab 切换不改变主题。
 
 import 'package:flutter/material.dart';
@@ -82,6 +82,14 @@ void main() {
     expect(_selectedTab(tester), 2, reason: '应切到数学 tab');
     expect(container.read(activeSubjectProvider), initialSubject);
 
+    await tester.tap(find.text('英语'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    expect(_selectedTab(tester), 3);
+    expect(find.text('练习'), findsOneWidget);
+    expect(find.text('复习'), findsOneWidget);
+    expect(container.read(activeSubjectProvider), initialSubject);
+
     // 点击“语文”切换到课本与诗词入口，主题仍不变。
     await tester.tap(find.text('语文'));
     await tester.pump();
@@ -139,7 +147,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    expect(_selectedTab(tester), 3);
+    expect(_selectedTab(tester), 4);
     expect(find.byTooltip('设置').hitTestable(), findsOneWidget);
 
     // 家长验证入口会读取本地设置，交替推进真实 I/O 与导航帧。

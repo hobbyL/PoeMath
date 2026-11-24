@@ -12,6 +12,66 @@ class AppRoutes {
   static const String chineseTab = '/chinese';
   static const String poemTab = '/poem';
   static const String mathTab = '/math';
+  static const String englishTab = '/english';
+  static String englishSectionOf(String section) =>
+      Uri(path: englishTab, queryParameters: {'section': section}).toString();
+  static const englishCourse = '/english/book/:id';
+  static const englishLesson = '/english/book/:id/lesson/:lesson';
+  static const englishStudy = '/english/book/:id/lesson/:lesson/study';
+  static const englishSpeaking = '/english/book/:id/lesson/:lesson/speaking';
+  static const englishPracticeHub = '/english/book/:id/practice';
+  static const englishPractice = '/english/book/:id/practice/:kind';
+  static const englishHistory = '/english/book/:id/history';
+  static const englishRecord = '/english/book/:id/record/:attempt';
+  static const englishSource = '/english/book/:id/source/:page';
+  static const englishReview = '/profile/settings/books/:id/english';
+  static const englishReviewLesson =
+      '/profile/settings/books/:id/english/:lesson';
+  static const englishTargetEdit =
+      '/profile/settings/books/:id/english/:lesson/target/:target';
+  static const englishVoice = '/profile/settings/english-voice';
+
+  static String englishBookOf(
+    String id, {
+    String? action,
+    String? lesson,
+    String? target,
+    String? kind,
+    String? attempt,
+    int? page,
+    bool review = false,
+    bool due = false,
+    bool retry = false,
+    String? targetKey,
+  }) {
+    final base = review
+        ? '/profile/settings/books/${Uri.encodeComponent(id)}/english'
+        : '/english/book/${Uri.encodeComponent(id)}';
+    final suffix = target != null
+        ? '/${Uri.encodeComponent(lesson!)}/target/${Uri.encodeComponent(target)}'
+        : page != null
+        ? '/source/$page'
+        : attempt != null
+        ? '/record/${Uri.encodeComponent(attempt)}'
+        : action == 'practice'
+        ? '/practice${kind == null ? '' : '/${Uri.encodeComponent(kind)}'}'
+        : action == 'history'
+        ? '/history'
+        : lesson != null
+        ? '${review ? '' : '/lesson'}/${Uri.encodeComponent(lesson)}${action == null ? '' : '/$action'}'
+        : '';
+    return Uri(
+      path: '$base$suffix',
+      queryParameters: {
+        if (action == 'practice' && lesson != null) 'lesson': lesson,
+        if (due) 'due': '1',
+        if (retry) 'retry': '1',
+        if (targetKey != null) 'targetKey': targetKey,
+        if (action == 'study' && kind != null) 'kind': kind,
+      },
+    ).toString();
+  }
+
   static const String studyHub = '/study';
   static const String profile = '/profile';
 

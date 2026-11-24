@@ -73,7 +73,7 @@ void main() {
           of: selected,
           matching: find.text('首页'),
         );
-        if (preset == AppSubject.space) {
+        if (preset == AppSubject.space || width / 5 < 90) {
           expect(
             tester.getRect(navIcon).bottom,
             lessThan(tester.getRect(navLabel).top),
@@ -103,7 +103,7 @@ void main() {
           ),
           greaterThanOrEqualTo(4.5),
         );
-        for (final label in ['首页', '语文', '数学', '我的']) {
+        for (final label in ['首页', '语文', '数学', '英语', '我的']) {
           final tab = find.byKey(ValueKey('navigation-tab-$label'));
           final bounds = tester.getRect(
             find.descendant(of: tab, matching: find.byType(TextButton)),

@@ -79,7 +79,11 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
                   child: AppEmptyState(
                     icon: Icons.menu_book_outlined,
                     title:
-                        '暂无$volume${widget.subject == TextbookSubject.math ? '数学' : ''}课本',
+                        '暂无$volume${switch (widget.subject) {
+                          TextbookSubject.math => '数学',
+                          TextbookSubject.english => '英语',
+                          _ => '',
+                        }}课本',
                     description: '请家长在“设置 → 学习与内容 → 书籍管理”中添加。',
                     actions: const [
                       ContentPreparationActions(

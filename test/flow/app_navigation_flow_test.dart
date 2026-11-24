@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/app.dart';
 import 'package:poemath/features/chinese/chinese_tab_page.dart';
+import 'package:poemath/features/english/english_tab_page.dart';
 import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/math/math_tab_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
@@ -41,7 +42,7 @@ void main() {
     await tearDownHiveForWidgetTesting();
   });
 
-  testWidgets('App 启动后 4 个 Tab 均可切换', (tester) async {
+  testWidgets('App 启动后 5 个 Tab 均可切换', (tester) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.textScaleFactorTestValue = 2;
@@ -62,8 +63,20 @@ void main() {
     // 标题承诺的「均可切换」完全没被验证。现在逐个断言高亮下标。
     expect(_selectedTab(tester), 0, reason: '启动应停在首页 tab');
 
-    const expectedIndex = <String, int>{'语文': 1, '数学': 2, '我的': 3, '首页': 0};
-    const pages = [HomePage, ChineseTabPage, MathTabPage, ProfilePage];
+    const expectedIndex = <String, int>{
+      '语文': 1,
+      '数学': 2,
+      '英语': 3,
+      '我的': 4,
+      '首页': 0,
+    };
+    const pages = [
+      HomePage,
+      ChineseTabPage,
+      MathTabPage,
+      EnglishTabPage,
+      ProfilePage,
+    ];
     for (final entry in expectedIndex.entries) {
       if (entry.key == '语文') {
         Focus.of(tester.element(_bottomBarItem(entry.key))).requestFocus();
@@ -88,7 +101,7 @@ void main() {
         entry.value,
         reason: '点击「${entry.key}」后应切到下标 ${entry.value}',
       );
-      for (final label in ['首页', '语文', '数学', '我的']) {
+      for (final label in ['首页', '语文', '数学', '英语', '我的']) {
         final labelContext = tester.element(_bottomBarItem(label));
         final style = DefaultTextStyle.of(labelContext).style
             .merge(tester.widget<Text>(_bottomBarItem(label)).style);
@@ -114,9 +127,12 @@ void main() {
         final labelBounds = tester.getRect(_bottomBarItem(label));
         final icon = find.descendant(of: tab, matching: find.byType(Icon));
         final iconBounds = tester.getRect(icon);
-        expect(iconBounds.center.dy, closeTo(labelBounds.center.dy, 0.1));
-        expect(iconBounds.right, lessThan(labelBounds.left));
-        expect(bounds.width, greaterThan(bounds.height * 1.5));
+        if (iconBounds.bottom <= labelBounds.top) {
+          expect(iconBounds.center.dx, closeTo(labelBounds.center.dx, 0.1));
+        } else {
+          expect(iconBounds.center.dy, closeTo(labelBounds.center.dy, 0.1));
+          expect(iconBounds.right, lessThan(labelBounds.left));
+        }
         expect(bounds.height, greaterThanOrEqualTo(44));
         expect(bounds.contains(iconBounds.topLeft), isTrue);
         expect(bounds.contains(labelBounds.bottomRight), isTrue);

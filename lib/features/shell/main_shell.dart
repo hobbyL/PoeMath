@@ -1,7 +1,7 @@
 // lib/features/shell/main_shell.dart
 //
 // 层级：features/shell
-// 职责：应用主体的 4-Tab Shell（首页 / 语文 / 口算 / 我的）+
+// 职责：应用主体的 5-Tab Shell（首页 / 语文 / 数学 / 英语 / 我的）+
 //       启动/前台恢复自动检测更新的挂载点（WidgetsBindingObserver）。
 // 依赖：go_router / Riverpod / AppRoutes / UpdateCheckController。
 
@@ -54,11 +54,12 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell>
     with WidgetsBindingObserver {
-  /// 4 个 tab 对应的目标路由。
+  /// 5 个 tab 对应的目标路由。
   static const List<String> _routes = [
     AppRoutes.home,
     AppRoutes.chineseTab,
     AppRoutes.mathTab,
+    AppRoutes.englishTab,
     AppRoutes.profile,
   ];
 
@@ -73,6 +74,11 @@ class _MainShellState extends ConsumerState<MainShell>
       icon: Icons.calculate_outlined,
       selectedIcon: Icons.calculate_rounded,
       label: '数学',
+    ),
+    (
+      icon: Icons.translate_outlined,
+      selectedIcon: Icons.translate_rounded,
+      label: '英语',
     ),
     (
       icon: Icons.person_outlined,
@@ -254,7 +260,8 @@ class _MainShellState extends ConsumerState<MainShell>
       return 1;
     }
     if (location == AppRoutes.mathTab) return 2;
-    if (location == AppRoutes.profile) return 3;
+    if (location == AppRoutes.englishTab) return 3;
+    if (location == AppRoutes.profile) return 4;
     return 0;
   }
 
@@ -268,7 +275,9 @@ class _MainShellState extends ConsumerState<MainShell>
     final assistantEnabled = ref.watch(assistantEnabledProvider);
     final theme = Theme.of(context);
     final navigation = NavigationBar(
-      height: theme.appearance.space
+      height:
+          theme.appearance.space ||
+              MediaQuery.sizeOf(context).width / _destinations.length < 90
           ? SpacingTokens.xxl + SpacingTokens.lg
           : SpacingTokens.xl * 2,
       backgroundColor: theme.appearance.storybook ? Colors.transparent : null,
@@ -413,12 +422,20 @@ class _NavigationTab extends StatelessWidget {
                         ? Duration.zero
                         : const Duration(milliseconds: 200),
                   ),
-                  child: theme.appearance.ink
-                      ? Stack(
-                          clipBehavior: Clip.none,
-                          alignment: Alignment.center,
-                          children: [
-                            Row(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stacked =
+                          theme.appearance.space || constraints.maxWidth < 75;
+                      final content = stacked
+                          ? Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                glyph,
+                                const SizedBox(height: SpacingTokens.xs),
+                                labelWidget,
+                              ],
+                            )
+                          : Row(
                               mainAxisSize: MainAxisSize.min,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -426,38 +443,29 @@ class _NavigationTab extends StatelessWidget {
                                 const SizedBox(width: SpacingTokens.xs),
                                 labelWidget,
                               ],
-                            ),
-                            if (selected)
-                              Positioned(
-                                bottom: -SpacingTokens.sm,
-                                child: SizedBox(
-                                  width: SpacingTokens.md,
-                                  height: SpacingTokens.xs / 2,
-                                  child: ColoredBox(
-                                    color: theme.colorScheme.secondary,
+                            );
+                      return theme.appearance.ink
+                          ? Stack(
+                              clipBehavior: Clip.none,
+                              alignment: Alignment.center,
+                              children: [
+                                content,
+                                if (selected)
+                                  Positioned(
+                                    bottom: -SpacingTokens.sm,
+                                    child: SizedBox(
+                                      width: SpacingTokens.md,
+                                      height: SpacingTokens.xs / 2,
+                                      child: ColoredBox(
+                                        color: theme.colorScheme.secondary,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                          ],
-                        )
-                      : theme.appearance.space
-                      ? Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            glyph,
-                            const SizedBox(height: SpacingTokens.xs),
-                            labelWidget,
-                          ],
-                        )
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            glyph,
-                            const SizedBox(width: SpacingTokens.xs),
-                            labelWidget,
-                          ],
-                        ),
+                              ],
+                            )
+                          : content;
+                    },
+                  ),
                 ),
               ),
             ),
