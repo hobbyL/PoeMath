@@ -250,6 +250,14 @@ class SettingsPage extends ConsumerWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: SpacingTokens.sm),
+              AppTile(
+                icon: Icons.translate_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: '英语声音',
+                subtitle: '英语系统音色，与中文朗读分别设置',
+                onTap: () => context.push(AppRoutes.englishVoice),
+              ),
               const SizedBox(height: SpacingTokens.md),
             ],
 

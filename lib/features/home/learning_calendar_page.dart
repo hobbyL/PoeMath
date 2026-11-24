@@ -9,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/check_in.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 
 class LearningCalendarPage extends ConsumerStatefulWidget {
@@ -21,6 +23,7 @@ class LearningCalendarPage extends ConsumerStatefulWidget {
 
 class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
   late DateTime _currentMonth;
+  Map<int, ({int count, int seconds})> _englishDays = {};
 
   @override
   void initState() {
@@ -35,6 +38,26 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
     final repo = ref.watch(checkInRepoProvider);
     final records = repo.getByMonth(_currentMonth.year, _currentMonth.month);
     final streak = ref.watch(streakProvider);
+    ref.watch(todayLearningActivityCountsProvider);
+    final english = ref
+        .watch(learningActivityRepositoryProvider)
+        .completedBetween(
+          _currentMonth,
+          DateTime(_currentMonth.year, _currentMonth.month + 1),
+        )
+        .where(
+          (a) =>
+              a.typeOrNull == LearningActivityType.englishPractice ||
+              a.typeOrNull == LearningActivityType.englishSpeaking,
+        );
+    _englishDays = {};
+    for (final a in english) {
+      final day = a.completedAt.day, old = _englishDays[a.completedAt.day];
+      _englishDays[day] = (
+        count: (old?.count ?? 0) + 1,
+        seconds: (old?.seconds ?? 0) + a.durationSeconds,
+      );
+    }
 
     // 构建日期 → 打卡记录映射
     final checkInMap = <int, CheckIn>{};
@@ -107,7 +130,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
                     child: _buildStat(
                       theme,
                       Icons.event_available,
-                      '${records.length}',
+                      '${{...checkInMap.keys, ..._englishDays.keys}.length}',
                       '本月学习',
                       theme.colorScheme.primary,
                     ),
@@ -225,11 +248,13 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
     CheckIn? checkIn,
     bool isToday,
   ) {
-    final level = _activityLevel(checkIn);
+    final level = _activityLevel(checkIn, _englishDays[day]?.count ?? 0);
     final bgColor = _levelColor(theme, level);
 
     return GestureDetector(
-      onTap: checkIn != null ? () => _showDayDetail(day, checkIn) : null,
+      onTap: checkIn != null || _englishDays.containsKey(day)
+          ? () => _showDayDetail(day, checkIn)
+          : null,
       child: Container(
         height: 44,
         margin: const EdgeInsets.all(2),
@@ -258,9 +283,11 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
   }
 
   /// 活跃等级：0=无，1=少量，2=中等，3=活跃，4=非常活跃
-  int _activityLevel(CheckIn? checkIn) {
-    if (checkIn == null) return 0;
-    final total = checkIn.poemCount + checkIn.legacyCompatibleMathTotalCount;
+  int _activityLevel(CheckIn? checkIn, int englishCount) {
+    final total =
+        (checkIn?.poemCount ?? 0) +
+        (checkIn?.legacyCompatibleMathTotalCount ?? 0) +
+        englishCount;
     if (total == 0) return 0;
     if (total <= 3) return 1;
     if (total <= 10) return 2;
@@ -313,12 +340,15 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
     );
   }
 
-  void _showDayDetail(int day, CheckIn checkIn) {
+  void _showDayDetail(int day, CheckIn? checkIn) {
     showModalBottomSheet<void>(
       context: context,
       builder: (ctx) {
         final theme = Theme.of(ctx);
-        final minutes = checkIn.durationSeconds ~/ 60;
+        final minutes =
+            ((checkIn?.durationSeconds ?? 0) +
+                (_englishDays[day]?.seconds ?? 0)) ~/
+            60;
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(SpacingTokens.lg),
@@ -337,7 +367,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
                   theme,
                   Icons.menu_book_rounded,
                   '诗词学习',
-                  '${checkIn.poemCount} 首',
+                  '${checkIn?.poemCount ?? 0} 首',
                   theme.colorScheme.primary,
                 ),
                 const SizedBox(height: SpacingTokens.sm),
@@ -345,8 +375,8 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
                   theme,
                   Icons.calculate_rounded,
                   '口算答题',
-                  '${checkIn.mathCorrectCount}/'
-                      '${checkIn.legacyCompatibleMathTotalCount} 题',
+                  '${checkIn?.mathCorrectCount ?? 0}/'
+                      '${checkIn?.legacyCompatibleMathTotalCount ?? 0} 题',
                   theme.semantic.secondaryForeground,
                 ),
                 const SizedBox(height: SpacingTokens.sm),
@@ -354,7 +384,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
                   theme,
                   Icons.star_rounded,
                   '获得星星',
-                  '${checkIn.starsEarned}',
+                  '${checkIn?.starsEarned ?? 0}',
                   theme.semantic.caution,
                 ),
                 const SizedBox(height: SpacingTokens.sm),
@@ -365,6 +395,16 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
                   '$minutes 分钟',
                   theme.colorScheme.tertiary,
                 ),
+                if (_englishDays.containsKey(day)) ...[
+                  const SizedBox(height: SpacingTokens.sm),
+                  _buildDetailRow(
+                    theme,
+                    Icons.translate_outlined,
+                    '英语练习与跟读',
+                    '${_englishDays[day]!.count} 次',
+                    theme.colorScheme.primary,
+                  ),
+                ],
                 const SizedBox(height: SpacingTokens.md),
               ],
             ),

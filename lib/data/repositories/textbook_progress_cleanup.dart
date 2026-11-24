@@ -4,6 +4,7 @@ import 'package:hive/hive.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/math_textbook_progress.dart';
+import 'package:poemath/data/models/english_progress.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 
 /// 删除本书时清理学习进度。
@@ -31,6 +32,7 @@ class TextbookProgressCleanup {
           key.startsWith(recognitionKeyPrefix) ||
           key.startsWith(writingKeyPrefix) ||
           key.startsWith(exerciseKeyPrefix) ||
+          key.startsWith(EnglishProgress.prefix) ||
           key.startsWith(MathTextbookProgress.prefix);
       if (!isProgressKey) continue;
       if (_matchesBook(_box.get(key), bookId)) targets.add(key);
@@ -48,7 +50,13 @@ class TextbookProgressCleanup {
             bookId,
             box: draftBox,
           );
-    return targets.length + draftCount;
+    final englishDraftCount = draftBox == null
+        ? 0
+        : await PracticeDraftRepository.deleteEnglishBookDrafts(
+            bookId,
+            box: draftBox,
+          );
+    return targets.length + draftCount + englishDraftCount;
   }
 
   bool _matchesBook(Object? raw, String bookId) {

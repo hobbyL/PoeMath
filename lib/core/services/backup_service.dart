@@ -28,6 +28,7 @@ import 'package:poemath/data/models/formula_favorite.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/math_textbook_progress.dart';
+import 'package:poemath/data/models/english_progress.dart';
 import 'package:poemath/data/models/math_textbook_session_context.dart';
 import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
@@ -77,6 +78,7 @@ const String _textbookRecognitionPrefix = 'textbook_recognition_v1:';
 const String _textbookWritingPrefix = 'textbook_writing_v1:';
 const String _textbookExercisePrefix = 'textbook_exercise_v1:';
 const String _textbookMathPrefix = MathTextbookProgress.prefix;
+const String _textbookEnglishPrefix = EnglishProgress.prefix;
 
 /// 允许随备份迁移的 settings key 及其类型契约（key → 期望类型标签）。
 ///
@@ -350,6 +352,7 @@ class BackupService {
       'learningActivities': _exportLearningActivities(),
       'textbookLearning': _exportTextbookLearning(),
       'mathTextbookProgressVersion': 1,
+      'englishProgressVersion': 1,
       'pictureStoryPractice': _exportPictureStoryPractice(),
       'llmProblems': _exportLlmProblems(),
       'conversations': [
@@ -722,6 +725,12 @@ class BackupService {
     // 恢复前先快照当前数据（不含凭据节），失败时用于回滚
     // 题库补偿保留原始键和值，不能依赖旧图片可读或目录 JSON 有效。
     final snapshot = await _exportToJson(includePictureStoryCatalog: false);
+    // 可携带的备份省略录音 ID；事务补偿另存本机原值，避免失败恢复断开录音关联。
+    final englishLocalSnapshot = <String, dynamic>{
+      for (final key in HiveBoxes.settings.keys.whereType<String>())
+        if (key.startsWith(_textbookEnglishPrefix))
+          key: HiveBoxes.settings.get(key),
+    };
     final picturePracticeSnapshot = <dynamic, PictureStoryPracticeRecord>{
       for (final key in HiveBoxes.pictureStoryPractice.keys)
         if (HiveBoxes.pictureStoryPractice.get(key) case final record?)
@@ -797,6 +806,16 @@ class BackupService {
       try {
         final rollback = _decodeAndValidate(snapshot);
         await _doRestore(rollback, canonicalize: false);
+      } on Object catch (rollbackError) {
+        rollbackErrors.add(rollbackError);
+      }
+      try {
+        final englishKeys = HiveBoxes.settings.keys
+            .whereType<String>()
+            .where((key) => key.startsWith(_textbookEnglishPrefix))
+            .toList();
+        await HiveBoxes.settings.deleteAll(englishKeys);
+        await HiveBoxes.settings.putAll(englishLocalSnapshot);
       } on Object catch (rollbackError) {
         rollbackErrors.add(rollbackError);
       }
@@ -1187,6 +1206,11 @@ class BackupService {
             (data['textbookLearning'] as Map<String, dynamic>).keys.any(
               (key) => key.startsWith(_textbookMathPrefix),
             ),
+        replaceEnglish:
+            data['englishProgressVersion'] == 1 ||
+            (data['textbookLearning'] as Map<String, dynamic>).keys.any(
+              (key) => key.startsWith(_textbookEnglishPrefix),
+            ),
       );
     }
     if (data.containsKey('pictureStoryPractice')) {
@@ -1346,14 +1370,22 @@ class BackupService {
     }).toList();
   }
 
-  Map<String, String> _exportTextbookLearning() =>
-      _exportTextbookProgressValues(HiveBoxes.settings, const [
-        _textbookReadingPrefix,
-        _textbookRecognitionPrefix,
-        _textbookWritingPrefix,
-        _textbookExercisePrefix,
-        _textbookMathPrefix,
-      ]);
+  Map<String, String> _exportTextbookLearning() => {
+    ..._exportTextbookProgressValues(HiveBoxes.settings, const [
+      _textbookReadingPrefix,
+      _textbookRecognitionPrefix,
+      _textbookWritingPrefix,
+      _textbookExercisePrefix,
+      _textbookMathPrefix,
+    ]),
+    for (final key in HiveBoxes.settings.keys.whereType<String>())
+      if (key.startsWith(_textbookEnglishPrefix))
+        key: jsonEncode(
+          EnglishProgress.fromJson(
+            jsonDecode(HiveBoxes.settings.get(key) as String),
+          ).toJson(portable: true),
+        ),
+  };
 
   Map<String, String> _exportTextbookProgressValues(
     Box<dynamic> box,
@@ -1866,14 +1898,44 @@ class BackupService {
   Future<int> _restoreTextbookLearning(
     Map<String, dynamic> data, {
     required bool replaceMath,
+    required bool replaceEnglish,
   }) async {
-    final settings = data.cast<String, String>();
+    final settings = Map<String, String>.from(data);
+    // 同机恢复保留完全相同文字记录的本机录音关联；备份本身不携带这些标识。
+    for (final key
+        in settings.keys
+            .where((key) => key.startsWith(_textbookEnglishPrefix))
+            .toList()) {
+      final raw = HiveBoxes.settings.get(key);
+      if (raw is! String) continue;
+      try {
+        final old = EnglishProgress.fromJson(jsonDecode(raw));
+        final restored = EnglishProgress.fromJson(jsonDecode(settings[key]!));
+        final attempts = restored.attempts.map((attempt) {
+          final local = old.attempts
+              .where((a) => a.id == attempt.id)
+              .firstOrNull;
+          return local != null &&
+                  textbookContentDigest(local.toJson(portable: true)) ==
+                      textbookContentDigest(attempt.toJson(portable: true))
+              ? local
+              : attempt;
+        }).toList();
+        settings[key] = jsonEncode({
+          ...restored.toJson(),
+          'attempts': attempts.map((a) => a.toJson()).toList(),
+        });
+      } on Object {
+        /* 损坏的本机记录不能阻止有效备份恢复。 */
+      }
+    }
     final progressPrefixes = [
       _textbookReadingPrefix,
       _textbookRecognitionPrefix,
       _textbookWritingPrefix,
       _textbookExercisePrefix,
       if (replaceMath) _textbookMathPrefix,
+      if (replaceEnglish) _textbookEnglishPrefix,
     ];
     final oldSettingsKeys = HiveBoxes.settings.keys
         .whereType<String>()
@@ -2792,6 +2854,11 @@ class BackupService {
   }
 
   void _validateTextbookLearning(Map<String, dynamic> data) {
+    if (data.containsKey('englishProgressVersion') &&
+        (data['englishProgressVersion'] != 1 ||
+            !data.containsKey('textbookLearning'))) {
+      _invalidField('englishProgressVersion', '英语进度版本或数据段无效');
+    }
     if (data.containsKey('mathTextbookProgressVersion') &&
         (data['mathTextbookProgressVersion'] != 1 ||
             !data.containsKey('textbookLearning'))) {
@@ -2846,6 +2913,7 @@ class BackupService {
         _textbookWritingPrefix,
         _textbookExercisePrefix,
         _textbookMathPrefix,
+        _textbookEnglishPrefix,
       ].where(key.startsWith).firstOrNull;
       if (prefix == null ||
           !RegExp(r'^[a-f0-9]{64}$').hasMatch(key.substring(prefix.length))) {
@@ -2873,6 +2941,12 @@ class BackupService {
           TextbookExerciseProgress.fromJson(parsed);
         case _textbookMathPrefix:
           MathTextbookProgress.fromJson(parsed);
+        case _textbookEnglishPrefix:
+          final english = EnglishProgress.fromJson(parsed);
+          if (textbookContentDigest(parsed) !=
+              textbookContentDigest(english.toJson(portable: true))) {
+            _invalidField(path, '英语备份只允许文字进度，不得含录音文件或额外字段');
+          }
       }
     } on Object {
       _invalidField(path, '教材学习进度内容无效');

@@ -69,7 +69,13 @@ class PracticeDraftRepository {
 
   static const kinds = ['math', 'word'];
   static const poemKinds = ['poemQuiz', 'poemRecite', 'poemDictation'];
-  static const scopedKinds = [...poemKinds, 'mathTextbook', 'mathAdventure'];
+  static const scopedKinds = [
+    ...poemKinds,
+    'mathTextbook',
+    'mathAdventure',
+    'englishPractice',
+    'englishSpeaking',
+  ];
   static const _prefix = 'practice_draft:';
   static final Map<String, Future<void>> _writes = {};
   static final Map<String, Object> _owners = {};
@@ -253,6 +259,34 @@ class PracticeDraftRepository {
         // 无法识别的记录不按猜测归属删除。
       }
     }
+    for (final key in keys) {
+      _owners.remove(key);
+      await _enqueue(key, () => box.delete(key));
+    }
+    return keys.length;
+  }
+
+  /// 撤销英语页面租约后排空队列，旧页面不能重新写回已删除的本书草稿。
+  static Future<int> deleteEnglishBookDrafts(
+    String bookId, {
+    required Box<dynamic> box,
+  }) async {
+    final keys = <String>{...box.keys.whereType<String>(), ..._owners.keys}
+        .where((key) {
+          for (final kind in ['englishPractice', 'englishSpeaking']) {
+            final marker = '_practice_draft:$kind:';
+            final at = key.indexOf(marker);
+            if (at < 0) continue;
+            try {
+              return Uri.decodeComponent(key.substring(at + marker.length))
+                  .startsWith('$bookId/');
+            } on FormatException {
+              return false;
+            }
+          }
+          return false;
+        })
+        .toList();
     for (final key in keys) {
       _owners.remove(key);
       await _enqueue(key, () => box.delete(key));

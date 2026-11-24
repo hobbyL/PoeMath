@@ -37,6 +37,7 @@ const Set<String> _travelingFields = {
   'learningActivities',
   'textbookLearning',
   'mathTextbookProgressVersion',
+  'englishProgressVersion',
   'pictureStoryPractice',
   'llmProblems',
   'conversations',
@@ -95,6 +96,7 @@ void main() {
     expect(data['pictureStoryPractice'], isEmpty);
     expect(data['textbookLearning'], isEmpty);
     expect(data['mathTextbookProgressVersion'], 1);
+    expect(data['englishProgressVersion'], 1);
     expect(data['conversations'], isEmpty);
     expect(data['messages'], isEmpty);
     expect(

@@ -18,6 +18,8 @@ enum LearningActivityType {
   textbookRecognition,
   textbookWriting,
   pictureStoryExpression,
+  englishPractice,
+  englishSpeaking,
 }
 
 class LearningRewardCalculator {
@@ -54,7 +56,9 @@ class LearningRewardCalculator {
       LearningActivityType.manualCheckIn ||
       LearningActivityType.textbookRecognition ||
       LearningActivityType.textbookWriting ||
-      LearningActivityType.pictureStoryExpression => 0,
+      LearningActivityType.pictureStoryExpression ||
+      LearningActivityType.englishPractice ||
+      LearningActivityType.englishSpeaking => 0,
     };
   }
 

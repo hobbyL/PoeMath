@@ -92,6 +92,7 @@ void main() {
     await write(support, 'textbooks/courses/${book.pdfSha256}.json', 8);
     await write(support, 'picture_story/images/${book.pdfSha256}.png', 9);
     await write(support, 'picture_story_audio/practice.wav', 17);
+    await write(support, 'english-recordings/child/book/segment.wav', 19);
     await write(support, 'backups/snapshot.json', 10);
     await write(temporary, 'keep.txt', 11);
     await write(temporary, 'unknown/keep.jpg', 12);
@@ -145,7 +146,7 @@ void main() {
     await seed();
     final snapshot = await service.scan();
     expect(snapshot.hasErrors, isFalse);
-    expect(snapshot.diskBytes, 1159);
+    expect(snapshot.diskBytes, 1178);
     expect(snapshot.memoryBytes, 0);
     expect(await bytes(), {
       StorageCacheKind.textbookCovers: 11,
@@ -159,6 +160,7 @@ void main() {
       StorageCacheKind.sharing: 9,
       StorageCacheKind.systemTts: 4,
       StorageCacheKind.legacySpeechModels: 7,
+      StorageCacheKind.englishRecordings: 19,
     });
     expect(
       snapshot.entries
@@ -186,6 +188,7 @@ void main() {
         'textbooks/courses/${book.pdfSha256}.json': 8,
         'picture_story/images/${book.pdfSha256}.png': 9,
         'picture_story_audio/practice.wav': 17,
+        'english-recordings/child/book/segment.wav': 19,
         'backups/snapshot.json': 10,
       }.entries) {
         expect(
@@ -243,10 +246,10 @@ void main() {
     );
     final snapshot = await service.scan();
     expect(snapshot.memoryBytes, 48);
-    expect(snapshot.diskBytes, 1159);
+    expect(snapshot.diskBytes, 1178);
     await service.clear(StorageCacheKind.images);
     expect((await service.scan()).memoryBytes, 0);
-    expect((await service.scan()).diskBytes, 1159);
+    expect((await service.scan()).diskBytes, 1178);
     expect(image.debugDisposed, isFalse);
   });
 

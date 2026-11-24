@@ -28,6 +28,7 @@ import 'package:poemath/features/home/home_check_in_header.dart';
 import 'package:poemath/features/home/home_section.dart';
 import 'package:poemath/features/home/practice_resume_section.dart';
 import 'package:poemath/features/home/today_plan_section.dart';
+import 'package:poemath/features/english/english_home_section.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
@@ -64,6 +65,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       _buildDailyGoal(context, ref),
       const SizedBox(height: SpacingTokens.lg),
       const PracticeResumeSection(),
+      const EnglishHomeSection(),
       const TodayPlanSection(),
 
       const HomeSectionHeading('累计进步'),
@@ -603,6 +605,15 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   _DailyGoalStatus _dailyGoalStatus(WidgetRef ref, DailyGoalActivity type) {
     return switch (type) {
+      DailyGoalActivity.english => _DailyGoalStatus(
+        type: type,
+        count: ref.watch(todayLearningActivityCountsProvider).english,
+        goal: 1,
+        unit: '次',
+        icon: Icons.translate_outlined,
+        action: '去学英语',
+        route: AppRoutes.englishTab,
+      ),
       DailyGoalActivity.poem => _DailyGoalStatus(
         type: type,
         count: ref.watch(todayPoemCountProvider),

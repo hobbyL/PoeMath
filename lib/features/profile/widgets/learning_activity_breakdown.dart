@@ -13,7 +13,9 @@ class LearningActivityBreakdown extends StatelessWidget {
     (day) =>
         day.textbookRecognitionCount > 0 ||
         day.textbookWritingCount > 0 ||
-        day.pictureStoryExpressionCount > 0,
+        day.pictureStoryExpressionCount > 0 ||
+        day.englishPracticeCount > 0 ||
+        day.englishSpeakingCount > 0,
   );
 
   @override
@@ -21,6 +23,19 @@ class LearningActivityBreakdown extends StatelessWidget {
     if (!hasData) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final rows = [
+      (
+        label: '英语练习与跟读',
+        icon: Icons.translate_outlined,
+        count: stats.fold<int>(
+          0,
+          (sum, day) =>
+              sum + day.englishPracticeCount + day.englishSpeakingCount,
+        ),
+        seconds: stats.fold<int>(
+          0,
+          (sum, day) => sum + day.englishDurationSeconds,
+        ),
+      ),
       (
         label: '认一认',
         icon: Icons.spellcheck_rounded,

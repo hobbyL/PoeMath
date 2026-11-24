@@ -111,7 +111,8 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final snapshot = _snapshot;
-    final entries = snapshot?.entries ??
+    final entries =
+        snapshot?.entries ??
         [
           for (final kind in StorageCacheKind.values)
             if (kind != StorageCacheKind.legacySpeechModels)
@@ -180,7 +181,7 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
                 final textScale = fontSize == null
                     ? 1.0
                     : MediaQuery.textScalerOf(context).scale(fontSize) /
-                        fontSize;
+                          fontSize;
                 return MasonryLayout(
                   columnCount: ResponsiveLayout.columns(
                     constraints.maxWidth /
@@ -196,8 +197,8 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
                         titleSuffix: _loading
                             ? '正在统计…'
                             : entry.usage == null
-                                ? '统计失败，请刷新重试'
-                                : '${entry.usage!.entries}${entry.kind.isMemory ? '项' : '个文件'} · ${formatBytes(entry.usage!.bytes)}',
+                            ? '统计失败，请刷新重试'
+                            : '${entry.usage!.entries}${entry.kind.isMemory ? '项' : '个文件'} · ${formatBytes(entry.usage!.bytes)}',
                         titleSuffixInline: true,
                         subtitle: entry.kind.description,
                         trailing: Tooltip(
@@ -213,7 +214,8 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
                               ),
                               alignment: AlignmentDirectional.centerEnd,
                             ),
-                            onPressed: !entry.kind.canClear ||
+                            onPressed:
+                                !entry.kind.canClear ||
                                     _loading ||
                                     _busy != null ||
                                     entry.usage == null ||
@@ -237,56 +239,56 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
 
 extension _StorageCacheLabels on StorageCacheKind {
   String get label => switch (this) {
-        StorageCacheKind.textbookCovers => '教材封面',
-        StorageCacheKind.textbookContent => '教材解析',
-        StorageCacheKind.textbookAudio => '教材朗读',
-        StorageCacheKind.cloudAudio => '云朗读',
-        StorageCacheKind.images => '图片显示',
-        StorageCacheKind.pictureStoryImages => '看图说话题图',
-        StorageCacheKind.updates => '更新安装包',
-        StorageCacheKind.pickers => '文件与图片选择',
-        StorageCacheKind.sharing => '分享与导出临时文件',
-        StorageCacheKind.systemTts => '系统朗读临时文件',
-        StorageCacheKind.legacySpeechModels => '旧版语音模型',
-      };
+    StorageCacheKind.englishRecordings => '英语个人录音',
+    StorageCacheKind.textbookCovers => '教材封面',
+    StorageCacheKind.textbookContent => '教材解析',
+    StorageCacheKind.textbookAudio => '教材朗读',
+    StorageCacheKind.cloudAudio => '云朗读',
+    StorageCacheKind.images => '图片显示',
+    StorageCacheKind.pictureStoryImages => '看图说话题图',
+    StorageCacheKind.updates => '更新安装包',
+    StorageCacheKind.pickers => '文件与图片选择',
+    StorageCacheKind.sharing => '分享与导出临时文件',
+    StorageCacheKind.systemTts => '系统朗读临时文件',
+    StorageCacheKind.legacySpeechModels => '旧版语音模型',
+  };
 
   IconData get icon => switch (this) {
-        StorageCacheKind.textbookCovers ||
-        StorageCacheKind.images ||
-        StorageCacheKind.pictureStoryImages =>
-          Icons.image_outlined,
-        StorageCacheKind.textbookContent => Icons.menu_book_outlined,
-        StorageCacheKind.textbookAudio ||
-        StorageCacheKind.cloudAudio ||
-        StorageCacheKind.systemTts =>
-          Icons.volume_up_outlined,
-        StorageCacheKind.updates => Icons.system_update_outlined,
-        StorageCacheKind.pickers => Icons.folder_open_outlined,
-        StorageCacheKind.sharing => Icons.ios_share_outlined,
-        StorageCacheKind.legacySpeechModels => Icons.mic_none_outlined,
-      };
+    StorageCacheKind.englishRecordings => Icons.mic_none_outlined,
+    StorageCacheKind.textbookCovers ||
+    StorageCacheKind.images ||
+    StorageCacheKind.pictureStoryImages => Icons.image_outlined,
+    StorageCacheKind.textbookContent => Icons.menu_book_outlined,
+    StorageCacheKind.textbookAudio ||
+    StorageCacheKind.cloudAudio ||
+    StorageCacheKind.systemTts => Icons.volume_up_outlined,
+    StorageCacheKind.updates => Icons.system_update_outlined,
+    StorageCacheKind.pickers => Icons.folder_open_outlined,
+    StorageCacheKind.sharing => Icons.ios_share_outlined,
+    StorageCacheKind.legacySpeechModels => Icons.mic_none_outlined,
+  };
 
   String get description => switch (this) {
-        StorageCacheKind.textbookCovers => '原书首页生成的封面图片',
-        StorageCacheKind.textbookContent => '目录、逐页文字、页面布局与学习配图',
-        StorageCacheKind.textbookAudio => '系统或云端生成的教材音频及校验文件',
-        StorageCacheKind.cloudAudio => '本次使用中复用的云端朗读音频',
-        StorageCacheKind.images => '用于加快图片显示的闲置解码图片',
-        StorageCacheKind.pictureStoryImages => '删除题目时清理无引用题图，历史和草稿使用的图片会保留',
-        StorageCacheKind.updates => '已下载的更新包及未完成副本',
-        StorageCacheKind.pickers => '导入文件、相册选图和拍照的临时副本',
-        StorageCacheKind.sharing => '分享产生的副本与导出临时文件',
-        StorageCacheKind.systemTts => '系统语音合成留下的临时音频',
-        StorageCacheKind.legacySpeechModels => '旧版本遗留的本地识别模型',
-      };
+    StorageCacheKind.englishRecordings => '孩子保存的本机跟读录音，清理缓存不会删除，也不随备份迁移',
+    StorageCacheKind.textbookCovers => '原书首页生成的封面图片',
+    StorageCacheKind.textbookContent => '目录、逐页文字、页面布局与学习配图',
+    StorageCacheKind.textbookAudio => '系统或云端生成的教材音频及校验文件',
+    StorageCacheKind.cloudAudio => '本次使用中复用的云端朗读音频',
+    StorageCacheKind.images => '用于加快图片显示的闲置解码图片',
+    StorageCacheKind.pictureStoryImages => '删除题目时清理无引用题图，历史和草稿使用的图片会保留',
+    StorageCacheKind.updates => '已下载的更新包及未完成副本',
+    StorageCacheKind.pickers => '导入文件、相册选图和拍照的临时副本',
+    StorageCacheKind.sharing => '分享产生的副本与导出临时文件',
+    StorageCacheKind.systemTts => '系统语音合成留下的临时音频',
+    StorageCacheKind.legacySpeechModels => '旧版本遗留的本地识别模型',
+  };
 
   String get clearDescription => switch (this) {
-        StorageCacheKind.textbookAudio ||
-        StorageCacheKind.cloudAudio =>
-          '清理后再次朗读会重新生成音频；使用云端生成时可能消耗云额度。教材和学习记录会保留。',
-        StorageCacheKind.updates => '清理后需要重新下载更新安装包，当前应用版本会保留。',
-        StorageCacheKind.pickers => '清理文件选择、相册和相机产生的临时副本，已导入的教材和题目配图会保留。',
-        StorageCacheKind.sharing => '清理应用内的分享副本和导出临时文件，已另存的备份与本机备份快照会保留。',
-        _ => '清理后再次使用会重新生成缓存，教材、题库、学习记录和设置会保留。',
-      };
+    StorageCacheKind.textbookAudio ||
+    StorageCacheKind.cloudAudio => '清理后再次朗读会重新生成音频；使用云端生成时可能消耗云额度。教材和学习记录会保留。',
+    StorageCacheKind.updates => '清理后需要重新下载更新安装包，当前应用版本会保留。',
+    StorageCacheKind.pickers => '清理文件选择、相册和相机产生的临时副本，已导入的教材和题目配图会保留。',
+    StorageCacheKind.sharing => '清理应用内的分享副本和导出临时文件，已另存的备份与本机备份快照会保留。',
+    _ => '清理后再次使用会重新生成缓存，教材、题库、学习记录和设置会保留。',
+  };
 }

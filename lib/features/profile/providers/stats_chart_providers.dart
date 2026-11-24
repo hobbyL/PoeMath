@@ -18,6 +18,7 @@ class DailyStat {
   final int textbookRecognitionCount;
   final int textbookWritingCount;
   final int pictureStoryExpressionCount;
+  final int englishPracticeCount, englishSpeakingCount, englishDurationSeconds;
   final int textbookRecognitionDurationSeconds;
   final int textbookWritingDurationSeconds;
   final int pictureStoryExpressionDurationSeconds;
@@ -33,6 +34,9 @@ class DailyStat {
     this.textbookRecognitionCount = 0,
     this.textbookWritingCount = 0,
     this.pictureStoryExpressionCount = 0,
+    this.englishPracticeCount = 0,
+    this.englishSpeakingCount = 0,
+    this.englishDurationSeconds = 0,
     this.textbookRecognitionDurationSeconds = 0,
     this.textbookWritingDurationSeconds = 0,
     this.pictureStoryExpressionDurationSeconds = 0,
@@ -50,7 +54,9 @@ class DailyStat {
       mathTotal > 0 ||
       textbookRecognitionCount > 0 ||
       textbookWritingCount > 0 ||
-      pictureStoryExpressionCount > 0;
+      pictureStoryExpressionCount > 0 ||
+      englishPracticeCount > 0 ||
+      englishSpeakingCount > 0;
 }
 
 class _DailyActivityAggregate {
@@ -69,6 +75,7 @@ class _DailyActivityAggregate {
   int pictureStoryExpressionDuration = 0;
   bool hasPoem = false;
   bool hasMath = false;
+  int englishPracticeCount = 0, englishSpeakingCount = 0, englishDuration = 0;
 
   void add(LearningActivity activity) {
     switch (activity.typeOrNull) {
@@ -96,6 +103,12 @@ class _DailyActivityAggregate {
       case LearningActivityType.pictureStoryExpression:
         pictureStoryExpressionCount++;
         pictureStoryExpressionDuration += activity.durationSeconds;
+      case LearningActivityType.englishPractice:
+        englishPracticeCount++;
+        englishDuration += activity.durationSeconds;
+      case LearningActivityType.englishSpeaking:
+        englishSpeakingCount++;
+        englishDuration += activity.durationSeconds;
       default:
         break;
     }
@@ -257,7 +270,11 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
             (partial?.duration ?? 0) +
             (activity?.textbookRecognitionDuration ?? 0) +
             (activity?.textbookWritingDuration ?? 0) +
-            (activity?.pictureStoryExpressionDuration ?? 0),
+            (activity?.pictureStoryExpressionDuration ?? 0) +
+            (activity?.englishDuration ?? 0),
+        englishPracticeCount: activity?.englishPracticeCount ?? 0,
+        englishSpeakingCount: activity?.englishSpeakingCount ?? 0,
+        englishDurationSeconds: activity?.englishDuration ?? 0,
         textbookRecognitionCount: activity?.textbookRecognitionCount ?? 0,
         textbookWritingCount: activity?.textbookWritingCount ?? 0,
         pictureStoryExpressionCount: activity?.pictureStoryExpressionCount ?? 0,

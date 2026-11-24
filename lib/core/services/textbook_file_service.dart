@@ -524,7 +524,10 @@ class TextbookFileService {
 
     final audio = await narrationCache.bookUsage(id);
     var courseBytes = 0;
-    final course = File('$textbooks/courses/$id.json');
+    final folder = book.subject == TextbookSubject.english
+        ? 'english-courses'
+        : 'courses';
+    final course = File('$textbooks/$folder/$id.json');
     if (await course.exists()) courseBytes = await course.length();
 
     return TextbookStorageUsage(

@@ -24,10 +24,11 @@ enum StorageCacheKind {
   pickers,
   sharing,
   systemTts,
-  legacySpeechModels;
+  legacySpeechModels,
+  englishRecordings;
 
   bool get isMemory => this == cloudAudio || this == images;
-  bool get canClear => this != pictureStoryImages;
+  bool get canClear => this != pictureStoryImages && this != englishRecordings;
 }
 
 class StorageCacheEntry {
@@ -132,6 +133,12 @@ class StorageManagementService {
 
   Future<CacheUsage> _usage(StorageCacheKind kind) async {
     switch (kind) {
+      case StorageCacheKind.englishRecordings:
+        return CacheFileStorage.usage(
+          await CacheFileStorage.files(
+            Directory('${(await _supportDirectory()).path}/english-recordings'),
+          ),
+        );
       case StorageCacheKind.textbookAudio:
         return _textbooks.narrationCache.storageUsage();
       case StorageCacheKind.cloudAudio:
@@ -165,6 +172,8 @@ class StorageManagementService {
   Future<void> clear(StorageCacheKind kind) async {
     _authorize();
     switch (kind) {
+      case StorageCacheKind.englishRecordings:
+        throw UnsupportedError('孩子保存的英语录音不属于缓存');
       case StorageCacheKind.textbookCovers:
         await _textbooks.clearAllCovers(authorize: _authorize);
       case StorageCacheKind.textbookContent:

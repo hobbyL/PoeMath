@@ -118,6 +118,7 @@ void main() {
     final legacy = Map<String, dynamic>.from(json)
       ..remove('textbookLearning')
       ..remove('mathTextbookProgressVersion')
+      ..remove('englishProgressVersion')
       ..remove('pictureStoryPractice');
     await backup.restoreFromJson(jsonEncode(legacy));
     expect(repo.reading('child', book.pdfSha256).page, 3);

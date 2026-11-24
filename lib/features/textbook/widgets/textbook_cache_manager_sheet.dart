@@ -13,6 +13,8 @@ import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
+import 'package:poemath/features/english/english_providers.dart';
+import 'package:poemath/features/english/english_audio.dart';
 
 Future<void> showTextbookCacheSheet(BuildContext context, Textbook book) {
   return showModalBottomSheet<void>(
@@ -148,7 +150,8 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
           '· 书目登记\n'
           '· 全部档案的阅读位置\n'
           '· 全部档案的认一认、写一写、习题与数学教材进度\n'
-          '· 数学教材作答、家长核对和本书练习草稿\n\n'
+          '· 数学教材作答、家长核对和本书练习草稿\n'
+          '· 本书英语进度、练习草稿与全部档案的跟读录音\n\n'
           '学习进度删除后不可恢复；重新导入同一 PDF 将从零开始。',
         ),
         actions: [
@@ -173,6 +176,20 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
     try {
       assertParentAccess(context);
       final mathCourses = ref.read(mathTextbookRepositoryProvider);
+      final englishGeneration = ref.read(englishGenerationProvider.notifier);
+      englishGeneration.pause(id);
+      await englishGeneration.drain();
+      if (!mounted) return;
+      assertParentAccess(context);
+      if (widget.book.subject == TextbookSubject.english) {
+        await ref.read(englishAudioProvider(englishAudioKey(id))).stop();
+        await ref
+            .read(englishRecordingStoreProvider)
+            .deleteBook(id, () => assertParentAccess(context));
+        await ref
+            .read(englishCourseRepositoryProvider)
+            .clear(widget.book, check: () => assertParentAccess(context));
+      }
       mathCourses.invalidate(id);
       await ref.read(mathTextbookGenerationProvider.notifier).stop(id);
       await mathCourses.drain();
@@ -205,6 +222,8 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
       ref.invalidate(mathTextbookCourseProvider(id));
       ref.invalidate(mathTextbookLearningRepositoryProvider(id));
       ref.invalidate(mathTextbookProgressProvider(id));
+      ref.invalidate(englishCourseProvider(id));
+      ref.invalidate(englishProgressProvider(id));
     } on Object {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -409,11 +428,30 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   title: '课程内容',
                   subtitle: usage.courseBytes > 0
                       ? '${formatBytes(usage.courseBytes)} · '
-                            '读一读/认一认/写一写内容，删除后需重新生成'
+                            '已整理的学习内容，删除后需重新整理核对'
                       : '未生成',
                   onDelete: () => _clear(
                     '课程内容',
                     () async {
+                      if (widget.book.subject == TextbookSubject.english) {
+                        final generation = ref.read(
+                          englishGenerationProvider.notifier,
+                        );
+                        generation.pause(widget.book.pdfSha256);
+                        await generation.drain();
+                        if (!context.mounted) return;
+                        assertParentAccess(context);
+                        await ref
+                            .read(englishCourseRepositoryProvider)
+                            .clear(
+                              widget.book,
+                              check: () => assertParentAccess(context),
+                            );
+                        ref.invalidate(
+                          englishCourseProvider(widget.book.pdfSha256),
+                        );
+                        return;
+                      }
                       await ref
                           .read(textbookCourseRepositoryProvider)
                           .clear(widget.book);
@@ -424,10 +462,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                         textbookCourseDocumentProvider(widget.book.pdfSha256),
                       );
                     },
-                    warning:
-                        '读一读、认一认、写一写的内容来自课程数据，删除后不会自动'
-                        '恢复，需要重新生成或重新导入课程 JSON。原书、缓存与学习进度'
-                        '不受影响。',
+                    warning: '将删除已整理的内容、人工改稿与核对记录，删除后不会自动恢复，需要重新整理核对后才能学习。原书、学习历史和已保存的跟读录音会保留。',
                     danger: true,
                   ),
                 ),
@@ -466,13 +501,18 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                             ref.watch(textbookDownloadsProvider)[id]?.active ??
                             false;
                         final blocked = generationBusy || downloading;
+                        final englishBusy =
+                            ref.watch(englishGenerationProvider)[id]?.running ??
+                            false;
                         final button = OutlinedButton.icon(
                           key: const ValueKey('cache-delete-book'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: theme.colorScheme.error,
                             side: BorderSide(color: theme.colorScheme.error),
                           ),
-                          onPressed: _busy || blocked ? null : _deleteBook,
+                          onPressed: _busy || blocked || englishBusy
+                              ? null
+                              : _deleteBook,
                           icon: const Icon(Icons.delete_forever_outlined),
                           label: const Text('删除本书'),
                         );

@@ -4,7 +4,8 @@ enum DailyGoalActivity {
   math('口算'),
   textbookRecognition('认一认'),
   textbookWriting('写一写'),
-  pictureStoryExpression('看图表达');
+  pictureStoryExpression('看图表达'),
+  english('英语');
 
   const DailyGoalActivity(this.label);
 

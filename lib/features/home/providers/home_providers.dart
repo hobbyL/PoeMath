@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/data/models/check_in.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -124,15 +125,22 @@ class TodayLearningActivityCounts {
     this.textbookRecognition = 0,
     this.textbookWriting = 0,
     this.pictureStoryExpression = 0,
+    this.english = 0,
   });
 
   final int textbookRecognition;
   final int textbookWriting;
   final int pictureStoryExpression;
+  final int english;
 }
+
+final _learningActivityChangesProvider = StreamProvider(
+  (ref) => HiveBoxes.learningActivities.watch(),
+);
 
 final todayLearningActivityCountsProvider =
     Provider<TodayLearningActivityCounts>((ref) {
+      ref.watch(_learningActivityChangesProvider);
       final today = DateTime.parse(ref.watch(dayKeyProvider));
       final activities = ref
           .watch(learningActivityRepositoryProvider)
@@ -143,6 +151,7 @@ final todayLearningActivityCountsProvider =
       var recognition = 0;
       var writing = 0;
       var expression = 0;
+      var english = 0;
       for (final activity in activities) {
         switch (activity.typeOrNull) {
           case LearningActivityType.textbookRecognition:
@@ -151,6 +160,9 @@ final todayLearningActivityCountsProvider =
             writing++;
           case LearningActivityType.pictureStoryExpression:
             expression++;
+          case LearningActivityType.englishPractice ||
+              LearningActivityType.englishSpeaking:
+            english++;
           default:
             break;
         }
@@ -159,6 +171,7 @@ final todayLearningActivityCountsProvider =
         textbookRecognition: recognition,
         textbookWriting: writing,
         pictureStoryExpression: expression,
+        english: english,
       );
     });
 
