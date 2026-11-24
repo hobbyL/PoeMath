@@ -73,11 +73,12 @@ class TextbookTocGlyph {
 }
 
 class TextbookTocPage {
-  const TextbookTocPage(this.text, {this.glyphs = const []});
+  const TextbookTocPage(this.text, {this.glyphs = const [], this.layout});
 
   factory TextbookTocPage.fromPageText(TextbookPageText page) =>
       TextbookTocPage(
         page.text,
+        layout: page,
         glyphs: [
           for (final g in page.glyphs)
             if (g.text.trim().isNotEmpty)
@@ -93,4 +94,5 @@ class TextbookTocPage {
 
   final String text;
   final List<TextbookTocGlyph> glyphs;
+  final TextbookPageText? layout;
 }

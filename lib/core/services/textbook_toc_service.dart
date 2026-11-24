@@ -2,6 +2,9 @@ import 'dart:math' as math;
 
 import 'package:poemath/core/services/textbook_content_cache.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
+import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/data/models/textbook_page_text.dart';
+import 'package:poemath/domain/english_course_parser.dart';
 import 'package:poemath/domain/textbook_printed_page.dart';
 
 final _spaces = RegExp(r'\s+');
@@ -86,6 +89,58 @@ class TextbookTocService {
         source: TextbookTocSource.bookmarks,
       );
       await cache?.writeToc(_cached!, generation: revision);
+      yield _progress(TextbookTocPhase.ready, pageCount, _cached);
+      return;
+    }
+
+    // 英语标题从正文布局定位，避免把 Unit 编号误当成印刷页码。
+    // 此处只产生原书导航，不生成或审核学习内容。
+    if (cache?.book.subject == TextbookSubject.english) {
+      final pages = <TextbookPageText>[];
+      for (var page = 1; page <= pageCount; page++) {
+        final text = await loadPage(page);
+        pages.add(
+          text.layout ??
+              TextbookPageText(
+                page: page,
+                text: text.text,
+                width: 1,
+                height: 1,
+              ),
+        );
+        yield _progress(TextbookTocPhase.locating, page);
+      }
+      final plan = EnglishCourseParser().outline(cache!.book, pages);
+      final entries = <TextbookTocEntry>[];
+      final groups = <String>{};
+      for (final lesson in plan.lessons) {
+        if (groups.add(lesson.unitId)) {
+          entries.add(
+            TextbookTocEntry(
+              title: lesson.unitTitle,
+              page: lesson.startPage,
+              isGroup: true,
+            ),
+          );
+        }
+        entries.add(
+          TextbookTocEntry(
+            title: lesson.title,
+            page: lesson.startPage,
+            level: 1,
+          ),
+        );
+      }
+      _cached = TextbookTocResult(
+        entries: entries,
+        source: TextbookTocSource.text,
+        hasText: pages.any((p) => p.text.trim().isNotEmpty),
+        directoryPages: [
+          for (final e in plan.coverage.entries)
+            if (e.value == '目录') e.key,
+        ],
+      );
+      await cache!.writeToc(_cached!, generation: revision);
       yield _progress(TextbookTocPhase.ready, pageCount, _cached);
       return;
     }
