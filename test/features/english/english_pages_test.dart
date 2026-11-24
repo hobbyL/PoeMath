@@ -21,6 +21,7 @@ import 'package:poemath/features/english/english_tab_page.dart';
 import 'package:poemath/features/english/english_target_editor.dart';
 import 'package:poemath/features/english/english_widgets.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
+import 'package:poemath/features/textbook/providers/textbook_learning_providers.dart';
 
 import '../../helpers/english_fixture.dart';
 import '../../helpers/hive_test_helper.dart';
@@ -68,6 +69,8 @@ void main() {
   });
   List<Override> overrides({Map<String, int> cardNumbers = const {}}) => [
     textbookListProvider.overrideWith((ref) => [englishBook()]),
+    subjectTextbooksProvider(TextbookSubject.english)
+        .overrideWithValue([englishBook()]),
     englishCourseRepositoryProvider.overrideWithValue(courses),
     englishTargetCardNumberProvider.overrideWith(
       (ref, key) async => cardNumbers,
@@ -126,6 +129,25 @@ void main() {
           .widget<FilledButton>(find.widgetWithText(FilledButton, '提交答案'))
           .onPressed !=
       null;
+  testWidgets('英语 Tab 暂时仅保留课本入口', (tester) async {
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await show(tester, const EnglishTabPage());
+
+    final title = find.text('课本(1)');
+    expect(title, findsOneWidget);
+    expect(
+      tester.getCenter(title).dx,
+      closeTo(
+        tester.view.physicalSize.width / tester.view.devicePixelRatio / 2,
+        1,
+      ),
+    );
+    expect(find.text('练习'), findsNothing);
+    expect(find.text('复习'), findsNothing);
+    expect(find.byType(EnglishPracticeHubPage), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('具体词句编辑保存后返回来源课时，其他课时内容不变', (tester) async {
     final book = englishBook();
     final sourceLesson = courses.course.lessons.single;
@@ -681,7 +703,7 @@ void main() {
         addTearDown(tester.view.resetDevicePixelRatio);
         final book = englishBook(), lesson = courses.course.lessons.single;
         final pages = <({Widget page, String text})>[
-          (page: const EnglishTabPage(section: 'practice'), text: '练习'),
+          (page: const EnglishTabPage(), text: '课本(1)'),
           (page: EnglishCoursePage(bookId: book.pdfSha256), text: '全书课程'),
           (
             page: EnglishCoursePage(bookId: book.pdfSha256, review: true),

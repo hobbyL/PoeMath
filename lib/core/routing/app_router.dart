@@ -170,9 +170,7 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.home}) {
             path: AppRoutes.englishTab,
             pageBuilder: (context, state) => NoTransitionPage<void>(
               key: state.pageKey,
-              child: EnglishTabPage(
-                section: state.uri.queryParameters['section'],
-              ),
+              child: const EnglishTabPage(),
             ),
           ),
           GoRoute(

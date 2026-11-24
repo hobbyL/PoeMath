@@ -19,12 +19,14 @@ class TextbookLearningPage extends ConsumerStatefulWidget {
     super.key,
     this.navigationTitle,
     this.navigationToolbarHeight,
+    this.centerTitle = false,
     this.subject = TextbookSubject.chinese,
     this.showAppBar = true,
   });
 
   final Widget? navigationTitle;
   final double? navigationToolbarHeight;
+  final bool centerTitle;
   final TextbookSubject subject;
   final bool showAppBar;
 
@@ -53,7 +55,7 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
       appBar: widget.showAppBar
           ? AppBar(
               automaticallyImplyLeading: false,
-              centerTitle: widget.navigationTitle != null,
+              centerTitle: widget.centerTitle || widget.navigationTitle != null,
               title:
                   widget.navigationTitle ??
                   Text(
