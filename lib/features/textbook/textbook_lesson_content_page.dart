@@ -686,18 +686,16 @@ class _TextbookLessonContentPageState
               )
             : course.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, __) => Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('课文内容加载失败，请重试。'),
-                      TextButton(
-                        onPressed: () =>
-                            ref.invalidate(textbookCourseProvider(bookId)),
-                        child: const Text('重试'),
-                      ),
-                    ],
-                  ),
+                error: (_, __) => AppEmptyState(
+                  icon: Icons.error_outline,
+                  title: '课文内容加载失败',
+                  actions: [
+                    TextButton(
+                      onPressed: () =>
+                          ref.invalidate(textbookCourseProvider(bookId)),
+                      child: const Text('重试'),
+                    ),
+                  ],
                 ),
                 data: (pack) {
                   if (lessons.isEmpty) {

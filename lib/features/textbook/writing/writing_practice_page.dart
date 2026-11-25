@@ -787,20 +787,13 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     );
   }
 
-  Widget _errorView() => ListView(
-    padding: const EdgeInsets.all(SpacingTokens.md),
-    children: [
-      ColoredCard(
-        color: Theme.of(context).colorScheme.error,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(_error ?? '加载失败'),
-            if (_retry != null)
-              TextButton(onPressed: _retry, child: const Text('重试')),
-          ],
-        ),
-      ),
+  Widget _errorView() => AppEmptyState(
+    icon: Icons.error_outline,
+    title: '写字练习暂时无法打开',
+    description: _error ?? '加载失败',
+    actions: [
+      if (_retry != null)
+        TextButton(onPressed: _retry, child: const Text('重试')),
     ],
   );
 

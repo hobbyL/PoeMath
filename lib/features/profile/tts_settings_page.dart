@@ -615,32 +615,17 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (_loadError != null)
-              Padding(
-                padding: const EdgeInsets.all(SpacingTokens.xl),
-                child: Center(
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.record_voice_over_outlined,
-                        color: theme.colorScheme.error,
-                      ),
-                      const SizedBox(height: SpacingTokens.sm),
-                      Text(
-                        _loadError!,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.error,
-                        ),
-                      ),
-                      const SizedBox(height: SpacingTokens.md),
-                      OutlinedButton.icon(
-                        onPressed: _loadVoices,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('重新加载'),
-                      ),
-                    ],
+              AppEmptyState(
+                icon: Icons.record_voice_over_outlined,
+                title: '音色加载失败',
+                description: _loadError!,
+                actions: [
+                  TextButton.icon(
+                    onPressed: _loadVoices,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('重新加载'),
                   ),
-                ),
+                ],
               )
             else ...[
               ResponsiveCardGrid(

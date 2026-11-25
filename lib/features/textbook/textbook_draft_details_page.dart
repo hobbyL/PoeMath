@@ -468,8 +468,10 @@ class _TextbookDraftDetailsState
       ),
       body: data.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => Center(
-          child: TextButton(onPressed: _reload, child: const Text('读取失败，重试')),
+        error: (_, __) => AppEmptyState(
+          icon: Icons.error_outline,
+          title: '草稿读取失败',
+          actions: [TextButton(onPressed: _reload, child: const Text('重试'))],
         ),
         data: (doc) {
           final generation = doc?.generation;

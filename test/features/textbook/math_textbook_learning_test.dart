@@ -229,6 +229,7 @@ void defineMathTextbookLearningTests({
     Size size = const Size(420, 860),
     double scale = 1,
     Brightness brightness = Brightness.light,
+    AppSubject subject = AppSubject.math,
     List<MathTextbookRegion>? renderedSources,
     MathTextbookKnowledgeImageLoader? knowledgeImageLoader,
     TextbookViewerBuilder? viewerBuilder,
@@ -340,10 +341,7 @@ void defineMathTextbookLearningTests({
           ],
           child: MaterialApp.router(
             routerConfig: router,
-            theme: AppTheme.resolve(
-              subject: AppSubject.math,
-              brightness: brightness,
-            ),
+            theme: AppTheme.resolve(subject: subject, brightness: brightness),
             builder: (context, child) => RepaintBoundary(
               key: const ValueKey('math-textbook-evidence'),
               child: MediaQuery(
@@ -1559,7 +1557,8 @@ void defineMathTextbookLearningTests({
         pages: [lesson.endPage + 1],
       ),
     );
-    await waitFor(tester, () => find.text('当前页尚未关联课时。').evaluate().isNotEmpty);
+    await waitFor(tester, () => find.text('当前页暂无对应课时').evaluate().isNotEmpty);
+    expect(find.byType(AppEmptyState), findsOneWidget);
     expect(find.widgetWithText(AppTile, '合并数量'), findsNothing);
 
     router!.go(
@@ -1569,9 +1568,67 @@ void defineMathTextbookLearningTests({
         pages: [lesson.endPage + 1],
       ),
     );
-    await waitFor(tester, () => find.text('当前页尚未关联课时。').evaluate().isNotEmpty);
+    await waitFor(tester, () => find.text('当前页暂无对应课时').evaluate().isNotEmpty);
     expect(find.widgetWithText(AppTile, '教材原题'), findsNothing);
   });
+
+  for (final subject in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('已整理无讲解的课时使用统一空态：$subject $brightness', (tester) async {
+        final source = mathLearningFixture();
+        final readingOnly = source.edit(
+          blocks: [
+            for (var page = source.startPage; page <= source.endPage; page++)
+              MathTextbookBlock(
+                id: 'source-$page',
+                kind: MathTextbookBlockKind.sourcePage,
+                spans: [],
+                sources: [
+                  MathTextbookRegion(
+                    page: page,
+                    left: 0,
+                    top: 0,
+                    right: 1,
+                    bottom: 1,
+                  ),
+                ],
+              ),
+          ],
+          learning: MathTextbookLearning(
+            knowledgePoints: [],
+            exercises: [],
+            practicePlans: [],
+          ),
+        );
+        await tester.runAsync(() => install(readingOnly, approve: false));
+        await mount(
+          tester,
+          AppRoutes.mathTextbookBookOf(
+            book.pdfSha256,
+            mode: AppRoutes.mathTextbookLearnMode,
+            pages: [readingOnly.startPage],
+          ),
+          subject: subject,
+          brightness: brightness,
+          size: brightness == Brightness.light
+              ? const Size(320, 520)
+              : const Size(740, 320),
+          scale: 2,
+        );
+        await waitFor(
+          tester,
+          () => find.byType(AppEmptyState).evaluate().isNotEmpty,
+        );
+        expect(find.text('暂无知识点与例题'), findsOneWidget);
+        expect(find.text('尚未整理课时'), findsNothing);
+        expect(find.text('整理教材内容'), findsNothing);
+        await tester.ensureVisible(find.text('看一看本课内容'));
+        await tester.pumpAndSettle();
+        expect(find.text('看一看本课内容').hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets('课时详情用导航栏显示当前课名，不重复显示名称和顶部进度统计', (tester) async {
     await tester.runAsync(() => install(mathLearningFixture()));

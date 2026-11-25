@@ -257,7 +257,57 @@ class MathTextbookBookPage extends ConsumerWidget {
       AppRoutes.mathTextbookPracticeMode => practiceEntries.isNotEmpty,
       _ => lessons.isNotEmpty,
     };
-    final showIntro = !hasModeContent || needsCourseUpdate;
+    if (!hasModeContent) {
+      final hasLessons = lessons.isNotEmpty;
+      final outsideLesson =
+          hasLessons && currentPages != null && pageLessons.isEmpty;
+      final lesson = pageLessons.firstOrNull;
+      return AppEmptyState(
+        icon: selectedMode == AppRoutes.mathTextbookPracticeMode
+            ? Icons.edit_note_outlined
+            : Icons.auto_stories_outlined,
+        title: !hasLessons
+            ? '尚未整理课时'
+            : outsideLesson
+            ? '当前页暂无对应课时'
+            : selectedMode == AppRoutes.mathTextbookPracticeMode
+            ? '暂无可练习的内容'
+            : '暂无知识点与例题',
+        description: !hasLessons
+            ? '整理教材后，可按课时学习。'
+            : outsideLesson
+            ? '翻到正文页后再查看。'
+            : '可以先阅读已整理的原书内容。',
+        actions: [
+          if (hasLessons)
+            TextButton.icon(
+              onPressed: () => context.push(
+                lesson != null
+                    ? AppRoutes.mathTextbookStudyOf(
+                        bookId,
+                        lesson.id,
+                        mode: AppRoutes.mathTextbookReadMode,
+                      )
+                    : AppRoutes.textbookReadOf(bookId),
+              ),
+              icon: const Icon(Icons.menu_book_outlined),
+              label: Text(lesson == null ? '阅读原书' : '看一看本课内容'),
+            ),
+          TextButton.icon(
+            onPressed: () =>
+                context.push(AppRoutes.mathTextbookReviewOf(bookId)),
+            icon: const Icon(Icons.fact_check_outlined),
+            label: Text(
+              needsCourseUpdate
+                  ? '更新课时内容'
+                  : hasLessons
+                  ? '查看整理内容'
+                  : '整理教材内容',
+            ),
+          ),
+        ],
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = ResponsiveLayout.columns(constraints.maxWidth);
@@ -430,55 +480,20 @@ class MathTextbookBookPage extends ConsumerWidget {
               ),
               sliver: SliverMainAxisGroup(
                 slivers: [
-                  if (showIntro)
+                  if (needsCourseUpdate)
                     SliverPadding(
                       padding: EdgeInsets.only(
                         bottom: lessons.isEmpty ? 0 : SpacingTokens.sm,
                       ),
                       sliver: SliverToBoxAdapter(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (needsCourseUpdate)
-                              AppTile(
-                                icon: Icons.auto_stories_outlined,
-                                iconColor: color,
-                                title: '更新课时内容',
-                                subtitle: '按讲解、例题和练习重新整理',
-                                onTap: () => context.push(
-                                  AppRoutes.mathTextbookReviewOf(bookId),
-                                ),
-                              ),
-                            if (!hasModeContent) ...[
-                              const SizedBox(height: SpacingTokens.md),
-                              Text(
-                                currentPages != null && pageLessons.isEmpty
-                                    ? '当前页尚未关联课时。'
-                                    : switch (selectedMode) {
-                                        AppRoutes.mathTextbookLearnMode =>
-                                          currentPages == null
-                                              ? '本书尚未整理知识点与例题。'
-                                              : '本课时尚未整理知识点与例题。',
-                                        AppRoutes.mathTextbookPracticeMode =>
-                                          currentPages == null
-                                              ? '本书尚未整理练习。'
-                                              : '本课时尚未整理练习。',
-                                        _ => '还没有整理的课时。',
-                                      },
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: SpacingTokens.md,
-                                ),
-                                child: OutlinedButton(
-                                  onPressed: () => context.push(
-                                    AppRoutes.mathTextbookReviewOf(bookId),
-                                  ),
-                                  child: const Text('整理教材内容'),
-                                ),
-                              ),
-                            ],
-                          ],
+                        child: AppTile(
+                          icon: Icons.auto_stories_outlined,
+                          iconColor: color,
+                          title: '更新课时内容',
+                          subtitle: '按讲解、例题和练习重新整理',
+                          onTap: () => context.push(
+                            AppRoutes.mathTextbookReviewOf(bookId),
+                          ),
                         ),
                       ),
                     ),

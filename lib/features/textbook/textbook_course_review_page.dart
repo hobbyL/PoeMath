@@ -391,26 +391,22 @@ class _TextbookCourseReviewPageState
                   .when(
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
-                    error: (_, __) => Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(SpacingTokens.lg),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('课程草稿读取失败。可重试，或重新导入有效草稿。'),
-                            TextButton(
-                              onPressed: () => ref.invalidate(
-                                textbookCourseProvider(widget.bookId),
-                              ),
-                              child: const Text('重试读取'),
-                            ),
-                            TextButton(
-                              onPressed: () => _import(book),
-                              child: const Text('重新导入'),
-                            ),
-                          ],
+                    error: (_, __) => AppEmptyState(
+                      icon: Icons.error_outline,
+                      title: '课程草稿读取失败',
+                      description: '可重试，或重新导入有效草稿。',
+                      actions: [
+                        TextButton(
+                          onPressed: () => ref.invalidate(
+                            textbookCourseProvider(widget.bookId),
+                          ),
+                          child: const Text('重试读取'),
                         ),
-                      ),
+                        TextButton(
+                          onPressed: () => _import(book),
+                          child: const Text('重新导入'),
+                        ),
+                      ],
                     ),
                     data: (pack) {
                       final path = ref.watch(
@@ -711,14 +707,13 @@ class _TextbookCourseLessonPageState
       body: _reloading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(_error!),
-                  TextButton(onPressed: _reload, child: const Text('重试读取')),
-                ],
-              ),
+          ? AppEmptyState(
+              icon: Icons.error_outline,
+              title: '课时内容读取失败',
+              description: _error!,
+              actions: [
+                TextButton(onPressed: _reload, child: const Text('重试读取')),
+              ],
             )
           : SafeArea(
               top: false,

@@ -147,7 +147,17 @@ class _WordProblemGeneratePageState
       appBar: AppBar(title: const Text('应用题 AI 出题')),
       body: configAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(child: Text('配置读取失败')),
+        error: (_, __) => AppEmptyState(
+          icon: Icons.error_outline,
+          title: '配置读取失败',
+          actions: [
+            TextButton.icon(
+              onPressed: () => ref.invalidate(llmConfigProvider),
+              icon: const Icon(Icons.refresh),
+              label: const Text('重试'),
+            ),
+          ],
+        ),
         data: (config) => config == null
             ? AppEmptyState(
                 icon: Icons.smart_toy_outlined,

@@ -56,12 +56,16 @@ class _TextbookSourcePageState extends ConsumerState<TextbookCourseSourcePage> {
         .watch(textbookPathProvider(widget.book.pdfSha256))
         .when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => Center(
-            child: TextButton(
-              onPressed: () =>
-                  ref.invalidate(textbookPathProvider(widget.book.pdfSha256)),
-              child: const Text('文件检查失败，点击重试'),
-            ),
+          error: (_, __) => AppEmptyState(
+            icon: Icons.error_outline,
+            title: '原书文件检查失败',
+            actions: [
+              TextButton(
+                onPressed: () =>
+                    ref.invalidate(textbookPathProvider(widget.book.pdfSha256)),
+                child: const Text('重试'),
+              ),
+            ],
           ),
           data: (path) {
             if (path == null) {

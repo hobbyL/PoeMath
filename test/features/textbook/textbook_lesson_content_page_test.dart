@@ -561,7 +561,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('课文内容加载失败，请重试。'), findsOneWidget);
+    expect(find.text('课文内容加载失败'), findsOneWidget);
+    expect(find.byType(AppEmptyState), findsOneWidget);
     await tester.tap(find.text('重试'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, '读一读·星月测试'), findsOneWidget);

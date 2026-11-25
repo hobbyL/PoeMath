@@ -978,7 +978,8 @@ void main() {
       expect(find.text('设为当前数学课本'), findsNothing);
       expect(find.text(placeholder.title), findsNothing);
       expect(find.text(lesson.title), findsNothing);
-      expect(find.text('当前页尚未关联课时。'), findsOneWidget);
+      expect(find.text('当前页暂无对应课时'), findsOneWidget);
+      expect(find.byType(AppEmptyState), findsOneWidget);
       expect(find.textContaining('PDF 第'), findsNothing);
       expect(repo.selected, isEmpty);
 

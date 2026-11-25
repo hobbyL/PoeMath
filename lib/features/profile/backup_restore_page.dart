@@ -410,7 +410,13 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
         FutureBuilder<BackupHistoryOverview>(
           future: _history,
           builder: (context, snapshot) {
-            if (snapshot.hasError) return const Text('本地历史暂时无法读取，可稍后重试');
+            if (snapshot.hasError) {
+              return const AppEmptyState(
+                icon: Icons.restore,
+                title: '本地历史暂时无法读取',
+                description: '请稍后重试。',
+              );
+            }
             final entries = snapshot.data?.snapshots ?? [];
             final unreadable = snapshot.data?.unreadableCount ?? 0;
             return Column(

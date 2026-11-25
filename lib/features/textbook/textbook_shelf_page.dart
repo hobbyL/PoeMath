@@ -310,23 +310,18 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
                   const SliverToBoxAdapter(child: LinearProgressIndicator()),
               error: (_, __) => SliverFillRemaining(
                 hasScrollBody: false,
-                child: Center(
-                  child: ColoredCard(
-                    color: theme.colorScheme.primary,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('教材目录暂时无法读取'),
-                        TextButton(
-                          onPressed: () {
-                            ref.invalidate(textbookCatalogProvider);
-                            ref.invalidate(textbookCatalogRefreshProvider);
-                          },
-                          child: const Text('重新加载目录'),
-                        ),
-                      ],
+                child: AppEmptyState(
+                  icon: Icons.error_outline,
+                  title: '教材目录暂时无法读取',
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        ref.invalidate(textbookCatalogProvider);
+                        ref.invalidate(textbookCatalogRefreshProvider);
+                      },
+                      child: const Text('重新加载目录'),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),

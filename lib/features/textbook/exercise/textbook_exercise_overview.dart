@@ -96,7 +96,17 @@ class _TextbookExerciseOverviewState
     if (progress.hasValue && !progress.isLoading) _savedProgress = null;
     return progress.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Text('习题进度加载失败：$error'),
+      error: (_, __) => AppEmptyState(
+        icon: Icons.error_outline,
+        title: '习题进度加载失败',
+        actions: [
+          TextButton(
+            onPressed: () =>
+                ref.invalidate(textbookExerciseProgressProvider(widget.bookId)),
+            child: const Text('重试'),
+          ),
+        ],
+      ),
       data: (value) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

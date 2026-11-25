@@ -327,10 +327,12 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   child: Center(child: CircularProgressIndicator()),
                 )
               else if (_failed || usage == null)
-                const Text(
-                  '缓存统计失败，请稍后重试',
+                const AppEmptyState(
                   key: ValueKey('cache-failed'),
-                  textAlign: TextAlign.center,
+                  icon: Icons.error_outline,
+                  title: '缓存统计失败',
+                  description: '请稍后重试。',
+                  padding: EdgeInsets.all(SpacingTokens.md),
                 )
               else ...[
                 ColoredCard(

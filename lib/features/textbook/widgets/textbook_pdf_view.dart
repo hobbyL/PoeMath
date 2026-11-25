@@ -8,6 +8,7 @@ import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/core/services/textbook_pdf_page_loader.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/core/widgets/app_empty_state.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_corner.dart';
@@ -385,24 +386,16 @@ class _TextbookPdfViewState extends State<TextbookPdfView> {
           ],
         ),
       ),
-      errorBannerBuilder: (context, _, __, ___) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(SpacingTokens.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                '原书无法打开，请重新尝试或回书架导入完整的 PDF。',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: SpacingTokens.md),
-              FilledButton(
-                onPressed: widget.options.onRetry,
-                child: const Text('重新打开'),
-              ),
-            ],
+      errorBannerBuilder: (context, _, __, ___) => AppEmptyState(
+        icon: Icons.menu_book_outlined,
+        title: '原书无法打开',
+        description: '请重新尝试或回书架导入完整的 PDF。',
+        actions: [
+          TextButton(
+            onPressed: widget.options.onRetry,
+            child: const Text('重新打开'),
           ),
-        ),
+        ],
       ),
     ),
   );
