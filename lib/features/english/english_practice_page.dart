@@ -102,7 +102,7 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
         if (_questions!.any((q) {
               final t = course.target(q.lessonId, q.target.id);
               return t == null ||
-                  !t.approved ||
+                  !t.isAvailableForChild ||
                   t.fingerprint != q.target.fingerprint;
             }) ||
             _answers.length > _questions!.length ||

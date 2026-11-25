@@ -115,7 +115,8 @@ class EnglishProgressRepository {
       check();
       if (course?.lesson(lessonId) == null ||
           (targetId != null &&
-              course?.target(lessonId, targetId)?.approved != true)) {
+              course?.target(lessonId, targetId)?.isAvailableForChild !=
+                  true)) {
         throw const FormatException('学习内容已变化，请重新打开课时');
       }
       final p = load();
@@ -144,9 +145,7 @@ class EnglishProgressRepository {
       check();
       final target = course?.target(lessonId, targetId);
       if (target == null ||
-          !target.approved ||
-          target.kind != EnglishTargetKind.vocabulary ||
-          target.meaning.isEmpty ||
+          !target.isLearnableVocabulary ||
           target.fingerprint != expectedFingerprint) {
         throw const FormatException('单词内容已变化，请重新打开学习页');
       }
@@ -237,7 +236,7 @@ class EnglishProgressRepository {
             throw const FormatException('此作答不能标为已核对');
           }
           if (t == null ||
-              !t.approved ||
+              !t.isAvailableForChild ||
               t.fingerprint != q.target.fingerprint ||
               q.voiceKey != null && !t.audioApproved(q.voiceKey!)) {
             throw const FormatException('题目内容已更新，请重新开始本轮');
@@ -386,7 +385,7 @@ class EnglishProgressRepository {
             course.lessons.any(
               (l) => l.targets.any(
                 (t) =>
-                    t.approved &&
+                    t.isAvailableForChild &&
                     e.key.startsWith('${l.id}/${t.id}/') &&
                     t.fingerprint == e.value.fingerprint,
               ),

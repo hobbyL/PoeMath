@@ -13,6 +13,7 @@ EnglishTarget englishWord({
   String text = 'red kite',
   String meaning = '红风筝',
   bool approved = true,
+  String origin = 'textbook',
 }) {
   final target = EnglishTarget(
     id: id,
@@ -21,6 +22,7 @@ EnglishTarget englishWord({
     meaning: meaning,
     sources: const [EnglishSource(2, printedPage: '1')],
     spellingEnabled: true,
+    origin: origin,
   );
   return approved ? target.approve(voiceKey: 'en-US|test') : target;
 }

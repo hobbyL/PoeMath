@@ -150,6 +150,19 @@ class EnglishTarget {
   };
   String get fingerprint => textbookContentDigest(content);
   bool get approved => reviewDigest == fingerprint;
+  bool get isAutoExtractedVocabulary =>
+      kind == EnglishTargetKind.vocabulary &&
+      origin == 'textbook' &&
+      text.trim().isNotEmpty &&
+      meaning.trim().isNotEmpty;
+  bool get isLearnableVocabulary =>
+      kind == EnglishTargetKind.vocabulary &&
+      meaning.trim().isNotEmpty &&
+      (approved || isAutoExtractedVocabulary);
+  bool get isSpellingLearnable =>
+      isLearnableVocabulary && (spellingEnabled || isAutoExtractedVocabulary);
+  bool get isAvailableForChild =>
+      kind == EnglishTargetKind.vocabulary ? isLearnableVocabulary : approved;
   bool get hasSpeech =>
       kind != EnglishTargetKind.exercise &&
       kind != EnglishTargetKind.activity &&
@@ -265,6 +278,7 @@ class EnglishLesson {
   final List<EnglishTarget> targets;
   final List<String> issues;
   int get approvedCount => targets.where((t) => t.approved).length;
+  int get availableCount => targets.where((t) => t.isAvailableForChild).length;
   bool containsPage(int page) => page >= startPage && page <= endPage;
   EnglishLesson change(Map<String, dynamic> fields) =>
       EnglishLesson.fromJson({...toJson(), ...fields});

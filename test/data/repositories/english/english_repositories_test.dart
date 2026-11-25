@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/english_course.dart';
 import 'package:poemath/data/models/english_progress.dart';
 import 'package:poemath/data/repositories/english_course_repository.dart';
 import 'package:poemath/data/repositories/english_progress_repository.dart';
@@ -175,7 +176,29 @@ void main() {
     expect(repository.load().attempts, hasLength(3));
   });
   test('单词自评分离保存；待复习次日进入词义题，客观答对再推进间隔', () async {
-    final book = englishBook(), course = englishCourse();
+    final book = englishBook();
+    final course = englishCourse(
+      book: book,
+      lessons: [
+        englishLesson(
+          targets: [
+            englishWord(approved: false),
+            englishWord(
+              id: 'word-2',
+              text: 'blue bird',
+              meaning: '蓝鸟',
+              approved: false,
+            ),
+            EnglishTarget(
+              id: 'sentence-1',
+              kind: EnglishTargetKind.sentence,
+              text: 'Hello.',
+              sources: const [EnglishSource(3)],
+            ).approve(),
+          ],
+        ),
+      ],
+    );
     await courses.seed(book, course, check: () {});
     final repository = EnglishProgressRepository(book, courses),
         lesson = course.lessons.single,
@@ -186,6 +209,8 @@ void main() {
         ).first,
         recordKey = q.recordKey;
 
+    expect(q.target.approved, isFalse);
+    await repository.remember(lesson.id, targetId: q.target.id);
     await repository.selfAssessVocabulary(
       lesson.id,
       q.target.id,

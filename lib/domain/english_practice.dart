@@ -111,15 +111,12 @@ List<EnglishQuestion> buildEnglishQuestions(
   final pool = [
     for (final l in course.lessons)
       for (final t in l.targets)
-        if (t.approved &&
-            t.kind == EnglishTargetKind.vocabulary &&
-            t.meaning.isNotEmpty)
-          t,
+        if (t.isLearnableVocabulary) t,
   ];
   for (final lesson in course.lessons) {
     if (lessonId != null && lesson.id != lessonId) continue;
     for (final t in lesson.targets) {
-      if (!t.approved) continue;
+      if (!t.isAvailableForChild) continue;
       final key = '${lesson.id}/${t.id}/${kind.name}';
       if (targetKeys != null && !targetKeys.contains(key)) continue;
       final options = <String>[], answers = <String>[];
@@ -128,9 +125,7 @@ List<EnglishQuestion> buildEnglishQuestions(
       switch (kind) {
         case EnglishPracticeKind.meaning:
         case EnglishPracticeKind.listening:
-          if (t.kind != EnglishTargetKind.vocabulary || t.meaning.isEmpty) {
-            continue;
-          }
+          if (!t.isLearnableVocabulary) continue;
           if (kind == EnglishPracticeKind.listening &&
               (voiceKey == null || !t.audioApproved(voiceKey))) {
             continue;
@@ -183,11 +178,7 @@ List<EnglishQuestion> buildEnglishQuestions(
           answers.add(answer);
           prompt = '${t.text} 对应的${upper ? '小写' : '大写'}字母';
         case EnglishPracticeKind.spelling:
-          if (t.kind != EnglishTargetKind.vocabulary ||
-              !t.spellingEnabled ||
-              t.meaning.isEmpty) {
-            continue;
-          }
+          if (!t.isSpellingLearnable) continue;
           prompt = t.meaning;
           answers.add(t.text);
           options.addAll(t.text.split('')..shuffle(random));
@@ -252,9 +243,7 @@ void validateEnglishQuestion(EnglishCourse course, EnglishQuestion question) {
     final pool = {
       for (final l in course.lessons)
         for (final t in l.targets)
-          if (t.approved &&
-              t.kind == EnglishTargetKind.vocabulary &&
-              t.meaning.isNotEmpty)
+          if (t.isLearnableVocabulary)
             question.kind == EnglishPracticeKind.meaning ? t.meaning : t.text,
     };
     if (b.length < 2 ||

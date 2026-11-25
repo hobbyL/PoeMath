@@ -103,7 +103,7 @@ void main() {
           lessons: [
             englishLesson(
               targets: [
-                englishWord(approved: false),
+                englishWord(approved: false, origin: 'parent'),
                 englishWord(id: 'other'),
               ],
             ),
@@ -112,6 +112,50 @@ void main() {
         EnglishPracticeKind.meaning,
       ),
       isEmpty,
+    );
+  });
+  test('自动整理的教材词汇无需人工审核即可学习，手工草稿仍受限', () {
+    final lesson = englishLesson(
+      targets: [
+        englishWord(id: 'auto-one', approved: false),
+        englishWord(
+          id: 'auto-two',
+          text: 'blue bird',
+          meaning: '蓝鸟',
+          approved: false,
+        ).change({'spellingEnabled': false}),
+        englishWord(
+          id: 'parent-draft',
+          text: 'green boat',
+          meaning: '绿船',
+          approved: false,
+          origin: 'parent',
+        ),
+      ],
+    );
+    final course = englishCourse(lessons: [lesson]);
+    expect(lesson.targets.take(2).every((target) => !target.approved), isTrue);
+    expect(
+      lesson.targets.take(2).every((target) => target.isLearnableVocabulary),
+      isTrue,
+    );
+    expect(lesson.targets.last.isLearnableVocabulary, isFalse);
+    final questions = buildEnglishQuestions(
+      course,
+      EnglishPracticeKind.meaning,
+    );
+    expect(
+      questions.map((question) => question.target.id),
+      containsAll(['auto-one', 'auto-two']),
+    );
+    expect(
+      questions.map((question) => question.target.id),
+      isNot(contains('parent-draft')),
+    );
+    expect(
+      buildEnglishQuestions(course, EnglishPracticeKind.spelling)
+          .map((question) => question.target.id),
+      containsAll(['auto-one', 'auto-two']),
     );
   });
   test('提示和跳过不升级；跨日到期成功升级，同日重复不会升级', () {

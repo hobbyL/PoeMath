@@ -100,6 +100,7 @@ void main() {
     expect(targets[1].sources.single.page, 9);
     expect(targets.last.sources.single.page, 9);
     expect(targets.every((target) => !target.approved), isTrue);
+    expect(targets.every((target) => target.isLearnableVocabulary), isTrue);
   });
   test('英语原书目录复用完整字形布局，Unit 编号不是书内页码', () async {
     final root = await Directory.systemTemp.createTemp('english-toc-');
