@@ -17,6 +17,8 @@ import 'package:poemath/data/models/english_progress.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/english_course_repository.dart';
 import 'package:poemath/data/repositories/english_progress_repository.dart';
+import 'package:poemath/data/repositories/practice_draft_repository.dart';
+import 'package:poemath/domain/english_practice.dart';
 import 'package:poemath/features/english/english_course_page.dart';
 import 'package:poemath/features/english/english_history_page.dart';
 import 'package:poemath/features/english/english_practice_page.dart';
@@ -87,6 +89,17 @@ class _Progress extends EnglishProgressRepository {
     required bool mastered,
     DateTime? now,
   }) async => selfAssessments.add((targetId, mastered));
+}
+
+class _RetryProgress extends EnglishProgressRepository {
+  _RetryProgress(super.book, super.courses);
+  int calls = 0;
+
+  @override
+  Future<void> complete(EnglishAttempt attempt) async {
+    if (++calls == 1) throw StateError('保存失败，请重试');
+    await super.complete(attempt);
+  }
 }
 
 void main() {
@@ -327,6 +340,21 @@ void main() {
     );
     expect(find.text('red kite'), findsOneWidget);
     expect(find.text('blue bird'), findsNothing);
+    await tester.runAsync(() async {
+      await tester.tap(find.text('红风筝'));
+    });
+    await tester.pump();
+    await until(tester, () => submitReady(tester));
+    await tester.runAsync(() async {
+      await tester.tap(find.text('提交答案'));
+    });
+    await tester.pump();
+    await until(
+      tester,
+      () => find.byIcon(Icons.check_circle_outline).evaluate().isNotEmpty,
+    );
+    expect(find.text('完成练习'), findsOneWidget);
+    expect(find.text('下一题'), findsNothing);
     router.pop();
     await tester.pumpAndSettle();
     expect(find.text('单词详情'), findsOneWidget);
@@ -1144,6 +1172,184 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await drainHiveWritesForTesting(tester);
   });
+  testWidgets('单词练习左右切换保留独立草稿，返回仍到原入口', (tester) async {
+    final book = englishBook();
+    final firstPath = AppRoutes.englishBookOf(
+      book.pdfSha256,
+      action: 'practice',
+      kind: 'meaning',
+      lesson: 'unit-1-p2',
+      targetKey: 'unit-1-p2/word-1/meaning',
+    );
+    final router = GoRouter(
+      initialLocation: '/origin',
+      routes: [
+        GoRoute(
+          path: '/origin',
+          builder: (context, _) => Scaffold(
+            body: TextButton(
+              onPressed: () => context.push(firstPath),
+              child: const Text('单词详情入口'),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: AppRoutes.englishPractice,
+          builder: (_, state) => EnglishPracticePage(
+            key: ValueKey(state.uri.toString()),
+            bookId: state.pathParameters['id']!,
+            kind: state.pathParameters['kind']!,
+            lessonId: state.uri.queryParameters['lesson'],
+            targetKey: state.uri.queryParameters['targetKey'],
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: overrides(),
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.tap(find.text('单词详情入口'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('red kite')),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<IconButton>(
+            find.widgetWithIcon(IconButton, Icons.chevron_left),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tester.runAsync(() => tester.tap(find.text('红风筝')));
+    await until(tester, () => submitReady(tester));
+    await tester.runAsync(() => tester.tap(find.byTooltip('下一题')));
+    await until(tester, () => find.text('blue bird').evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<IconButton>(
+            find.widgetWithIcon(IconButton, Icons.chevron_right),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(submitReady(tester), isFalse);
+    expect(find.byIcon(Icons.radio_button_checked), findsNothing);
+    await tester.runAsync(() => tester.tap(find.text('蓝鸟')));
+    await until(tester, () => submitReady(tester));
+    await tester.runAsync(() => tester.tap(find.byTooltip('上一题')));
+    await until(tester, () => find.text('red kite').evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+    expect(submitReady(tester), isTrue);
+    final drafts = PracticeDraftRepository();
+    final prefix = '${book.pdfSha256}/unit-1-p2/meaning/false/false';
+    final first = drafts.get(
+      'englishPractice',
+      scope: '$prefix/unit-1-p2/word-1/meaning',
+    )!;
+    final second = drafts.get(
+      'englishPractice',
+      scope: '$prefix/unit-1-p2/word-2/meaning',
+    )!;
+    expect(first['input'], '红风筝');
+    expect(second['input'], '蓝鸟');
+    expect(first['answers'], isEmpty);
+    expect(second['answers'], isEmpty);
+    expect(first['sessionId'], isNot(second['sessionId']));
+    expect(HiveBoxes.learningActivities.values, isEmpty);
+    await tester.runAsync(() => tester.tap(find.byTooltip('下一题')));
+    await until(tester, () => find.text('blue bird').evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+    expect(submitReady(tester), isTrue);
+    await tester.runAsync(() => tester.tap(find.text('提交答案')));
+    await until(tester, () => find.text('完成练习').evaluate().isNotEmpty);
+    await tester.runAsync(() => tester.tap(find.byTooltip('上一题')));
+    await until(tester, () => find.text('red kite').evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+    expect(submitReady(tester), isTrue);
+    await tester.runAsync(() => tester.tap(find.byTooltip('下一题')));
+    await until(tester, () => find.text('blue bird').evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+    expect(find.text('完成练习'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('单词详情入口'), findsOneWidget);
+    expect(router.canPop(), isFalse);
+    await tester.pumpWidget(const SizedBox());
+    await drainHiveWritesForTesting(tester);
+  });
+
+  testWidgets('整组词义练习可未作答切词，乱序提交后恢复位置和正确归属', (tester) async {
+    final book = englishBook();
+    final practicePath = AppRoutes.englishBookOf(
+      book.pdfSha256,
+      action: 'practice',
+      kind: 'meaning',
+    );
+    final router = GoRouter(
+      initialLocation: practicePath,
+      routes: [
+        GoRoute(
+          path: AppRoutes.englishPractice,
+          builder: (_, _) =>
+              EnglishPracticePage(bookId: book.pdfSha256, kind: 'meaning'),
+        ),
+        GoRoute(
+          path: AppRoutes.englishRecord,
+          builder: (_, _) => const Scaffold(body: Text('保存完成')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: overrides(),
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => tester.tap(find.text('红风筝')));
+    await until(tester, () => submitReady(tester));
+    await tester.runAsync(() => tester.tap(find.byTooltip('下一题')));
+    await until(tester, () => find.text('blue bird').evaluate().isNotEmpty);
+    expect(submitReady(tester), isFalse);
+    expect(HiveBoxes.learningActivities.values, isEmpty);
+    await tester.runAsync(() => tester.tap(find.text('蓝鸟')));
+    await until(tester, () => submitReady(tester));
+    await tester.runAsync(() => tester.tap(find.text('提交答案')));
+    await until(tester, () => find.text('继续练习').evaluate().isNotEmpty);
+    router.go('/missing');
+    await tester.pumpAndSettle();
+    router.go(practicePath);
+    await tester.pumpAndSettle();
+    expect(find.text('blue bird'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+    await tester.runAsync(() => tester.tap(find.byTooltip('上一题')));
+    await until(tester, () => find.text('red kite').evaluate().isNotEmpty);
+    expect(submitReady(tester), isTrue);
+    expect(find.byIcon(Icons.radio_button_checked), findsOneWidget);
+    await tester.runAsync(() => tester.tap(find.text('提交答案')));
+    await until(tester, () => find.text('完成练习').evaluate().isNotEmpty);
+    await tester.runAsync(() => tester.tap(find.text('完成练习')));
+    await until(tester, () => find.text('保存完成').evaluate().isNotEmpty);
+    final answers = EnglishProgressRepository(
+      book,
+      courses,
+    ).load().attempts.single.answers;
+    expect(answers.map((a) => a.question.target.id), ['word-2', 'word-1']);
+    expect(answers.every((a) => a.objectiveCorrect && !a.skipped), isTrue);
+    expect(HiveBoxes.learningActivities.values.single.totalItems, 2);
+    expect(HiveBoxes.learningActivities.values.single.successfulItems, 2);
+    await tester.pumpWidget(const SizedBox());
+    await drainHiveWritesForTesting(tester);
+  });
   testWidgets('选择题保存当前作答，退出后从下一题继续，提交后产生真实活动', (tester) async {
     final book = englishBook();
     final router = GoRouter(
@@ -1184,22 +1390,45 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('词义练习'), findsOneWidget);
+    expect(find.text('词义选择'), findsNothing);
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('red kite')),
+      findsOneWidget,
+    );
     expect(find.text('第 1 / 2 题'), findsNothing);
     expect(find.text('red kite'), findsOneWidget);
+    expect(submitReady(tester), isFalse);
+    expect(find.byIcon(Icons.radio_button_checked), findsNothing);
+    expect(find.byIcon(Icons.check_circle_outline), findsNothing);
     await tester.runAsync(() async {
       await tester.tap(find.text('红风筝'));
     });
     await tester.pump();
     await until(tester, () => submitReady(tester));
+    router.go('/missing');
+    await tester.pumpAndSettle();
+    router.go(
+      AppRoutes.englishBookOf(
+        book.pdfSha256,
+        action: 'practice',
+        kind: 'meaning',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('red kite'), findsOneWidget);
+    expect(find.byIcon(Icons.radio_button_checked), findsOneWidget);
+    expect(submitReady(tester), isTrue);
     await tester.runAsync(() async {
       await tester.tap(find.text('提交答案'));
     });
     await tester.pump();
-    await until(tester, () => find.text('答对了').evaluate().isNotEmpty);
-    expect(find.text('答对了'), findsOneWidget);
-    await tester.tap(find.text('下一题'));
-    await tester.pump();
+    await until(
+      tester,
+      () => find.byIcon(Icons.check_circle_outline).evaluate().isNotEmpty,
+    );
+    expect(find.text('答对了'), findsNothing);
+    await tester.runAsync(() => tester.tap(find.byTooltip('下一题')));
+    await until(tester, () => find.text('blue bird').evaluate().isNotEmpty);
     expect(find.text('第 2 / 2 题'), findsNothing);
     expect(find.text('blue bird'), findsOneWidget);
     // 重建该页面，读取已落盘的草稿。
@@ -1224,11 +1453,12 @@ void main() {
       await tester.tap(find.text('提交答案'));
     });
     await tester.pump();
-    await until(tester, () => find.text('答对了').evaluate().isNotEmpty);
-    await tester.tap(find.text('查看本轮结果'));
-    await tester.pump();
+    await until(
+      tester,
+      () => find.byIcon(Icons.check_circle_outline).evaluate().isNotEmpty,
+    );
     await tester.runAsync(() async {
-      await tester.tap(find.text('保存本轮结果'));
+      await tester.tap(find.text('完成练习'));
     });
     await tester.pump();
     await until(tester, () => find.text('本次学习').evaluate().isNotEmpty);
@@ -1236,6 +1466,139 @@ void main() {
     expect(find.text('本次学习'), findsOneWidget);
     expect(HiveBoxes.learningActivities.values.single.totalItems, 2);
     expect(HiveBoxes.learningActivities.values.single.successfulItems, 2);
+    await tester.pumpWidget(const SizedBox());
+    await drainHiveWritesForTesting(tester);
+  });
+  testWidgets('旧词义提示草稿仍不计独立答对，保存失败可从末题草稿重试', (tester) async {
+    final book = englishBook();
+    final progress = _RetryProgress(book, courses);
+    const targetKey = 'unit-1-p2/word-1/meaning';
+    final practicePath = AppRoutes.englishBookOf(
+      book.pdfSha256,
+      action: 'practice',
+      kind: 'meaning',
+      lesson: 'unit-1-p2',
+      targetKey: targetKey,
+    );
+    // 兼容移除“看提示”入口前留下的草稿，不能把旧提示作答当作独立答对。
+    final legacyQuestion = buildEnglishQuestions(
+      courses.course,
+      EnglishPracticeKind.meaning,
+      lessonId: 'unit-1-p2',
+      targetKeys: {targetKey},
+    ).single;
+    final legacyDrafts = PracticeDraftRepository();
+    final legacyScope =
+        '${book.pdfSha256}/unit-1-p2/meaning/false/false/$targetKey';
+    legacyDrafts.claim('englishPractice', scope: legacyScope);
+    await tester.runAsync(
+      () => legacyDrafts.save('englishPractice', {
+        'sessionId': 'legacy-hinted-meaning',
+        'questions': [legacyQuestion.toJson()],
+        'answers': <Object>[],
+        'input': '',
+        'tokens': <int>[],
+        'hint': true,
+        'seconds': 0,
+      }, scope: legacyScope),
+    );
+    final router = GoRouter(
+      initialLocation: practicePath,
+      routes: [
+        GoRoute(
+          path: AppRoutes.englishPractice,
+          builder: (_, state) => EnglishPracticePage(
+            bookId: state.pathParameters['id']!,
+            kind: state.pathParameters['kind']!,
+            lessonId: state.uri.queryParameters['lesson'],
+            targetKey: state.uri.queryParameters['targetKey'],
+          ),
+        ),
+        GoRoute(
+          path: AppRoutes.englishRecord,
+          builder: (_, _) => const Scaffold(body: Text('保存完成')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ...overrides(),
+          englishProgressRepositoryProvider.overrideWith((ref, id) => progress),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('看提示'), findsNothing);
+    expect(find.text('提示：红风筝'), findsNothing);
+    expect(submitReady(tester), isFalse);
+    await tester.runAsync(() => tester.tap(find.text('红风筝')));
+    await until(tester, () => submitReady(tester));
+    await tester.runAsync(() => tester.tap(find.text('提交答案')));
+    await until(tester, () => find.text('完成练习').evaluate().isNotEmpty);
+    expect(find.text('red kite'), findsOneWidget);
+    expect(find.text('答对了'), findsNothing);
+    expect(find.text('完成练习'), findsOneWidget);
+    await tester.runAsync(() => tester.tap(find.text('完成练习')));
+    await until(tester, () => find.text('保存失败，请重试').evaluate().isNotEmpty);
+    expect(progress.load().attempts, isEmpty);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(SnackBar), const Offset(0, 100));
+    await tester.pumpAndSettle();
+    final drafts = PracticeDraftRepository();
+    final scope = '${book.pdfSha256}/unit-1-p2/meaning/false/false/$targetKey';
+    final sessionId = drafts.get('englishPractice', scope: scope)!['sessionId'];
+    router.go('/missing');
+    await tester.pumpAndSettle();
+    router.go(practicePath);
+    await tester.pumpAndSettle();
+    expect(find.text('red kite'), findsOneWidget);
+    expect(find.text('已安排复习'), findsNothing);
+    expect(find.text('完成练习'), findsOneWidget);
+    expect(find.text('提交答案'), findsNothing);
+    await tester.runAsync(() => tester.tap(find.text('完成练习')));
+    await until(tester, () => find.text('保存完成').evaluate().isNotEmpty);
+    final attempt = progress.load().attempts.single;
+    expect(attempt.id, sessionId);
+    expect(attempt.answers.single.question.target.id, 'word-1');
+    expect(attempt.answers.single.hinted, isTrue);
+    expect(attempt.answers.single.objectiveCorrect, isFalse);
+    expect(HiveBoxes.learningActivities.values.single.totalItems, 1);
+    expect(HiveBoxes.learningActivities.values.single.successfulItems, 0);
+    expect(drafts.get('englishPractice', scope: scope), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await drainHiveWritesForTesting(tester);
+  });
+  testWidgets('词义选择跳过保留题面并写入跳过证据，下一题不沿用选中项', (tester) async {
+    final book = englishBook();
+    await show(
+      tester,
+      EnglishPracticePage(bookId: book.pdfSha256, kind: 'meaning'),
+    );
+    expect(submitReady(tester), isFalse);
+    await tester.runAsync(() => tester.tap(find.text('跳过')));
+    await until(tester, () => find.text('继续练习').evaluate().isNotEmpty);
+    expect(find.text('这题已跳过'), findsNothing);
+    expect(find.text('red kite'), findsOneWidget);
+    expect(find.byIcon(Icons.radio_button_checked), findsNothing);
+    final draft = PracticeDraftRepository().get(
+      'englishPractice',
+      scope: '${book.pdfSha256}/all/meaning/false/false/all',
+    )!;
+    final answer = EnglishAnswer.fromJson(
+      (draft['answers'] as List<dynamic>).single,
+    );
+    expect(answer.skipped, isTrue);
+    expect(answer.correct, isNull);
+    expect(answer.objectiveCorrect, isFalse);
+    expect(HiveBoxes.learningActivities.values, isEmpty);
+    await tester.runAsync(() => tester.tap(find.byTooltip('下一题')));
+    await until(tester, () => find.text('blue bird').evaluate().isNotEmpty);
+    expect(find.text('blue bird'), findsOneWidget);
+    expect(find.byIcon(Icons.radio_button_checked), findsNothing);
+    expect(submitReady(tester), isFalse);
     await tester.pumpWidget(const SizedBox());
     await drainHiveWritesForTesting(tester);
   });

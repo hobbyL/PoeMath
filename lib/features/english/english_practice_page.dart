@@ -15,6 +15,7 @@ import 'package:poemath/domain/english_practice.dart';
 import 'package:poemath/features/english/english_audio.dart';
 import 'package:poemath/features/english/english_providers.dart';
 import 'package:poemath/features/english/english_widgets.dart';
+import 'package:poemath/features/english/widgets/english_meaning_practice_content.dart';
 
 class EnglishPracticePage extends ConsumerStatefulWidget {
   const EnglishPracticePage({
@@ -48,6 +49,10 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
   String _session = newEnglishId();
   List<EnglishQuestion>? _questions;
   List<EnglishAnswer> _answers = [];
+  int _meaningIndex = 0;
+  Map<String, String> _meaningInputs = {};
+  Set<String> _meaningHints = {};
+  List<EnglishQuestion> _meaningNeighbours = [];
   final _input = TextEditingController();
   List<int> _tokens = [];
   bool _hint = false, _heard = false, _busy = false;
@@ -59,6 +64,13 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
   StreamSubscription<String>? _profiles;
   EnglishPracticeKind? get _kind => EnglishPracticeKind.values
       .where((k) => k.name == widget.kind)
+      .firstOrNull;
+  EnglishQuestion? get _meaningQuestion =>
+      _kind == EnglishPracticeKind.meaning && _questions?.isNotEmpty == true
+      ? _questions![_meaningIndex]
+      : null;
+  EnglishAnswer? get _meaningFeedback => _answers
+      .where((answer) => answer.question.id == _meaningQuestion?.id)
       .firstOrNull;
 
   @override
@@ -106,9 +118,15 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
                   t.fingerprint != q.target.fingerprint;
             }) ||
             _answers.length > _questions!.length ||
-            _answers.asMap().entries.any(
-              (e) => e.value.question.id != _questions![e.key].id,
-            )) {
+            (_kind == EnglishPracticeKind.meaning
+                ? _answers.map((a) => a.question.id).toSet().length !=
+                          _answers.length ||
+                      _answers.any(
+                        (a) => !_questions!.any((q) => q.id == a.question.id),
+                      )
+                : _answers.asMap().entries.any(
+                    (e) => e.value.question.id != _questions![e.key].id,
+                  ))) {
           throw const FormatException('内容已经更新，请重新开始本轮。过去的学习记录仍保留。');
         }
         _session = englishString(draft['sessionId']);
@@ -129,6 +147,32 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
         if (draft['attempt'] != null) {
           _attempt = EnglishAttempt.fromJson(draft['attempt']);
         }
+        if (_kind == EnglishPracticeKind.meaning && _questions!.isNotEmpty) {
+          _meaningIndex = draft['meaningIndex'] == null
+              ? _answers.length.clamp(0, _questions!.length - 1)
+              : englishInt(draft['meaningIndex'], max: _questions!.length - 1);
+          final id = _meaningQuestion!.id;
+          _meaningInputs = draft['meaningInputs'] == null
+              ? {id: _input.text}
+              : englishObject(draft['meaningInputs']).map(
+                  (key, value) =>
+                      MapEntry(key, englishString(value, empty: true)),
+                );
+          _meaningHints = draft['meaningHints'] == null
+              ? {if (_hint) id}
+              : englishList(
+                  draft['meaningHints'],
+                  (value) => englishString(value, max: 500),
+                  max: 10,
+                ).toSet();
+          final ids = _questions!.map((q) => q.id).toSet();
+          if (!_meaningInputs.keys.every(ids.contains) ||
+              !_meaningHints.every(ids.contains)) {
+            throw const FormatException('词义选择草稿无效');
+          }
+          _input.text = _meaningInputs[id] ?? '';
+          _hint = _meaningHints.contains(id);
+        }
       } else {
         final due = widget.targetKey != null
             ? {widget.targetKey!}
@@ -146,6 +190,18 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
           seed: DateTime.now().millisecondsSinceEpoch,
         ).take(10).toList();
       }
+      if (_kind == EnglishPracticeKind.meaning && widget.targetKey != null) {
+        _meaningNeighbours = buildEnglishQuestions(
+          course,
+          EnglishPracticeKind.meaning,
+          lessonId: widget.lessonId,
+          targetKeys: widget.due
+              ? _progress.dueKeys(course, DateTime.now())
+              : widget.retry
+              ? _progress.retryKeys(course)
+              : null,
+        );
+      }
     } on Object catch (e) {
       _error = e is FormatException ? e.message.toString() : '草稿读取失败，请重试或重新开始';
     }
@@ -156,6 +212,8 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
     String? input,
     List<int>? tokens,
     bool? hint,
+    int? meaningIndex,
+    Map<String, String>? meaningInputs,
   }) async {
     _progress.check();
     _drafts.assertOwner('englishPractice', scope: _scope);
@@ -171,6 +229,11 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
       'input': input ?? _input.text,
       'tokens': tokens ?? _tokens,
       'hint': hint ?? _hint,
+      if (_kind == EnglishPracticeKind.meaning) ...{
+        'meaningIndex': meaningIndex ?? _meaningIndex,
+        'meaningInputs': meaningInputs ?? _meaningInputs,
+        'meaningHints': _meaningHints.toList(),
+      },
       'seconds': (_previousSeconds + _watch.elapsed.inSeconds).clamp(0, 86400),
       'attempt': _attempt?.toJson(),
     }, scope: _scope);
@@ -180,9 +243,20 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      await _checkpoint(input: input, tokens: tokens, hint: hint);
+      final inputs = {
+        ..._meaningInputs,
+        if (_meaningQuestion != null && input != null)
+          _meaningQuestion!.id: input,
+      };
+      await _checkpoint(
+        input: input,
+        tokens: tokens,
+        hint: hint,
+        meaningInputs: inputs,
+      );
       if (mounted) {
         setState(() {
+          _meaningInputs = inputs;
           if (input != null) _input.text = input;
           if (tokens != null) _tokens = tokens;
           if (hint != null) _hint = hint;
@@ -196,7 +270,12 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
   }
 
   Future<void> _answer(EnglishQuestion q, {bool skip = false}) async {
-    if (_busy || _feedback != null) return;
+    if (_busy ||
+        (_kind == EnglishPracticeKind.meaning
+            ? _meaningFeedback != null
+            : _feedback != null)) {
+      return;
+    }
     setState(() => _busy = true);
     try {
       await _audio.stop();
@@ -212,10 +291,21 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
         skipped: skip,
       );
       final next = [..._answers, answer];
-      await _checkpoint(answers: next, input: '', tokens: [], hint: false);
+      final inputs = {
+        ..._meaningInputs,
+        if (_meaningQuestion != null) q.id: '',
+      };
+      await _checkpoint(
+        answers: next,
+        input: '',
+        tokens: [],
+        hint: false,
+        meaningInputs: inputs,
+      );
       if (mounted) {
         setState(() {
           _answers = next;
+          _meaningInputs = inputs;
           _feedback = answer;
           _input.clear();
           _tokens = [];
@@ -238,6 +328,65 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
   bool _isTokens(EnglishQuestion q) =>
       q.kind == EnglishPracticeKind.sentence ||
       q.kind == EnglishPracticeKind.spelling;
+
+  /// Navigation saves the current draft; it never creates an answer or a skip.
+  Future<void> _moveMeaningTo(int index) async {
+    if (_busy) return;
+    final questions = widget.targetKey == null
+        ? _questions!
+        : _meaningNeighbours;
+    if (index < 0 || index >= questions.length) return;
+    setState(() => _busy = true);
+    try {
+      await _audio.stop();
+      if (widget.targetKey != null) {
+        await _checkpoint();
+        if (!mounted) return;
+        context.pushReplacement(
+          AppRoutes.englishBookOf(
+            widget.bookId,
+            action: 'practice',
+            kind: widget.kind,
+            lesson: widget.lessonId,
+            due: widget.due,
+            retry: widget.retry,
+            targetKey: questions[index].recordKey,
+          ),
+        );
+      } else {
+        final id = questions[index].id;
+        final input = _meaningInputs[id] ?? '';
+        final hint = _meaningHints.contains(id);
+        await _checkpoint(meaningIndex: index, input: input, hint: hint);
+        if (!mounted) return;
+        setState(() {
+          _meaningIndex = index;
+          _input.text = input;
+          _hint = hint;
+        });
+      }
+    } on Object catch (e) {
+      if (mounted) englishMessage(context, e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _continueMeaning(EnglishCourse course) {
+    if (_answers.length == _questions!.length) {
+      unawaited(_finish(course));
+      return;
+    }
+    final answered = _answers.map((a) => a.question.id).toSet();
+    for (var offset = 1; offset <= _questions!.length; offset++) {
+      final index = (_meaningIndex + offset) % _questions!.length;
+      if (!answered.contains(_questions![index].id)) {
+        unawaited(_moveMeaningTo(index));
+        return;
+      }
+    }
+  }
+
   Future<void> _finish(EnglishCourse course) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -291,8 +440,26 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
     final audio = ref.watch(englishAudioProvider(_audioKey)),
         voice = ref.watch(englishVoiceProvider),
         theme = Theme.of(context);
+    final course = ref
+        .watch(englishCourseProvider(widget.bookId))
+        .asData
+        ?.value;
+    if (course != null &&
+        !(_kind == EnglishPracticeKind.listening && voices.isLoading)) {
+      _init(course, voice);
+    }
     return AppScaffold(
-      appBar: AppBar(title: Text(_kind?.label ?? '英语练习')),
+      backgroundScene: PineInkScene.study,
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(
+          _kind == EnglishPracticeKind.meaning
+              ? (_error == null ? _meaningQuestion?.prompt : null) ?? '词义选择'
+              : _kind?.label ?? '英语练习',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
       body: SafeArea(
         top: false,
         child: EnglishCourseBody(
@@ -330,6 +497,10 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
                             _error = null;
                             _attempt = null;
                             _feedback = null;
+                            _meaningIndex = 0;
+                            _meaningInputs = {};
+                            _meaningHints = {};
+                            _meaningNeighbours = [];
                             _session = newEnglishId();
                           });
                         }
@@ -343,10 +514,37 @@ class _EnglishPracticePageState extends ConsumerState<EnglishPracticePage>
               );
             }
             if (_questions!.isEmpty) {
-              return const AppEmptyState(
+              return AppEmptyState(
                 icon: Icons.task_alt,
                 title: '目前没有可练题目',
-                description: '听辨题需先核对英语示范。',
+                description: _kind == EnglishPracticeKind.listening
+                    ? '听辨题需先核对英语示范。'
+                    : null,
+              );
+            }
+            if (_kind == EnglishPracticeKind.meaning) {
+              final complete = _answers.length == _questions!.length;
+              final question = _meaningQuestion!;
+              final navigation = widget.targetKey == null
+                  ? _questions!
+                  : _meaningNeighbours;
+              final index = navigation.indexWhere(
+                (q) => q.recordKey == question.recordKey,
+              );
+              return EnglishMeaningPracticeContent(
+                question: question,
+                selected: _input.text,
+                busy: _busy,
+                lastQuestion: complete,
+                feedback: _meaningFeedback,
+                onSelect: (value) => _change(input: value),
+                onSkip: () => _answer(question, skip: true),
+                onSubmit: () => _answer(question),
+                onPrevious: index > 0 ? () => _moveMeaningTo(index - 1) : null,
+                onNext: index >= 0 && index + 1 < navigation.length
+                    ? () => _moveMeaningTo(index + 1)
+                    : null,
+                onContinue: () => _continueMeaning(course),
               );
             }
             final feedback = _feedback;
