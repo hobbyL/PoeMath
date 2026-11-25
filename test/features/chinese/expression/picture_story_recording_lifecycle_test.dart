@@ -696,11 +696,13 @@ void main() {
     });
     addTearDown(client.close);
     await recordSegment(tester, client: client);
+    expect(find.text('5 字'), findsOneWidget);
     await tester.enterText(find.byType(TextField), '');
     await waitUntil(
       tester,
       () => HiveBoxes.pictureStoryPractice.values.single.answerText.isEmpty,
     );
+    expect(find.text('0 字'), findsOneWidget);
     await tester.tap(find.byTooltip('完成练习').first);
     await tester.pump();
     expect(
@@ -716,6 +718,27 @@ void main() {
     expect(saved.segments.single.transcript, '孩子的表达');
     expect(saved.segments.single.audioPath, isNotEmpty);
     expect(requests, 0);
+  });
+
+  testWidgets('实时识别、最终转写和手动修改同步更新字数，保存原转写', (tester) async {
+    await mount(tester);
+    await tap(tester, '说一说');
+    speeches.single.partials.add('小猫\n看书。');
+    await tester.pump();
+    expect(find.text('5 字'), findsOneWidget);
+    await tap(tester, '说好了');
+    await waitUntil(tester, () => find.byType(TextField).evaluate().isNotEmpty);
+    expect(find.text('5 字'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '猫\n睡觉。');
+    await waitUntil(
+      tester,
+      () => HiveBoxes.pictureStoryPractice.values.single.answerText == '猫\n睡觉。',
+    );
+    expect(find.text('4 字'), findsOneWidget);
+    final segment =
+        HiveBoxes.pictureStoryPractice.values.single.segments.single;
+    expect(segment.transcript, '孩子的表达');
+    expect(segment.editedText, '猫\n睡觉。');
   });
 
   testWidgets('完成保存失败保留草稿及重试，成功后才显示结果', (tester) async {
@@ -975,6 +998,7 @@ void main() {
       final original = HiveBoxes.pictureStoryPractice.values.single.segments;
       final button = find.byTooltip('删除这段').at(removedIndex);
       await tester.ensureVisible(button);
+      await tester.pump();
       await tester.tap(button);
       await waitUntil(tester, () => audio.deleted.length == 1);
       await tester.ensureVisible(find.widgetWithText(FilledButton, '说一说'));

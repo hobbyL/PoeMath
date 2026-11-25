@@ -32,6 +32,7 @@ import 'package:poemath/features/chinese/expression/providers/picture_story_prov
 import 'package:poemath/features/chinese/expression/widgets/picture_story_illustration.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_guidance.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_takes_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_text_area.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_scaffold.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
@@ -1163,13 +1164,26 @@ class _PictureStoryPracticePageState
                     padding: const EdgeInsets.symmetric(
                       vertical: SpacingTokens.sm,
                     ),
-                    child: Text(
-                      _liveText.isEmpty
-                          ? '正在听你说… $_elapsedSeconds/60 秒'
-                          : _liveText,
-                      style: bodyStyle?.copyWith(
-                        color: theme.colorScheme.primary,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          _liveText.isEmpty
+                              ? '正在听你说… $_elapsedSeconds/60 秒'
+                              : _liveText,
+                          style: bodyStyle?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: SpacingTokens.xs),
+                        Text(
+                          '${pictureStoryTextLength(_liveText)} 字',
+                          textAlign: TextAlign.end,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1258,13 +1272,9 @@ class _PictureStoryPracticePageState
               ),
             ],
           ),
-          TextField(
+          PictureStoryTextArea(
             controller: controller,
             readOnly: _finishing || _deleting,
-            style: bodyStyle,
-            minLines: 1,
-            maxLines: 4,
-            decoration: const InputDecoration(labelText: '识别文字（可修改）'),
             onChanged: (value) {
               if (_deleting || _finishing) return;
               final index = _segments.indexWhere(

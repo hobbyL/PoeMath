@@ -17,6 +17,7 @@ import 'package:poemath/features/chinese/expression/providers/picture_story_prov
 import 'package:poemath/features/chinese/expression/widgets/picture_story_feedback.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_illustration.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_text_area.dart';
 
 /// 同一次练习的文字修订；录音仍对应最初口述，各版答案与点评成对展示。
 class PictureStoryReviewPage extends ConsumerStatefulWidget {
@@ -261,13 +262,11 @@ class _PictureStoryReviewPageState extends ConsumerState<PictureStoryReviewPage>
                       ),
                       const SizedBox(height: SpacingTokens.sm),
                       if (_editing) ...[
-                        TextField(
+                        PictureStoryTextArea(
                           controller: _text,
-                          minLines: 4,
-                          maxLines: 12,
                           maxLength: 6000,
                           readOnly: _busy || !_sameProfile,
-                          decoration: const InputDecoration(labelText: '表达文字'),
+                          label: '表达文字',
                           onChanged: (text) => unawaited(_saveText(text)),
                         ),
                         const Text('修改文字不会改变原录音，之前的表达和点评会保留。'),

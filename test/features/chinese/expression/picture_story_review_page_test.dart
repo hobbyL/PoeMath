@@ -219,6 +219,8 @@ void main() {
     );
     await tester.runAsync(() => tester.enterText(find.byType(TextField), ''));
     await waitFor(tester, () => repo.find('record')!.revisionDraft == '');
+    await tester.pump();
+    expect(find.text('0 字'), findsOneWidget);
     await evaluate(tester);
     expect(find.text('请先填写表达文字，再重新点评。'), findsOneWidget);
     expect(requests, 0);
@@ -231,6 +233,7 @@ void main() {
       '',
     );
     expect(repo.find('record')!.answerText, '最初的答案');
+    expect(find.text('0 字'), findsOneWidget);
     expect(requests, 0);
   });
 
