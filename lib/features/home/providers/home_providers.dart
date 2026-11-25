@@ -137,10 +137,14 @@ class TodayLearningActivityCounts {
 final _learningActivityChangesProvider = StreamProvider(
   (ref) => HiveBoxes.learningActivities.watch(),
 );
+final _expressionCompletionChangesProvider = StreamProvider(
+  (ref) => HiveBoxes.pictureStoryPractice.watch(),
+);
 
 final todayLearningActivityCountsProvider =
     Provider<TodayLearningActivityCounts>((ref) {
       ref.watch(_learningActivityChangesProvider);
+      ref.watch(_expressionCompletionChangesProvider);
       final today = DateTime.parse(ref.watch(dayKeyProvider));
       final activities = ref
           .watch(learningActivityRepositoryProvider)

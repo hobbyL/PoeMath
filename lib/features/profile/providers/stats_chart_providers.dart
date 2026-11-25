@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/learning_activity.dart';
+import 'package:poemath/data/repositories/learning_activity_repository.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 
 /// 单日聚合数据。
@@ -193,8 +194,7 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
 
   // 新版逐次活动事件。日报汇总缺失时优先使用事件，再回退旧明细。
   final activityMap = <String, _DailyActivityAggregate>{};
-  for (final activity in HiveBoxes.learningActivities.values) {
-    if (activity.profileId != ProfileScope.currentId) continue;
+  for (final activity in LearningActivityRepository().getAll()) {
     final key = _dateKey(activity.completedAt);
     activityMap.putIfAbsent(key, _DailyActivityAggregate.new).add(activity);
   }

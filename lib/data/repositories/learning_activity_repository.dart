@@ -20,9 +20,43 @@ class LearningActivityRepository {
   }
 
   List<LearningActivity> getAll() {
-    return HiveBoxes.learningActivities.values
-        .where((activity) => activity.profileId == ProfileScope.currentId)
-        .toList()
+    final activities = {
+      for (final activity in HiveBoxes.learningActivities.values)
+        if (activity.profileId == ProfileScope.currentId) activity.id: activity,
+    };
+    // 表达正文先保存，活动事件随后写入。进程中断或第二次写入失败时，
+    // 用已持久化的完成事实补齐查询；不改写记录，也不补造未知完成时间。
+    for (final record in HiveBoxes.pictureStoryPractice.values) {
+      final id = 'picture-story:${record.id}', completedAt = record.completedAt;
+      if (record.profileId != ProfileScope.currentId ||
+          record.status != 'completed' ||
+          completedAt == null ||
+          activities.containsKey(id)) {
+        continue;
+      }
+      final int duration;
+      try {
+        // 重讲仍是同一次活动，沿用首遍时长和首次完成日期。
+        duration =
+            record.retellingState?.archived.firstOrNull?.totalDurationSeconds ??
+            record.totalDurationSeconds;
+      } on FormatException {
+        // 损坏的重讲快照不能用最新一遍伪造首遍数据。
+        continue;
+      }
+      if (duration < 0) continue;
+      activities[id] = LearningActivity(
+        id: id,
+        profileId: record.profileId,
+        activityType: LearningActivityType.pictureStoryExpression.name,
+        totalItems: 1,
+        successfulItems: 1,
+        starsEarned: 0,
+        durationSeconds: duration,
+        completedAt: completedAt,
+      );
+    }
+    return activities.values.toList()
       ..sort((a, b) => b.completedAt.compareTo(a.completedAt));
   }
 
@@ -144,8 +178,7 @@ class LearningActivityRepository {
       LearningActivityType.poemRecitation ||
       LearningActivityType.poemQuiz ||
       LearningActivityType.poemDictation ||
-      LearningActivityType.readAlong =>
-        true,
+      LearningActivityType.readAlong => true,
       _ => false,
     };
     if (requiresPoem &&
@@ -157,10 +190,7 @@ class LearningActivityRepository {
     }
   }
 
-  bool _hasSamePayload(
-    LearningActivity left,
-    LearningActivity right,
-  ) {
+  bool _hasSamePayload(LearningActivity left, LearningActivity right) {
     return left.id == right.id &&
         left.profileId == right.profileId &&
         left.activityType == right.activityType &&
