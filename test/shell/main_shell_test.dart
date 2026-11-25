@@ -86,8 +86,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     expect(_selectedTab(tester), 3);
-    expect(find.text('练习'), findsOneWidget);
-    expect(find.text('复习'), findsOneWidget);
+    expect(find.text('课本(0)'), findsOneWidget);
+    expect(find.text('练习'), findsNothing);
+    expect(find.text('复习'), findsNothing);
     expect(container.read(activeSubjectProvider), initialSubject);
 
     // 点击“语文”切换到课本与诗词入口，主题仍不变。

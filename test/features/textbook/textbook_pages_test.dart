@@ -273,7 +273,12 @@ class _LifecycleViewerState extends State<_LifecycleViewer> {
 void main() {
   late _MemoryRepository repo;
   late _Files files;
+  late List<TextbookCatalogEntry> bundledCatalog;
   final book = textbookFixture();
+  setUpAll(() async {
+    // Prime asset futures in the real async zone before any widget test caches them.
+    bundledCatalog = await const TextbookCatalogRepository().load();
+  });
   setUp(() async {
     await setUpHiveForTesting();
     await unlockParentForTesting();
@@ -1195,7 +1200,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     files.installed = false;
-    final entries = (await const TextbookCatalogRepository().load())
+    final entries = bundledCatalog
         .where((entry) => entry.book.subject == TextbookSubject.chinese)
         .toList();
     await pump(
