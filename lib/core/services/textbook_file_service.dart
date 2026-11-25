@@ -181,11 +181,19 @@ class TextbookFileService {
     return File('${(await _directory()).path}/$id.pdf');
   }
 
-  Future<String?> installedPath(Textbook book) async {
+  /// Probe availability without invalidating caches during a derived-data read.
+  Future<String?> peekInstalledPath(Textbook book) async {
     final file = await _file(book.pdfSha256);
     if (await file.exists() && await file.length() == book.fileSize) {
       return file.path;
     }
+    return null;
+  }
+
+  Future<String?> installedPath(Textbook book) async {
+    final path = await peekInstalledPath(book);
+    if (path != null) return path;
+    final file = await _file(book.pdfSha256);
     const TextbookCoverCache().forget(file.path);
     await contentCache(book).clear();
     return null;

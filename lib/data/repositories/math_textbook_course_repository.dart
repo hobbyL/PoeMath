@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
+import 'package:poemath/core/services/math_textbook_example_repair_service.dart';
 import 'package:poemath/core/services/textbook_content_cache.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/utils/logger.dart';
@@ -133,7 +134,7 @@ class MathTextbookCourseRepository {
       'kind': 'math-course',
       // Decoded course compatibility projections change independently from
       // the authored file digest. Bump this when read-time repair rules change.
-      'version': 2,
+      'version': 3,
       'source': sha256.convert(data).toString(),
     });
     final previous = _prepared;
@@ -149,9 +150,17 @@ class MathTextbookCourseRepository {
       key,
       decode: _decodePreparedCourse,
       encode: (course) => course.toJson(),
-      load: () async => data.length >= 64 * 1024
-          ? await _decodeLargeCourse(data)
-          : _decodeCourse(data),
+      load: () async {
+        final decoded = data.length >= 64 * 1024
+            ? await _decodeLargeCourse(data)
+            : _decodeCourse(data);
+        decoded.matchBook(book);
+        return repairMathTextbookCourseExamples(
+          course: decoded,
+          book: book,
+          files: _files,
+        );
+      },
     );
     course.matchBook(book);
     _prepared = (

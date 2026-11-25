@@ -8,10 +8,16 @@ import 'package:poemath/domain/textbook_printed_page.dart';
 
 /// 数学专用二维版面整理。输入完整页；选区仅由页面证据产生。
 class MathTextbookDraftParser {
-  const MathTextbookDraftParser({this.legacyLayout = false});
+  const MathTextbookDraftParser({
+    this.legacyLayout = false,
+    this.legacyExampleBadges = false,
+  });
 
   /// Only used to reproduce an earlier automatic draft before replacing it.
   final bool legacyLayout;
+
+  /// Reproduce saved automatic drafts before the large-circle badge fix.
+  final bool legacyExampleBadges;
 
   MathTextbookLesson parse({
     required String title,
@@ -476,8 +482,11 @@ class MathTextbookDraftParser {
             marker != null &&
             (explicitExample != null ||
                 bodyHeight > 0 &&
-                    combined.first.height >= bodyHeight * .95 &&
-                    badge != null);
+                    badge != null &&
+                    (combined.first.height >= bodyHeight * .95 ||
+                        !legacyLayout &&
+                            !legacyExampleBadges &&
+                            badge.height >= bodyHeight * 1.6));
         final heading =
             classifyContent &&
             marker == null &&
