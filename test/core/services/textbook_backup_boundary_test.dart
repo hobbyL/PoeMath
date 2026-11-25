@@ -11,11 +11,15 @@ import 'package:poemath/data/models/textbook_writing_attempt.dart';
 import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/data/repositories/textbook_download_repository.dart';
+import 'package:poemath/data/models/english_progress.dart';
+import 'package:poemath/data/repositories/english_progress_repository.dart';
+import 'package:poemath/domain/english_practice.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/textbook_fixture.dart';
 import '../../helpers/writing_attempt_fixture.dart';
+import '../../helpers/english_fixture.dart';
 
 void main() {
   setUp(() async {
@@ -126,6 +130,71 @@ void main() {
       HiveBoxes.settings.get(recognitionKey),
       jsonEncode(recognition.toJson()),
     );
+  });
+
+  test('英语单词自评随便携备份往返，保留词义复习日期和客观记录', () async {
+    final book = englishBook();
+    final progress = EnglishProgress(
+      profileId: 'child',
+      bookId: book.pdfSha256,
+      editionId: book.learningEditionId,
+      lastLessonId: 'unit-1-p2',
+      lastTargetId: 'word-1',
+      reviews: {
+        'unit-1-p2/word-1/meaning': EnglishReviewRecord(
+          fingerprint: englishWord().fingerprint,
+          selfCorrect: 2,
+          selfAgain: 1,
+          lastSelfRating: 'again',
+          nextDay: '2026-11-26',
+          lastDay: '2026-11-25',
+        ),
+      },
+    );
+    final key = EnglishProgressRepository.keyFor(
+      'child',
+      book.pdfSha256,
+      book.learningEditionId,
+    );
+    await HiveBoxes.settings.put(key, jsonEncode(progress.toJson()));
+
+    final backup = BackupService(), exported = await backup.exportToJson();
+    final learning =
+        (jsonDecode(exported) as Map<String, dynamic>)['textbookLearning']
+            as Map<String, dynamic>;
+    expect(
+      EnglishProgress.fromJson(jsonDecode(learning[key] as String)).toJson(),
+      progress.toJson(),
+    );
+    expect(backup.inspectJson(exported).counts['教材学习进度'], 1);
+
+    await HiveBoxes.settings.delete(key);
+    await backup.restoreFromJson(exported);
+    expect(
+      EnglishProgress.fromJson(
+        jsonDecode(HiveBoxes.settings.get(key) as String),
+      ).toJson(),
+      progress.toJson(),
+    );
+
+    final legacyProgress = EnglishProgress(
+      profileId: 'child',
+      bookId: book.pdfSha256,
+      editionId: book.learningEditionId,
+      reviews: {
+        'unit-1-p2/word-2/meaning': EnglishReviewRecord(
+          fingerprint: englishWord(id: 'word-2').fingerprint,
+          stage: 1,
+          correct: 1,
+          nextDay: '2026-11-27',
+          lastDay: '2026-11-24',
+        ),
+      },
+    );
+    final legacyJson = jsonEncode(legacyProgress.toJson());
+    expect(legacyJson, isNot(contains('lastSelfRating')));
+    await HiveBoxes.settings.put(key, legacyJson);
+    expect(backup.inspectJson(await backup.exportToJson()).counts['教材学习进度'], 1);
   });
 
   test('含作品的写字进度超过原 4 MiB 后仍能完整备份与恢复', () async {

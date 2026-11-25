@@ -10,8 +10,10 @@ import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/english_course.dart';
+import 'package:poemath/data/models/english_progress.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/english_course_repository.dart';
+import 'package:poemath/data/repositories/english_progress_repository.dart';
 import 'package:poemath/features/english/english_course_page.dart';
 import 'package:poemath/features/english/english_history_page.dart';
 import 'package:poemath/features/english/english_practice_page.dart';
@@ -54,6 +56,33 @@ class _Courses extends EnglishCourseRepository {
       ],
     });
   }
+}
+
+class _Progress extends EnglishProgressRepository {
+  _Progress(super.book, super.courses, {this.lastTargetId});
+  final String? lastTargetId;
+  final selfAssessments = <(String, bool)>[];
+
+  @override
+  EnglishProgress load() => EnglishProgress(
+    profileId: profileId,
+    bookId: book.pdfSha256,
+    editionId: book.learningEditionId,
+    lastLessonId: lastTargetId == null ? null : 'unit-1-p2',
+    lastTargetId: lastTargetId,
+  );
+
+  @override
+  Future<void> remember(String lessonId, {String? targetId}) async {}
+
+  @override
+  Future<void> selfAssessVocabulary(
+    String lessonId,
+    String targetId, {
+    required String expectedFingerprint,
+    required bool mastered,
+    DateTime? now,
+  }) async => selfAssessments.add((targetId, mastered));
 }
 
 void main() {
@@ -147,6 +176,193 @@ void main() {
     expect(find.text('复习'), findsNothing);
     expect(find.byType(EnglishPracticeHubPage), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+  testWidgets('学一学显示已审核词汇入口并提供词表、翻卡和客观练习', (tester) async {
+    final book = englishBook(), lesson = courses.course.lessons.single;
+    late _Progress learningProgress;
+    final router = GoRouter(
+      initialLocation: AppRoutes.englishBookOf(
+        book.pdfSha256,
+        lesson: lesson.id,
+        action: 'content',
+      ),
+      routes: [
+        GoRoute(
+          path: AppRoutes.englishLessonContent,
+          builder: (_, state) => EnglishLessonPage(
+            bookId: state.pathParameters['id']!,
+            lessonId: state.pathParameters['lesson']!,
+            sourceContent: true,
+          ),
+        ),
+        GoRoute(
+          path: AppRoutes.englishStudy,
+          builder: (_, state) => EnglishStudyPage(
+            bookId: state.pathParameters['id']!,
+            lessonId: state.pathParameters['lesson']!,
+            kind: state.uri.queryParameters['kind'],
+          ),
+        ),
+        GoRoute(
+          path: AppRoutes.englishPractice,
+          builder: (_, state) => EnglishPracticePage(
+            bookId: state.pathParameters['id']!,
+            kind: state.pathParameters['kind']!,
+            lessonId: state.uri.queryParameters['lesson'],
+          ),
+        ),
+        GoRoute(
+          path: AppRoutes.englishSource,
+          builder: (_, state) =>
+              Scaffold(body: Text('原书第 ${state.pathParameters['page']} 页')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ...overrides(),
+          englishProgressRepositoryProvider.overrideWith((ref, id) {
+            final book = ref.watch(englishBookProvider(id));
+            if (book == null) return null;
+            return learningProgress = _Progress(
+              book,
+              courses,
+              lastTargetId: 'word-2',
+            );
+          }),
+        ],
+        child: MaterialApp.router(
+          theme: AppTheme.resolve(
+            subject: AppSubject.poem,
+            brightness: Brightness.light,
+          ),
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final entry = find.byKey(
+      const ValueKey('english-approved-vocabulary-entry'),
+    );
+    expect(entry, findsOneWidget);
+    expect(tester.widget<AppTile>(entry).onTap, isNotNull);
+    expect(find.text('2 项可学'), findsOneWidget);
+    await tester.ensureVisible(find.text('单词与短语'));
+    await tester.tap(find.text('单词与短语'));
+    await tester.pumpAndSettle();
+    final vocabularyPage = find.byType(EnglishStudyPage);
+    expect(vocabularyPage, findsOneWidget);
+    expect(tester.widget<EnglishStudyPage>(vocabularyPage).kind, 'vocabulary');
+    expect(find.text('红风筝'), findsOneWidget);
+    expect(find.text('听一听'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('english-vocabulary-self-mastered')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('english-vocabulary-self-again')),
+      findsNothing,
+    );
+
+    await tester.ensureVisible(find.text('看原书').first);
+    await tester.tap(find.text('看原书').first);
+    await tester.pumpAndSettle();
+    expect(find.text('原书第 2 页'), findsOneWidget);
+    router.pop();
+    await tester.pumpAndSettle();
+
+    final meaningEntry = find.byKey(
+      const ValueKey('english-vocabulary-meaning-practice'),
+    );
+    await tester.ensureVisible(meaningEntry);
+    await tester.tap(find.text('词义选择'));
+    await tester.pumpAndSettle();
+    final meaningPractice = find.byType(EnglishPracticePage);
+    expect(meaningPractice, findsOneWidget);
+    expect(tester.widget<EnglishPracticePage>(meaningPractice).kind, 'meaning');
+    expect(
+      tester.widget<EnglishPracticePage>(meaningPractice).lessonId,
+      lesson.id,
+    );
+    router.pop();
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('翻卡自测'));
+    await tester.tap(find.text('翻卡自测'));
+    await tester.pumpAndSettle();
+    expect(find.text('蓝鸟'), findsOneWidget);
+    expect(find.text('blue bird'), findsNothing);
+    await tester.ensureVisible(find.text('下一个'));
+    await tester.tap(find.text('下一个'));
+    await tester.pumpAndSettle();
+    expect(find.text('红风筝'), findsOneWidget);
+    expect(find.text('red kite'), findsNothing);
+    await tester.tap(find.text('上一个'));
+    await tester.pumpAndSettle();
+    expect(find.text('蓝鸟'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('english-vocabulary-reveal')));
+    await tester.pumpAndSettle();
+    expect(find.text('blue bird'), findsOneWidget);
+    expect(find.text('听一听'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('english-vocabulary-self-mastered')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('english-vocabulary-self-again')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('english-vocabulary-self-again')),
+    );
+    await tester.pumpAndSettle();
+    expect(learningProgress.selfAssessments, [('word-2', false)]);
+    expect(find.text('红风筝'), findsOneWidget);
+    await tester.ensureVisible(find.text('词表'));
+    await tester.tap(find.text('词表'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('english-vocabulary-meaning-practice')),
+    );
+    expect(find.text('词义选择'), findsOneWidget);
+    expect(find.text('拼写练习'), findsOneWidget);
+    await tester.tap(find.text('拼写练习'));
+    await tester.pumpAndSettle();
+    final spellingPractice = find.byType(EnglishPracticePage);
+    expect(spellingPractice, findsOneWidget);
+    expect(
+      tester.widget<EnglishPracticePage>(spellingPractice).kind,
+      'spelling',
+    );
+    expect(
+      tester.widget<EnglishPracticePage>(spellingPractice).lessonId,
+      lesson.id,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets('只展示已审核词汇入口，没有审核词时不出现空入口', (tester) async {
+    final book = englishBook(),
+        lesson = courses.course.lessons.single.change({
+          'targets': [englishWord(approved: false).toJson()],
+        });
+    courses.course = englishCourse(book: book, lessons: [lesson]);
+    await show(
+      tester,
+      EnglishLessonPage(
+        bookId: book.pdfSha256,
+        lessonId: lesson.id,
+        sourceContent: true,
+      ),
+    );
+    expect(
+      find.byKey(const ValueKey('english-approved-vocabulary-entry')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
   });
   testWidgets('具体词句编辑保存后返回来源课时，其他课时内容不变', (tester) async {
     final book = englishBook();

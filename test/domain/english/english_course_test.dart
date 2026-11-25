@@ -145,6 +145,58 @@ void main() {
     expect(r.stage, 0);
     expect(r.nextDay, '2026-11-25');
   });
+  test('自评证据与客观答题分开；旧复习记录仍保持原 JSON 格式', () {
+    final q = buildEnglishQuestions(
+      englishCourse(),
+      EnglishPracticeKind.meaning,
+    ).first;
+    final legacy = <String, dynamic>{
+      'fingerprint': q.target.fingerprint,
+      'stage': 1,
+      'correct': 2,
+      'incorrect': 1,
+      'nextDay': '2026-11-24',
+      'lastDay': '2026-11-21',
+      'advancedDay': '2026-11-21',
+    };
+    expect(EnglishReviewRecord.fromJson(legacy).toJson(), legacy);
+
+    final selfRated = EnglishReviewRecord(
+      fingerprint: q.target.fingerprint,
+      stage: 1,
+      correct: 2,
+      incorrect: 1,
+      selfCorrect: 3,
+      selfAgain: 1,
+      lastSelfRating: 'again',
+      nextDay: '2026-11-24',
+      lastDay: '2026-11-21',
+      advancedDay: '2026-11-21',
+    );
+    final next = updateEnglishReview(
+      selfRated,
+      EnglishAnswer(
+        question: q,
+        answer: q.answers.first,
+        correct: true,
+        hinted: false,
+        skipped: false,
+      ),
+      DateTime(2026, 11, 24),
+    );
+    expect(next.correct, 3);
+    expect(next.incorrect, 1);
+    expect(next.stage, 2);
+    expect(next.nextDay, '2026-12-01');
+    expect(next.selfCorrect, 3);
+    expect(next.selfAgain, 1);
+    expect(next.lastSelfRating, 'again');
+    expect(
+      () =>
+          EnglishReviewRecord.fromJson({...legacy, 'lastSelfRating': 'maybe'}),
+      throwsFormatException,
+    );
+  });
   test('重复 Lesson / Story 标题不串单元，覆盖目录与附录', () {
     final pages = [
       (MathPageFixture(1)..text('目 录', .1, .1)).build().text,

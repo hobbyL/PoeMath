@@ -317,18 +317,25 @@ class EnglishReviewRecord {
     this.stage = 0,
     this.correct = 0,
     this.incorrect = 0,
+    this.selfCorrect = 0,
+    this.selfAgain = 0,
+    this.lastSelfRating,
     this.nextDay,
     this.lastDay,
     this.advancedDay,
   });
   final String fingerprint;
-  final int stage, correct, incorrect;
+  final int stage, correct, incorrect, selfCorrect, selfAgain;
+  final String? lastSelfRating;
   final String? nextDay, lastDay, advancedDay;
   Map<String, dynamic> toJson() => {
     'fingerprint': fingerprint,
     'stage': stage,
     'correct': correct,
     'incorrect': incorrect,
+    if (selfCorrect > 0) 'selfCorrect': selfCorrect,
+    if (selfAgain > 0) 'selfAgain': selfAgain,
+    if (lastSelfRating != null) 'lastSelfRating': lastSelfRating,
     'nextDay': nextDay,
     'lastDay': lastDay,
     'advancedDay': advancedDay,
@@ -346,11 +353,22 @@ class EnglishReviewRecord {
       return v as String?;
     }
 
+    final lastSelfRating = j['lastSelfRating'];
+    if (lastSelfRating != null &&
+        lastSelfRating != 'mastered' &&
+        lastSelfRating != 'again') {
+      throw const FormatException('单词自评状态无效');
+    }
     return EnglishReviewRecord(
       fingerprint: englishString(j['fingerprint'], max: 64),
       stage: englishInt(j['stage'], max: 4),
       correct: englishInt(j['correct']),
       incorrect: englishInt(j['incorrect']),
+      selfCorrect: j.containsKey('selfCorrect')
+          ? englishInt(j['selfCorrect'])
+          : 0,
+      selfAgain: j.containsKey('selfAgain') ? englishInt(j['selfAgain']) : 0,
+      lastSelfRating: lastSelfRating as String?,
       nextDay: day('nextDay'),
       lastDay: day('lastDay'),
       advancedDay: day('advancedDay'),
@@ -395,6 +413,9 @@ EnglishReviewRecord updateEnglishReview(
     incorrect:
         record.incorrect +
         (answer.correct == false || answer.parentPassed == false ? 1 : 0),
+    selfCorrect: record.selfCorrect,
+    selfAgain: record.selfAgain,
+    lastSelfRating: record.lastSelfRating,
     lastDay: day,
     advancedDay: advanced,
     nextDay: failed || record.nextDay == null || delayed

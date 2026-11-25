@@ -515,6 +515,16 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
     final pageNumbers = <int>{
       for (var page = lesson.startPage; page <= lesson.endPage; page++) page,
     };
+    final approvedVocabulary = readOnlyContent
+        ? lesson.targets
+              .where(
+                (target) =>
+                    target.approved &&
+                    target.kind == EnglishTargetKind.vocabulary &&
+                    target.meaning.isNotEmpty,
+              )
+              .toList()
+        : const <EnglishTarget>[];
     final targetsByPage = <int, List<EnglishTarget>>{};
     final sourceByTarget = <String, EnglishSource>{};
     final originalOrder = {
@@ -584,6 +594,28 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (approvedVocabulary.isNotEmpty) ...[
+            AppTileGroup(
+              children: [
+                AppTile(
+                  key: const ValueKey('english-approved-vocabulary-entry'),
+                  icon: Icons.abc,
+                  iconColor: theme.colorScheme.primary,
+                  title: '单词与短语',
+                  subtitle: '${approvedVocabulary.length} 项可学',
+                  onTap: () => context.push(
+                    AppRoutes.englishBookOf(
+                      bookId,
+                      lesson: lessonId,
+                      action: 'study',
+                      kind: EnglishTargetKind.vocabulary.name,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: SpacingTokens.md),
+          ],
           LayoutBuilder(
             builder: (context, constraints) => Align(
               alignment: Alignment.topCenter,
