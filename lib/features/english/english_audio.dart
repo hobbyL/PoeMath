@@ -10,6 +10,7 @@ import 'package:poemath/core/services/tts/narration_player.dart';
 import 'package:poemath/core/services/tts/narration_session.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/models/english_course.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
@@ -98,8 +99,24 @@ class EnglishAudio extends ChangeNotifier {
     return _halt();
   }
 
-  Future<void> _halt() async {
-    _generation++;
+  Future<void> _release(
+    Future<void> Function() release,
+    String resource,
+  ) async {
+    try {
+      await release();
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '英语音频清理失败：$resource',
+        tag: 'EnglishAudio',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _halt({String status = ''}) async {
+    final generation = ++_generation;
     _limit?.cancel();
     _limit = null;
     final narration = _narration,
@@ -113,18 +130,18 @@ class EnglishAudio extends ChangeNotifier {
     _pcm = null;
     recording = false;
     busy = false;
-    message = '';
-    await narration?.cancel();
-    await player?.dispose();
-    await subscription?.cancel();
+    message = status;
+    // 一个资源释放失败也必须继续关闭麦克风；回调只拥有它捕获的会话。
+    if (narration != null) await _release(narration.cancel, '示范');
+    if (player != null) await _release(player.dispose, '回听');
+    if (subscription != null) await _release(subscription.cancel, '录音流');
     if (recorder != null) {
-      try {
-        await recorder.cancel();
-      } finally {
-        await recorder.dispose();
-      }
+      await _release(recorder.cancel, '麦克风');
+      await _release(recorder.dispose, '录音器');
     }
-    _emit();
+    // 页面 dispose 也会调用 stop；即使没有资源，也须等监听者卸载后通知。
+    await Future<void>.value();
+    if (generation == _generation) _emit();
   }
 
   Future<bool> speak(
@@ -186,7 +203,7 @@ class EnglishAudio extends ChangeNotifier {
         final narration = _narration;
         _narration = null;
         await narration?.cancel();
-        if (success) message = '示范播放完成';
+        if (success && generation == _generation) message = '示范播放完成';
       }
       return success;
     } on Object {
@@ -241,8 +258,8 @@ class EnglishAudio extends ChangeNotifier {
         },
         onError: (Object _) {
           if (generation != _generation) return;
-          message = '录音中断，请重试';
-          unawaited(stop());
+          _request++;
+          unawaited(_halt(status: '录音中断，请重试'));
         },
       );
       _limit = Timer(
@@ -252,34 +269,43 @@ class EnglishAudio extends ChangeNotifier {
       _emit();
     } on Object catch (error) {
       if (generation == _generation) {
-        await stop();
-        message = error is FormatException
-            ? error.message.toString()
-            : '无法启动录音，请重试';
-        _emit();
+        _request++;
+        await _halt(
+          status: error is FormatException
+              ? error.message.toString()
+              : '无法启动录音，请重试',
+        );
       }
     }
   }
 
   Future<void> finishRecording() async {
     if (!recording) return;
-    final generation = _generation;
+    final generation = _generation,
+        recorder = _recorder,
+        subscription = _subscription,
+        pcm = _pcm;
     recording = false;
     busy = true;
     _limit?.cancel();
     _emit();
     try {
-      await _recorder?.stop();
-      await _subscription?.cancel();
+      await recorder?.stop();
       if (generation != _generation) return;
-      _unsaved = _pcm?.takeBytes();
-      await _recorder?.dispose();
+      await subscription?.cancel();
+      if (generation != _generation) return;
+      await recorder?.dispose();
+      if (generation != _generation) return;
+      _unsaved = pcm?.takeBytes();
       _recorder = null;
       _subscription = null;
       _pcm = null;
       message = '录音已结束，请回听并保存';
     } on Object {
-      message = '录音未完成，请重新录制';
+      if (generation == _generation) {
+        _request++;
+        await _halt(status: '录音未完成，请重新录制');
+      }
     } finally {
       if (generation == _generation) {
         busy = false;
@@ -356,10 +382,13 @@ class EnglishAudio extends ChangeNotifier {
       }
     } finally {
       if (generation == _generation) {
-        await _player?.dispose();
+        final player = _player;
         _player = null;
-        busy = false;
-        _emit();
+        if (player != null) await _release(player.dispose, '回听');
+        if (generation == _generation) {
+          busy = false;
+          _emit();
+        }
       }
     }
   }

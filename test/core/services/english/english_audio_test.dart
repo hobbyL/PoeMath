@@ -16,6 +16,9 @@ class _Recorder implements SpeechAudioRecorder {
   final stream = StreamController<Uint8List>.broadcast();
   bool permitted = true, started = false, disposed = false;
   Completer<bool>? permission;
+  Completer<void>? stopping;
+  Completer<void>? releasing, disposing;
+  Object? stopError;
   @override
   Future<bool> hasPermission() async =>
       permission == null ? permitted : await permission!.future;
@@ -27,6 +30,8 @@ class _Recorder implements SpeechAudioRecorder {
 
   @override
   Future<void> stop() async {
+    await stopping?.future;
+    if (stopError != null) throw stopError!;
     started = false;
   }
 
@@ -37,6 +42,8 @@ class _Recorder implements SpeechAudioRecorder {
 
   @override
   Future<void> dispose() async {
+    if (disposing != null && !disposing!.isCompleted) disposing!.complete();
+    await releasing?.future;
     disposed = true;
     await stream.close();
   }
@@ -118,10 +125,10 @@ void main() {
       cache: MemoryNarrationCache(),
       store: EnglishRecordingStore(directory: () async => root),
     );
-    final pending = audio.speak(
-      'Hello there.',
-      {'locale': 'en-US', 'name': 'English'},
-    );
+    final pending = audio.speak('Hello there.', {
+      'locale': 'en-US',
+      'name': 'English',
+    });
     while (players.isEmpty || players.single.audio.isEmpty) {
       await Future<void>.delayed(Duration.zero);
     }
@@ -208,4 +215,140 @@ void main() {
     audio.dispose();
     tts.dispose();
   });
+
+  test('录音流中断保留可见错误，释放麦克风后可重新录制', () async {
+    final recorders = <_Recorder>[];
+    final tts = TtsService(NarrationSettings(), flutterTts: NarrationEngine());
+    final audio = EnglishAudio(
+      bookId: englishBook().pdfSha256,
+      tts: tts,
+      cache: MemoryNarrationCache(),
+      store: EnglishRecordingStore(directory: () async => root),
+      recorderFactory: () {
+        final recorder = _Recorder();
+        recorders.add(recorder);
+        return recorder;
+      },
+    );
+    final interrupted = Completer<void>();
+    var awaitingError = false;
+    audio.addListener(() {
+      if (awaitingError &&
+          !audio.recording &&
+          !audio.busy &&
+          !interrupted.isCompleted) {
+        interrupted.complete();
+      }
+    });
+    try {
+      await audio.startRecording();
+      awaitingError = true;
+      recorders.single.stream.addError(StateError('microphone interrupted'));
+      await interrupted.future.timeout(const Duration(seconds: 2));
+      expect(audio.message, '录音中断，请重试');
+      expect(audio.hasUnsaved, isFalse);
+      expect(recorders.single.disposed, isTrue);
+      await audio.startRecording();
+      expect(audio.recording, isTrue);
+      expect(recorders.last.started, isTrue);
+      expect(audio.message, '正在录音，最长一分钟');
+    } finally {
+      await audio.stop();
+      audio.dispose();
+      tts.dispose();
+    }
+  });
+
+  test('结束录音失败也释放麦克风，不留下未完成片段', () async {
+    final recorder = _Recorder()..stopError = StateError('stop failed');
+    final tts = TtsService(NarrationSettings(), flutterTts: NarrationEngine());
+    final audio = EnglishAudio(
+      bookId: englishBook().pdfSha256,
+      tts: tts,
+      cache: MemoryNarrationCache(),
+      store: EnglishRecordingStore(directory: () async => root),
+      recorderFactory: () => recorder,
+    );
+    try {
+      await audio.startRecording();
+      recorder.stream.add(Uint8List(3200));
+      await Future<void>.delayed(Duration.zero);
+      await audio.finishRecording();
+      expect(audio.message, '录音未完成，请重新录制');
+      expect(audio.recording, isFalse);
+      expect(audio.busy, isFalse);
+      expect(recorder.disposed, isTrue);
+      expect(recorder.started, isFalse);
+      expect(audio.hasUnsaved, isFalse);
+    } finally {
+      await audio.stop();
+      audio.dispose();
+      tts.dispose();
+    }
+  });
+
+  for (final (stage, fail) in [
+    ('stop', false),
+    ('stop', true),
+    ('dispose', false),
+  ]) {
+    test('旧录音结束晚回调不取消新录音或覆盖状态（$stage，失败=$fail）', () async {
+      final gate = Completer<void>();
+      final first = _Recorder()
+        ..stopping = stage == 'stop' ? gate : null
+        ..releasing = stage == 'dispose' ? gate : null
+        ..disposing = Completer<void>();
+      final second = _Recorder();
+      final recorders = [first, second].iterator;
+      final tts = TtsService(
+        NarrationSettings(),
+        flutterTts: NarrationEngine(),
+      );
+      final store = EnglishRecordingStore(directory: () async => root);
+      final audio = EnglishAudio(
+        bookId: englishBook().pdfSha256,
+        tts: tts,
+        cache: MemoryNarrationCache(),
+        store: store,
+        recorderFactory: () {
+          recorders.moveNext();
+          return recorders.current;
+        },
+      );
+      try {
+        await audio.startRecording();
+        final ending = audio.finishRecording();
+        if (stage == 'dispose') await first.disposing!.future;
+        final stopping = audio.stop();
+        if (stage == 'stop') await stopping;
+        await audio.startRecording();
+        if (fail) {
+          gate.completeError(StateError('old stop failed'));
+        } else {
+          gate.complete();
+        }
+        await ending;
+        await stopping;
+        expect(audio.recording, isTrue);
+        expect(audio.message, '正在录音，最长一分钟');
+        expect(second.stream.hasListener, isTrue);
+        final pcm = Uint8List.fromList(List.filled(3200, 7));
+        second.stream.add(pcm);
+        await Future<void>.delayed(Duration.zero);
+        await audio.finishRecording();
+        final id = await audio.saveRecording();
+        final path = await store.path(
+          audio.profileId,
+          id,
+          bookId: audio.bookId,
+        );
+        expect((await File(path!).readAsBytes()).sublist(44), pcm);
+      } finally {
+        if (!gate.isCompleted) gate.complete();
+        await audio.stop();
+        audio.dispose();
+        tts.dispose();
+      }
+    });
+  }
 }
