@@ -149,6 +149,8 @@ const Map<String, String> _settingsValueType = <String, String>{
   'llm_model_assistant': 'string', // AI 助手选中的模型名
   'llm_provider_word_problem': 'string', // AI 出题绑定的配置 id
   'llm_model_word_problem': 'string', // AI 出题选中的模型名
+  'llm_provider_english_phrase': 'string',
+  'llm_model_english_phrase': 'string',
   'llm_provider_picture_story': 'string', // 看图说话出题绑定
   'llm_model_picture_story': 'string', // 看图说话视觉模型
   'llm_provider_picture_story_feedback': 'string', // 独立表达点评
@@ -169,6 +171,7 @@ const Map<String, String> _settingsValueType = <String, String>{
   'llm_math_explain_prompt': 'string', // 口算解析 system prompt 覆盖
   'llm_assistant_prompt': 'string', // AI 助手 system prompt 覆盖
   'llm_word_problem_prompt': 'string', // AI 应用题素材选择提示词
+  SettingsRepository.englishPhraseGenerationPromptKey: 'string', // 英语短语教学要求
   'llm_picture_story_prompt': 'string', // 旧版共享教学偏好
   'llm_picture_story_image_prompt': 'string', // 看图说话生图要求
   'llm_picture_story_question_prompt': 'string', // 根据图片出题要求

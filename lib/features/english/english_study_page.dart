@@ -18,9 +18,12 @@ import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/english_progress_repository.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/domain/english_practice.dart';
+import 'package:poemath/domain/english_phrase_generation.dart';
 import 'package:poemath/features/english/english_audio.dart';
+import 'package:poemath/features/english/english_phrase_controller.dart';
 import 'package:poemath/features/english/english_providers.dart';
 import 'package:poemath/features/english/english_widgets.dart';
+import 'package:poemath/features/home/home_section.dart';
 
 class EnglishStudyPage extends ConsumerStatefulWidget {
   const EnglishStudyPage({
@@ -42,6 +45,7 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
   late final _audioKey = englishAudioKey(widget.bookId);
   StreamSubscription<String>? _profiles;
   int _vocabularyPlaybackRevision = 0;
+  EnglishPhraseController? _phrases;
   @override
   void initState() {
     super.initState();
@@ -56,11 +60,13 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
       unawaited(_stopVocabularyAudio());
+      _phrases?.cancel();
     }
   }
 
   @override
   void dispose() {
+    _phrases?.cancel(notify: false);
     unawaited(_stopVocabularyAudio());
     _profiles?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -102,6 +108,7 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
   }
 
   Future<void> _openVocabularyDetail(EnglishTarget target) async {
+    _phrases?.cancel();
     await _remember(target.id);
     await _stopVocabularyAudio();
     if (!mounted) return;
@@ -118,6 +125,7 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
     EnglishTarget target,
     EnglishPracticeKind kind,
   ) async {
+    _phrases?.cancel();
     await _remember(target.id);
     await _stopVocabularyAudio();
     if (!mounted) return;
@@ -142,8 +150,7 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
     final vocabularyTargets = widget.kind == 'vocabulary'
         ? ref
                   .watch(englishCourseProvider(widget.bookId))
-                  .asData
-                  ?.value
+                  .valueOrNull
                   ?.lesson(widget.lessonId)
                   ?.targets
                   .where((target) => target.isLearnableVocabulary)
@@ -155,6 +162,14 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
               .where((target) => target.id == widget.targetId)
               .firstOrNull
         : null;
+    _phrases =
+        widget.kind == 'vocabulary' &&
+            !isVocabularyDetail &&
+            vocabularyTargets.any((t) => isEnglishPhraseSeed(t) || t.isAiPhrase)
+        ? ref.watch(
+            englishPhraseControllerProvider((widget.bookId, widget.lessonId)),
+          )
+        : null;
     return AppScaffold(
       backgroundScene: PineInkScene.study,
       appBar: AppBar(
@@ -164,6 +179,8 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
               ? '学一学'
               : widget.targetId == null
               ? '单词与短语'
+              : detailTarget?.isAiPhrase == true
+              ? '短语详情'
               : '单词详情',
         ),
         actions: [
@@ -225,7 +242,7 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
                   theme,
                 );
               }
-              return _vocabularyLearning(targets, audio, voice, theme);
+              return _vocabularyLearning(lesson, targets, audio, voice, theme);
             }
             return ListView(
               padding: const EdgeInsets.all(SpacingTokens.md),
@@ -324,6 +341,7 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
   }
 
   Widget _vocabularyLearning(
+    EnglishLesson lesson,
     List<EnglishTarget> targets,
     EnglishAudio audio,
     Map<String, String>? voice,
@@ -335,6 +353,10 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
         title: '本课还没有可学习的单词',
       );
     }
+    final original = targets.where((t) => !t.isAiPhrase).toList();
+    final phrases = targets.where((t) => t.isAiPhrase).toList();
+    final controller = _phrases;
+    final remaining = englishPhraseSeeds(lesson).length;
     return ListView(
       key: const ValueKey('english-vocabulary-learning'),
       padding: const EdgeInsets.all(SpacingTokens.md),
@@ -344,39 +366,102 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
             padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
             child: Text(audio.message),
           ),
-        ResponsiveCardGrid(
-          preferredTileWidth: ResponsiveLayout.compactCardWidth,
-          children: [
-            for (final target in targets)
-              AppTile(
-                key: ValueKey('english-vocabulary-word-${target.id}'),
-                layout: AppTileLayout.stacked,
-                iconColor: theme.colorScheme.primary,
-                title: target.text,
-                titleWrap: true,
-                subtitle: target.meaning,
-                trailingPrefix: target.hasSpeech
-                    ? IconButton(
-                        tooltip: '朗读 ${target.text}',
-                        alignment: AlignmentDirectional.centerEnd,
-                        padding: EdgeInsets.zero,
-                        style: IconButton.styleFrom(
-                          minimumSize: const Size.square(
-                            SpacingTokens.minTapTarget,
-                          ),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () => _playVocabulary(target, voice),
-                        icon: const Icon(Icons.volume_up_outlined),
-                      )
-                    : null,
-                onTap: () => _openVocabularyDetail(target),
-              ),
+        _vocabularyGrid(original, voice, theme),
+        if (controller != null) ...[
+          const SizedBox(height: SpacingTokens.lg),
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: SpacingTokens.md,
+            runSpacing: SpacingTokens.xs,
+            children: [
+              const HomeSectionHeading('拓展短语'),
+              if (controller.busy)
+                TextButton.icon(
+                  key: const ValueKey('english-phrase-cancel'),
+                  onPressed: controller.cancel,
+                  icon: const Icon(Icons.stop_circle_outlined),
+                  label: Text('取消 ${controller.completed}/${controller.total}'),
+                )
+              else if (controller.needsConfiguration)
+                TextButton(
+                  onPressed: () async {
+                    controller.cancel();
+                    await context.push<void>(AppRoutes.llmSettings);
+                    if (mounted) controller.settingsReturned();
+                  },
+                  child: const Text('去设置'),
+                )
+              else if (remaining > 0 || controller.hasUnsaved)
+                TextButton.icon(
+                  key: const ValueKey('english-phrase-generate'),
+                  onPressed: controller.generate,
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: Text(
+                    controller.hasUnsaved
+                        ? '重试保存'
+                        : phrases.isEmpty
+                        ? '生成短语'
+                        : '补齐短语',
+                  ),
+                ),
+            ],
+          ),
+          if (controller.busy) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            const LinearProgressIndicator(),
           ],
-        ),
+          if (controller.message != null) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            Text(
+              controller.message!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          if (phrases.isNotEmpty) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            _vocabularyGrid(phrases, voice, theme),
+          ],
+        ],
       ],
     );
   }
+
+  Widget _vocabularyGrid(
+    List<EnglishTarget> targets,
+    Map<String, String>? voice,
+    ThemeData theme,
+  ) => ResponsiveCardGrid(
+    preferredTileWidth: ResponsiveLayout.compactCardWidth,
+    children: [
+      for (final target in targets)
+        AppTile(
+          key: ValueKey('english-vocabulary-word-${target.id}'),
+          layout: AppTileLayout.stacked,
+          iconColor: theme.colorScheme.primary,
+          title: target.text,
+          titleWrap: true,
+          subtitle: target.isAiPhrase
+              ? '${target.meaning}\n${target.phraseSource!.text} · 拓展'
+              : target.meaning,
+          trailingPrefix: target.hasSpeech
+              ? IconButton(
+                  tooltip: '朗读 ${target.text}',
+                  alignment: AlignmentDirectional.centerEnd,
+                  padding: EdgeInsets.zero,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size.square(SpacingTokens.minTapTarget),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => _playVocabulary(target, voice),
+                  icon: const Icon(Icons.volume_up_outlined),
+                )
+              : null,
+          onTap: () => _openVocabularyDetail(target),
+        ),
+    ],
+  );
 
   Widget _vocabularyDetail(
     BuildContext context,
@@ -424,6 +509,16 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
                     textAlign: TextAlign.center,
                     style: theme.textTheme.titleMedium,
                   ),
+                  if (target.isAiPhrase) ...[
+                    const SizedBox(height: SpacingTokens.sm),
+                    Text(
+                      '${target.phraseSource!.text} · 拓展短语',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                   if (target.picture != null) ...[
                     const SizedBox(height: SpacingTokens.md),
                     EnglishSourceImage(book: book, source: target.picture!),

@@ -142,7 +142,7 @@ class _EnglishCoursePageState extends ConsumerState<EnglishCoursePage>
                                 title: lesson.title,
                                 titleMaxLines: 2,
                                 subtitle: widget.review
-                                    ? 'PDF ${lesson.startPage}–${lesson.endPage} · 已核对 ${lesson.approvedCount}/${lesson.targets.length}${lesson.prepared ? '' : ' · 待整理'}${course.pending.any((l) => l.id == lesson.id) ? ' · 有新稿' : ''}'
+                                    ? 'PDF ${lesson.startPage}–${lesson.endPage} · 已核对 ${lesson.approvedCount}/${lesson.textbookTargets.length}${lesson.prepared ? '' : ' · 待整理'}${course.pending.any((l) => l.id == lesson.id) ? ' · 有新稿' : ''}'
                                     : 'PDF ${lesson.startPage}–${lesson.endPage} · ${lesson.availableCount} 项可学',
                                 onTap: () => _open(lesson),
                               ),
@@ -524,7 +524,7 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
     final originalOrder = {
       for (final (index, target) in lesson.targets.indexed) target.id: index,
     };
-    for (final target in lesson.targets) {
+    for (final target in lesson.textbookTargets) {
       if (readOnlyContent &&
           !target.isAvailableForChild &&
           target.kind != EnglishTargetKind.sentence) {
@@ -721,7 +721,7 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
             ),
           ),
           if (readOnlyContent &&
-              !lesson.targets.any(
+              !lesson.textbookTargets.any(
                 (target) =>
                     target.isAvailableForChild ||
                     target.kind == EnglishTargetKind.sentence,
@@ -740,12 +740,12 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '当前 ${lesson.targets.length} 项 / 候选 ${candidateLesson.targets.length} 项',
+                      '当前 ${lesson.textbookTargets.length} 项 / 候选 ${candidateLesson.textbookTargets.length} 项',
                     ),
                     ExpansionTile(
                       title: const Text('对照候选内容'),
                       children: [
-                        for (final target in candidateLesson.targets)
+                        for (final target in candidateLesson.textbookTargets)
                           Padding(
                             padding: const EdgeInsets.all(SpacingTokens.sm),
                             child: Text(

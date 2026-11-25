@@ -36,6 +36,7 @@ const Map<LlmScenario, IconData> _scenarioIcons = {
   LlmScenario.pictureStoryFeedback: Icons.rate_review_outlined,
   LlmScenario.poemExplain: Icons.menu_book_outlined,
   LlmScenario.mathExplain: Icons.calculate_outlined,
+  LlmScenario.englishPhrase: Icons.translate_outlined,
   LlmScenario.assistant: Icons.smart_toy_outlined,
 };
 

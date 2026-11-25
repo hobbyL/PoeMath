@@ -31,6 +31,12 @@ enum LlmScenario {
   /// 算数题 AI 解析。
   mathExplain('llm_provider_math_explain', 'llm_model_math_explain', '口算解析'),
 
+  englishPhrase(
+    'llm_provider_english_phrase',
+    'llm_model_english_phrase',
+    '英语短语',
+  ),
+
   /// AI 助手（App 内对话助手）。
   assistant('llm_provider_assistant', 'llm_model_assistant', 'AI 助手');
 

@@ -12,9 +12,12 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/english_progress.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/repositories/english_progress_repository.dart';
+import 'package:poemath/data/repositories/english_course_repository.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
+import 'package:poemath/domain/english_practice.dart';
 
 import '../../../helpers/english_fixture.dart';
+import '../../../helpers/english_phrase_fixture.dart';
 import '../../../helpers/hive_test_helper.dart';
 import '../../../helpers/parent_access_test_helper.dart';
 
@@ -31,6 +34,46 @@ void main() {
     lockParentForTesting();
     await tearDownHiveForTesting();
     await root.delete(recursive: true);
+  });
+  test('拓展短语答题快照及复习记录真实备份往返，课程仍保存在本机', () async {
+    final book = englishBook(), course = withPhrases(phraseCourse());
+    final courses = EnglishCourseRepository(
+      directoryProvider: () async => root,
+    );
+    await courses.seed(book, course, check: () {});
+    final progress = EnglishProgressRepository(book, courses);
+    final question = buildEnglishQuestions(
+      course,
+      EnglishPracticeKind.spelling,
+    ).firstWhere((q) => q.target.isAiPhrase);
+    await progress.complete(
+      EnglishAttempt(
+        id: 'generated-phrase',
+        lessonId: question.lessonId,
+        title: '短语拼写',
+        kind: 'practice',
+        completedAt: DateTime(2026, 11, 25),
+        durationSeconds: 10,
+        answers: [
+          EnglishAnswer(
+            question: question,
+            answer: question.answers.single,
+            correct: true,
+          ),
+        ],
+      ),
+    );
+    final original = progress.load().toJson(portable: true);
+    final backup = BackupService(), raw = await BackupService().exportToJson();
+    backup.inspectJson(raw);
+    await HiveBoxes.settings.delete(progress.key);
+    await backup.restoreFromJson(raw);
+    expect(
+      EnglishProgressRepository(book, courses).load().toJson(portable: true),
+      original,
+    );
+    expect((await courses.load(book))!.toJson(), course.toJson());
+    expect((jsonDecode(raw) as Map).containsKey('englishCourses'), isFalse);
   });
   test('录音写为 PCM16 WAV，重启可读，权限失效无半成品，不接受路径标识', () async {
     final store = EnglishRecordingStore(directory: () async => root),

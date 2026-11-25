@@ -287,6 +287,16 @@ class _EnglishTargetEditorState extends ConsumerState<EnglishTargetEditor>
         .watch(englishCourseProvider(widget.bookId))
         .valueOrNull;
     final currentLesson = currentCourse?.lesson(widget.lessonId);
+    if (currentCourse?.target(widget.lessonId, widget.targetId)?.isAiPhrase ==
+        true) {
+      return AppScaffold(
+        appBar: AppBar(title: const Text('拓展短语'), centerTitle: true),
+        body: const AppEmptyState(
+          icon: Icons.translate_outlined,
+          title: '请从单词与短语中学习',
+        ),
+      );
+    }
     return AppScaffold(
       appBar: AppBar(title: const Text('编辑英语内容')),
       bottomNavigationBar: currentBook == null || currentLesson == null
@@ -359,6 +369,13 @@ class _EnglishTargetEditorState extends ConsumerState<EnglishTargetEditor>
             final lesson = (_base ?? course).lesson(widget.lessonId);
             if (lesson == null) {
               return const AppEmptyState(icon: Icons.edit_note, title: '课时已移除');
+            }
+            if (course.target(widget.lessonId, widget.targetId)?.isAiPhrase ==
+                true) {
+              return const AppEmptyState(
+                icon: Icons.translate_outlined,
+                title: '请从单词与短语中学习',
+              );
             }
             _init(course, lesson);
             return ListView(

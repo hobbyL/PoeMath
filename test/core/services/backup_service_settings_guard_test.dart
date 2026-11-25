@@ -108,6 +108,7 @@ Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
   'llm_poem_explain_prompt': '自定义诗词讲解提示词',
   'llm_math_explain_prompt': '自定义口算解析提示词',
   'llm_word_problem_prompt': '优先选择自然观察情境',
+  'llm_english_phrase_prompt': '使用自然的家庭成员短语',
   'llm_picture_story_prompt': '引导先观察再表达',
   'llm_picture_story_image_prompt': '儿童水彩插图，突出人物互动',
   'llm_picture_story_question_prompt': '每题三个简短观察问题',

@@ -1608,6 +1608,21 @@ class SettingsRepository {
   String? get wordProblemGenerationPromptOverride =>
       _generationPromptOverride(_keyWordProblemGenerationPrompt);
 
+  static const englishPhraseGenerationPromptKey = 'llm_english_phrase_prompt';
+
+  String? get englishPhraseGenerationPromptOverride =>
+      _generationPromptOverride(englishPhraseGenerationPromptKey);
+
+  Future<void> setEnglishPhraseGenerationPrompt(String value) =>
+      _setGenerationPrompt(
+        englishPhraseGenerationPromptKey,
+        value,
+        maxLength: kEnglishPhrasePromptMaxLength,
+      );
+
+  Future<void> resetEnglishPhraseGenerationPrompt() =>
+      setEnglishPhraseGenerationPrompt('');
+
   /// 旧版共享教学偏好，作为尚未分别设置的两阶段提示词的兼容来源。
   String? get pictureStoryGenerationPromptOverride =>
       _generationPromptOverride(_keyPictureStoryGenerationPrompt);

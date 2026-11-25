@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
@@ -67,15 +68,22 @@ void main() {
     await settings.setPictureStoryGenerationPrompt('引导先观察再表达');
     final backup = BackupService();
     final data = await backup.exportToJson();
-    final exported = (jsonDecode(data) as Map<String, dynamic>)['settings']
-        as Map<String, dynamic>;
-    expect({
-      for (final key in ['llm_word_problem_prompt', 'llm_picture_story_prompt'])
-        key: exported[key],
-    }, {
-      'llm_word_problem_prompt': '优先选择自然观察情境',
-      'llm_picture_story_prompt': '引导先观察再表达',
-    });
+    final exported =
+        (jsonDecode(data) as Map<String, dynamic>)['settings']
+            as Map<String, dynamic>;
+    expect(
+      {
+        for (final key in [
+          'llm_word_problem_prompt',
+          'llm_picture_story_prompt',
+        ])
+          key: exported[key],
+      },
+      {
+        'llm_word_problem_prompt': '优先选择自然观察情境',
+        'llm_picture_story_prompt': '引导先观察再表达',
+      },
+    );
     await settings.resetWordProblemGenerationPrompt();
     await settings.resetPictureStoryGenerationPrompt();
     await backup.restoreFromJson(data);
@@ -85,8 +93,9 @@ void main() {
       <String, Object>{},
       {'llm_word_problem_prompt': 1, 'llm_picture_story_prompt': false},
     ]) {
-      await backup
-          .restoreFromJson(jsonEncode({'version': 1, 'settings': values}));
+      await backup.restoreFromJson(
+        jsonEncode({'version': 1, 'settings': values}),
+      );
       expect(settings.wordProblemGenerationPromptOverride, '优先选择自然观察情境');
       expect(settings.pictureStoryGenerationPromptOverride, '引导先观察再表达');
     }
@@ -100,5 +109,64 @@ void main() {
     expect(settings.pictureStoryGenerationSignature, isNot(signature));
     await settings.resetPictureStoryGenerationPrompt();
     expect(settings.pictureStoryGenerationSignature, signature);
+  });
+
+  test('英语短语提示词独立保存，限制长度和家长权限，空白或重置回默认', () async {
+    const key = SettingsRepository.englishPhraseGenerationPromptKey;
+    expect(settings.englishPhraseGenerationPromptOverride, isNull);
+    await settings.setWordProblemGenerationPrompt('数学专用要求');
+    await settings.setEnglishPhraseGenerationPrompt('  使用常见家庭搭配  ');
+    expect(
+      SettingsRepository().englishPhraseGenerationPromptOverride,
+      '使用常见家庭搭配',
+    );
+    await expectLater(
+      settings.setEnglishPhraseGenerationPrompt(
+        '词' * (kEnglishPhrasePromptMaxLength + 1),
+      ),
+      throwsFormatException,
+    );
+    expect(settings.englishPhraseGenerationPromptOverride, '使用常见家庭搭配');
+    lockParentForTesting();
+    for (final work in [
+      () => settings.setEnglishPhraseGenerationPrompt('未经授权'),
+      settings.resetEnglishPhraseGenerationPrompt,
+    ]) {
+      await expectLater(work(), throwsA(isA<ParentAccessDenied>()));
+    }
+    expect(settings.englishPhraseGenerationPromptOverride, '使用常见家庭搭配');
+    await unlockParentForTesting();
+    await settings.setEnglishPhraseGenerationPrompt('   ');
+    expect(HiveBoxes.settings.containsKey(key), isFalse);
+    await settings.setEnglishPhraseGenerationPrompt('新的要求');
+    await settings.resetEnglishPhraseGenerationPrompt();
+    expect(HiveBoxes.settings.containsKey(key), isFalse);
+    expect(settings.wordProblemGenerationPromptOverride, '数学专用要求');
+    for (final raw in [42, '  ']) {
+      await HiveBoxes.settings.put(key, raw);
+      expect(settings.englishPhraseGenerationPromptOverride, isNull);
+      expect(HiveBoxes.settings.get(key), raw);
+    }
+  });
+
+  test('英语短语提示词真实备份往返，旧备份或坏类型保留本机内容', () async {
+    const key = SettingsRepository.englishPhraseGenerationPromptKey;
+    await settings.setEnglishPhraseGenerationPrompt('优先自然的家庭搭配');
+    final backup = BackupService();
+    final data = await backup.exportToJson();
+    final exported = jsonDecode(data) as Map<String, dynamic>;
+    expect((exported['settings'] as Map<String, dynamic>)[key], '优先自然的家庭搭配');
+    await settings.resetEnglishPhraseGenerationPrompt();
+    await backup.restoreFromJson(data);
+    expect(settings.englishPhraseGenerationPromptOverride, '优先自然的家庭搭配');
+    for (final values in [
+      <String, Object>{},
+      {key: false},
+    ]) {
+      await backup.restoreFromJson(
+        jsonEncode({'version': 1, 'settings': values}),
+      );
+      expect(settings.englishPhraseGenerationPromptOverride, '优先自然的家庭搭配');
+    }
   });
 }
