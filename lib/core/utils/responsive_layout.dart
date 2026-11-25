@@ -18,6 +18,9 @@ class ResponsiveLayout {
   /// 窄屏（平板竖屏）断点：两列。
   static const double mediumBreakpoint = 600;
 
+  /// 文字与操作上下排列的紧凑卡片目标列宽；交给栅格随字号缩放。
+  static const double compactCardWidth = 160;
+
   /// 按可用宽度返回栅格列数：≥900 三列，≥600 两列，否则一列。
   ///
   /// 断点与 [wideBreakpoint] / [mediumBreakpoint] 保持一致，页面若需

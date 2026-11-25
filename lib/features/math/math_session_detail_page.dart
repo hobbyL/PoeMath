@@ -334,9 +334,11 @@ class _ProblemRow extends ConsumerWidget {
           : null,
       child: ColoredCard(
         color: theme.colorScheme.primary,
-        padding: const EdgeInsets.symmetric(
-          horizontal: SpacingTokens.md,
-          vertical: SpacingTokens.sm,
+        padding: EdgeInsetsDirectional.fromSTEB(
+          SpacingTokens.md,
+          SpacingTokens.sm,
+          canNavigate ? SpacingTokens.navigationArrowInset : SpacingTokens.md,
+          SpacingTokens.sm,
         ),
         child: Row(
           children: [
@@ -411,7 +413,7 @@ class _ProblemRow extends ConsumerWidget {
               const SizedBox(width: SpacingTokens.xs),
               Icon(
                 Icons.chevron_right,
-                size: 20,
+                size: SpacingTokens.navigationArrowSize,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ],

@@ -19,7 +19,7 @@ import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 
-enum AppTileLayout { row, poster }
+enum AppTileLayout { row, poster, stacked }
 
 /// 通用列表行组件。
 ///
@@ -57,7 +57,6 @@ class AppTile extends StatelessWidget {
     this.flat = false,
     this.flatLeadingEdgeAligned = false,
     this.flatTrailingEdgeAligned = false,
-    this.flatTrailingIconInset = false,
     this.selected = false,
     this.crossAxisAlignment = CrossAxisAlignment.center,
     this.layout = AppTileLayout.row,
@@ -72,7 +71,7 @@ class AppTile extends StatelessWidget {
        assert(!selected || flat),
        assert(leadingEdgeWidth == null || leadingEdgeWidth > 0),
        assert(leadingEdgeWidth == null || (leading != null && !flat)),
-       assert(layout != AppTileLayout.poster || leadingEdgeWidth == null);
+       assert(layout == AppTileLayout.row || leadingEdgeWidth == null);
 
   /// 图标；未提供 [leading] 时展示，省略时不保留图标占位。
   final IconData? icon;
@@ -153,20 +152,17 @@ class AppTile extends StatelessWidget {
   /// 普通列表行中将尾部图形贴到内容区右边界；整行仍保留 44dp 点击高度。
   final bool flatTrailingEdgeAligned;
 
-  /// Flat grouped rows keep the tap slot while aligning the default arrow to
-  /// the row's symmetric end inset.
-  final bool flatTrailingIconInset;
-
   /// 普通列表行（[flat]）的选中状态，提供主题高亮和辅助技术选中语义。
   final bool selected;
 
   /// 主行内前导内容、文本及尾部组件的垂直对齐方式。
   final CrossAxisAlignment crossAxisAlignment;
 
-  /// 海报式入口将图标置于文字上方，保留相同点击和尾部控件规则。
+  /// 海报式入口将操作置于文字上方；纵向卡片将操作放在文字下方。
+  /// 两者保留相同点击和尾部控件规则。
   final AppTileLayout layout;
 
-  AppTile copyWith({bool? flat, bool? flatTrailingIconInset}) => AppTile(
+  AppTile copyWith({bool? flat}) => AppTile(
     key: key,
     icon: icon,
     leading: leading,
@@ -194,7 +190,6 @@ class AppTile extends StatelessWidget {
     flat: flat ?? this.flat,
     flatLeadingEdgeAligned: flatLeadingEdgeAligned,
     flatTrailingEdgeAligned: flatTrailingEdgeAligned,
-    flatTrailingIconInset: flatTrailingIconInset ?? this.flatTrailingIconInset,
     selected: selected,
     crossAxisAlignment: crossAxisAlignment,
     layout: layout,
@@ -272,8 +267,17 @@ class AppTile extends StatelessWidget {
             ? IconButton(
                 tooltip: trailingTooltip,
                 onPressed: onTrailingTap,
+                alignment: AlignmentDirectional.centerEnd,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: SpacingTokens.minTapTarget,
+                  minHeight: SpacingTokens.minTapTarget,
+                ),
                 color: selected ? theme.colorScheme.onPrimaryContainer : null,
-                icon: Icon(trailingIcon),
+                icon: Icon(
+                  trailingIcon,
+                  size: SpacingTokens.navigationArrowSize,
+                ),
               )
             : Column(
                 mainAxisSize: MainAxisSize.min,
@@ -281,6 +285,7 @@ class AppTile extends StatelessWidget {
                 children: [
                   Icon(
                     trailingIcon,
+                    size: SpacingTokens.navigationArrowSize,
                     color: selected
                         ? theme.colorScheme.onPrimaryContainer
                         : theme.colorScheme.onSurfaceVariant,
@@ -306,23 +311,13 @@ class AppTile extends StatelessWidget {
                     child: trailingContent,
                   ),
                 )
-              : flatTrailingIconInset &&
-                    trailing == null &&
-                    trailingAction == null
-              ? SizedBox.square(
-                  dimension: SpacingTokens.minTapTarget,
-                  child: Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: trailingContent,
-                  ),
-                )
               : SizedBox.square(
                   dimension: SpacingTokens.minTapTarget,
                   child: Align(
                     alignment: switch (crossAxisAlignment) {
-                      CrossAxisAlignment.start => Alignment.topCenter,
-                      CrossAxisAlignment.end => Alignment.bottomCenter,
-                      _ => Alignment.center,
+                      CrossAxisAlignment.start => AlignmentDirectional.topEnd,
+                      CrossAxisAlignment.end => AlignmentDirectional.bottomEnd,
+                      _ => AlignmentDirectional.centerEnd,
                     },
                     child: trailingContent,
                   ),
@@ -384,19 +379,24 @@ class AppTile extends StatelessWidget {
                       : iconColor,
                   size: layout == AppTileLayout.poster ? SpacingTokens.xl : 22,
                 ));
-      if (layout == AppTileLayout.poster) {
+      if (layout != AppTileLayout.row) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                if (leadingWidget != null) leadingWidget,
-                const Spacer(),
-                trailingWithText,
-              ],
-            ),
-            const SizedBox(height: SpacingTokens.md),
+            if (layout == AppTileLayout.poster) ...[
+              Row(
+                children: [
+                  if (leadingWidget != null) leadingWidget,
+                  const Spacer(),
+                  trailingWithText,
+                ],
+              ),
+              const SizedBox(height: SpacingTokens.md),
+            ] else if (leadingWidget != null) ...[
+              leadingWidget,
+              const SizedBox(height: SpacingTokens.sm),
+            ],
             if (hasTitleRow) titleWidget,
             if (subtitle.isNotEmpty) ...[
               const SizedBox(height: SpacingTokens.xs),
@@ -409,6 +409,13 @@ class AppTile extends StatelessWidget {
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
+              ),
+            ],
+            if (layout == AppTileLayout.stacked) ...[
+              const SizedBox(height: SpacingTokens.sm),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: trailingWithText,
               ),
             ],
           ],
@@ -489,7 +496,7 @@ class AppTile extends StatelessWidget {
                   SpacingTokens.xs,
                   flatTrailingEdgeAligned || flatLeadingEdgeAligned
                       ? 0
-                      : SpacingTokens.sm,
+                      : SpacingTokens.navigationArrowInset,
                   SpacingTokens.xs,
                 ),
                 child: content,
@@ -499,9 +506,11 @@ class AppTile extends StatelessWidget {
         ),
       );
     }
-    const contentPadding = EdgeInsets.symmetric(
-      horizontal: SpacingTokens.md,
-      vertical: SpacingTokens.sm + SpacingTokens.xs / 2,
+    final contentPadding = EdgeInsetsDirectional.fromSTEB(
+      SpacingTokens.md,
+      SpacingTokens.sm + SpacingTokens.xs / 2,
+      trailing == null ? SpacingTokens.navigationArrowInset : SpacingTokens.md,
+      SpacingTokens.sm + SpacingTokens.xs / 2,
     );
     final edgeWidth = leadingEdgeWidth;
     final cardContent = edgeWidth == null
@@ -536,7 +545,10 @@ class AppTile extends StatelessWidget {
       padding: edgeWidth != null
           ? EdgeInsets.zero
           : layout == AppTileLayout.poster
-          ? const EdgeInsets.all(SpacingTokens.md)
+          ? contentPadding.copyWith(
+              top: SpacingTokens.md,
+              bottom: SpacingTokens.md,
+            )
           : contentPadding,
       child: cardContent,
     );

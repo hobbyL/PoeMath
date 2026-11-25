@@ -599,6 +599,17 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       expectImageAtCardEdges(tester);
+      final fileTile = find.widgetWithText(AppTile, '从文件选择');
+      final imageCard = find.ancestor(
+        of: fileTile,
+        matching: find.byType(ColoredCard),
+      );
+      final arrow = find.descendant(
+        of: fileTile,
+        matching: find.byIcon(Icons.chevron_right),
+      );
+      expect(tester.getRect(imageCard).right - tester.getRect(arrow).right, 8);
+      expect(tester.getSize(arrow), const Size.square(24));
       final reference = find.byKey(const ValueKey('picture-story-reference'));
       await tester.ensureVisible(reference);
       await tester.pumpAndSettle();

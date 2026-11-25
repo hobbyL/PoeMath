@@ -511,41 +511,13 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Widget _buildReviewReminder(BuildContext context, int count) {
     final theme = Theme.of(context);
-    return ColoredCard(
+    return AppTile(
       key: const ValueKey('home-review-reminder'),
-      color: theme.colorScheme.error,
+      icon: Icons.notifications_active,
+      iconColor: theme.colorScheme.error,
+      title: '$count 首诗词待复习',
+      subtitle: '按艾宾浩斯记忆曲线，现在是最佳复习时间',
       onTap: () => context.push(AppRoutes.poemReview),
-      child: Row(
-        children: [
-          Icon(
-            Icons.notifications_active,
-            color: theme.colorScheme.error,
-            size: 28,
-          ),
-          const SizedBox(width: SpacingTokens.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$count 首诗词待复习',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '按艾宾浩斯记忆曲线，现在是最佳复习时间',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
-        ],
-      ),
     );
   }
 

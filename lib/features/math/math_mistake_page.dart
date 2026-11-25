@@ -490,9 +490,11 @@ class _MistakeCard extends StatelessWidget {
 
     return ColoredCard(
       color: theme.colorScheme.primary,
-      padding: const EdgeInsets.symmetric(
-        horizontal: SpacingTokens.md,
-        vertical: SpacingTokens.sm,
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        SpacingTokens.md,
+        SpacingTokens.sm,
+        SpacingTokens.navigationArrowInset,
+        SpacingTokens.sm,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -642,7 +644,7 @@ class _MistakeCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: SpacingTokens.xs),
                 child: Icon(
                   Icons.chevron_right,
-                  size: 20,
+                  size: SpacingTokens.navigationArrowSize,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),

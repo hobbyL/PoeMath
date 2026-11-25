@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
@@ -82,6 +83,18 @@ void main() {
     expect(find.text('4 + 4 = ?'), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
     expect(find.text('4'), findsOneWidget);
+    for (final arrow in find.byIcon(Icons.chevron_right).evaluate()) {
+      final arrowFinder = find.byWidget(arrow.widget);
+      final card = find.ancestor(
+        of: arrowFinder,
+        matching: find.byType(ColoredCard),
+      );
+      expect(
+        tester.getRect(card).right - tester.getRect(arrowFinder).right,
+        closeTo(8, .01),
+      );
+      expect(tester.getSize(arrowFinder), const Size(24, 24));
+    }
 
     await tester.tap(find.text('4 + 4 = ?'));
     await tester.pumpAndSettle();

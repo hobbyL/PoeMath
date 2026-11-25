@@ -421,14 +421,25 @@ class _PictureStoryEditorPageState
                 ),
               ),
             Padding(
-              padding: const EdgeInsets.all(SpacingTokens.md),
+              padding: const EdgeInsets.symmetric(vertical: SpacingTokens.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (draft.image == null) const Text('选择一张图片，让孩子观察后讲一讲。'),
+                  if (draft.image == null)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: SpacingTokens.md,
+                      ),
+                      child: Text('选择一张图片，让孩子观察后讲一讲。'),
+                    ),
                   if (_editor.isPicking) ...[
                     const SizedBox(height: SpacingTokens.sm),
-                    const Text('正在获取图片，返回后可继续编辑。'),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: SpacingTokens.md,
+                      ),
+                      child: Text('正在获取图片，返回后可继续编辑。'),
+                    ),
                   ],
                   if (_editor.supportsGallery)
                     AppTile(
@@ -463,9 +474,14 @@ class _PictureStoryEditorPageState
                           : () => _chooseImage(PictureStoryImageSource.camera),
                     ),
                   const SizedBox(height: SpacingTokens.sm),
-                  Text(
-                    '图片保存在本机。使用已配置的 AI 评价时，会发送题图和表达文字。',
-                    style: theme.textTheme.bodySmall,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.md,
+                    ),
+                    child: Text(
+                      '图片保存在本机。使用已配置的 AI 评价时，会发送题图和表达文字。',
+                      style: theme.textTheme.bodySmall,
+                    ),
                   ),
                 ],
               ),

@@ -57,7 +57,12 @@ class PracticeEntryCard extends StatelessWidget {
       color: primary,
       backgroundOpacity: playful ? .1 : .02,
       onTap: onTap,
-      padding: const EdgeInsets.all(SpacingTokens.md),
+      padding: EdgeInsetsDirectional.fromSTEB(
+        SpacingTokens.md,
+        SpacingTokens.md,
+        playful ? SpacingTokens.md : SpacingTokens.navigationArrowInset,
+        SpacingTokens.md,
+      ),
       child: Column(
         crossAxisAlignment: playful
             ? CrossAxisAlignment.center
@@ -72,7 +77,7 @@ class PracticeEntryCard extends StatelessWidget {
                 const Spacer(),
                 Icon(
                   Icons.arrow_forward,
-                  size: SpacingTokens.md,
+                  size: SpacingTokens.navigationArrowSize,
                   color: primary,
                 ),
               ],

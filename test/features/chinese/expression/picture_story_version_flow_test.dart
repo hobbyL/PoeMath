@@ -674,6 +674,18 @@ void main() {
       expect(find.byTooltip('练习记录 · 1 次'), findsNothing);
       expect(find.byIcon(Icons.check_circle_outline), findsNothing);
       expect(find.text('尚未练习'), findsNothing);
+      final promptArrow = find.byIcon(Icons.chevron_right);
+      expect(promptArrow, findsOneWidget);
+      final promptCardFinder = find.ancestor(
+        of: promptArrow,
+        matching: find.byType(ColoredCard),
+      );
+      expect(
+        tester.getRect(promptCardFinder).right -
+            tester.getRect(promptArrow).right,
+        closeTo(8, .01),
+      );
+      expect(tester.getSize(promptArrow), const Size(24, 24));
       final draft = PictureStoryPracticeRecord(
         id: 'responsive-history',
         profileId: 'default',

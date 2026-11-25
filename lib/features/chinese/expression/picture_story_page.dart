@@ -181,7 +181,12 @@ class _PromptCardState extends ConsumerState<_PromptCard> {
                       borderRadius: BorderRadius.zero,
                     ),
                     Padding(
-                      padding: const EdgeInsets.all(SpacingTokens.md),
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        SpacingTokens.md,
+                        SpacingTokens.md,
+                        SpacingTokens.navigationArrowInset,
+                        SpacingTokens.md,
+                      ),
                       child: Row(
                         children: [
                           Expanded(
@@ -193,6 +198,7 @@ class _PromptCardState extends ConsumerState<_PromptCard> {
                           const SizedBox(width: SpacingTokens.sm),
                           Icon(
                             Icons.chevron_right,
+                            size: SpacingTokens.navigationArrowSize,
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ],

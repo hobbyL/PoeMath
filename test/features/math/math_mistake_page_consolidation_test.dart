@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/features/math/math_mistake_page.dart';
@@ -58,10 +59,7 @@ MathMistake _mistake({
   );
 }
 
-Future<void> _pumpPage(
-  WidgetTester tester,
-  List<MathMistake> mistakes,
-) async {
+Future<void> _pumpPage(WidgetTester tester, List<MathMistake> mistakes) async {
   tester.view.physicalSize = const Size(1200, 2400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -80,14 +78,20 @@ Future<void> _pumpPage(
 
 void main() {
   testWidgets('状态筛选提供未掌握 / 待巩固 / 已掌握四态 chip', (tester) async {
-    await _pumpPage(tester, [
-      _mistake(id: 'm1', problemText: '1 + 1 = ?'),
-    ]);
+    await _pumpPage(tester, [_mistake(id: 'm1', problemText: '1 + 1 = ?')]);
 
     expect(find.widgetWithText(ChoiceChip, '全部'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '未掌握'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '待巩固'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '已掌握'), findsOneWidget);
+    final arrow = find.byIcon(Icons.chevron_right);
+    expect(arrow, findsOneWidget);
+    final card = find.ancestor(of: arrow, matching: find.byType(ColoredCard));
+    expect(
+      tester.getRect(card).right - tester.getRect(arrow).right,
+      closeTo(8, .01),
+    );
+    expect(tester.getSize(arrow), const Size(24, 24));
   });
 
   testWidgets('统计卡按未掌握 / 待巩固 / 已掌握三组计数', (tester) async {

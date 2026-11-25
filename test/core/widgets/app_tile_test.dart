@@ -3,12 +3,14 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/theme/app_theme.dart';
-import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_tile.dart';
+import 'package:poemath/core/widgets/app_tile_group.dart';
+import 'package:poemath/features/home/home_section.dart';
 
 void main() {
   for (final flat in [false, true]) {
-    testWidgets('卡片箭头和左侧图标与各自边缘保持相同间距 flat=$flat', (tester) async {
+    testWidgets('卡片箭头使用首页右边距，左侧内容保留原留白 flat=$flat', (tester) async {
       final theme = AppTheme.resolve(
         subject: AppSubject.poem,
         brightness: Brightness.light,
@@ -23,7 +25,6 @@ void main() {
                 width: 320,
                 child: AppTile(
                   flat: flat,
-                  flatTrailingIconInset: flat,
                   icon: Icons.history_outlined,
                   iconColor: theme.colorScheme.primary,
                   title: '学习记录',
@@ -40,9 +41,204 @@ void main() {
       final arrow = tester.getRect(find.byIcon(Icons.chevron_right));
       final edgeInset = flat ? SpacingTokens.sm : SpacingTokens.md;
       expect(icon.left - tile.left, closeTo(edgeInset, .01));
-      expect(tile.right - arrow.right, closeTo(edgeInset, .01));
+      expect(tile.right - arrow.right, closeTo(8, .01));
       expect(tester.takeException(), isNull);
     });
+  }
+
+  for (final subject in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('导航箭头对齐首页且独立操作可点击 $subject $brightness', (tester) async {
+        addTearDown(tester.view.reset);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(1000, 1600);
+        final theme = AppTheme.resolve(
+          subject: subject,
+          brightness: brightness,
+        );
+        var opened = 0, played = 0, toggled = 0, removed = 0;
+        for (final width in [288.0, 800.0]) {
+          for (final scale in [1.0, 2.0]) {
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: theme,
+                home: MediaQuery(
+                  data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+                  child: Scaffold(
+                    body: SingleChildScrollView(
+                      child: SizedBox(
+                        width: width,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            HomeEntryGroup(
+                              children: [
+                                AppTile(
+                                  key: const ValueKey('home-reference'),
+                                  flat: theme.appearance.ink,
+                                  icon: Icons.history_outlined,
+                                  iconColor: theme.colorScheme.primary,
+                                  title: '继续学习',
+                                  subtitle: '首页卡片',
+                                  onTap: () {},
+                                ),
+                              ],
+                            ),
+                            AppTile(
+                              key: const ValueKey('word'),
+                              layout: AppTileLayout.stacked,
+                              iconColor: theme.colorScheme.primary,
+                              title: 'grandmother',
+                              subtitle: '（外）祖母',
+                              trailingPrefix: IconButton(
+                                tooltip: '朗读单词',
+                                onPressed: () => played++,
+                                icon: const Icon(Icons.volume_up_outlined),
+                              ),
+                              onTap: () => opened++,
+                            ),
+                            AppTileGroup(
+                              children: [
+                                AppTile(
+                                  key: const ValueKey('settings'),
+                                  icon: Icons.settings_outlined,
+                                  iconColor: theme.colorScheme.primary,
+                                  title: '设置',
+                                  subtitle: '',
+                                  onTap: () {},
+                                ),
+                              ],
+                            ),
+                            AppTile(
+                              key: const ValueKey('flat'),
+                              flat: true,
+                              iconColor: theme.colorScheme.primary,
+                              title: '目录条目',
+                              subtitle: '',
+                              onTap: () {},
+                            ),
+                            AppTile(
+                              key: const ValueKey('branch'),
+                              flat: true,
+                              iconColor: theme.colorScheme.primary,
+                              title: '可展开的目录',
+                              subtitle: '',
+                              onTrailingTap: () => toggled++,
+                              trailingTooltip: '展开目录',
+                              onTap: () {},
+                            ),
+                            AppTile(
+                              key: const ValueKey('history'),
+                              iconColor: theme.colorScheme.primary,
+                              title: '完整的学习记录说明',
+                              titleWrap: true,
+                              subtitle: '',
+                              trailingText: '2026/11/25',
+                              trailingTextMaxLines: null,
+                              onTap: () {},
+                            ),
+                            AppTile(
+                              key: const ValueKey('thumbnail'),
+                              leading: const SizedBox.expand(),
+                              leadingEdgeWidth: SpacingTokens.xxl,
+                              iconColor: theme.colorScheme.primary,
+                              title: '带题图的内容',
+                              subtitle: '内容说明',
+                              onTap: () {},
+                            ),
+                            AppTile(
+                              key: const ValueKey('delete'),
+                              iconColor: theme.colorScheme.primary,
+                              title: '编辑作答项',
+                              subtitle: '',
+                              trailingAction: IconButton(
+                                tooltip: '移除作答项',
+                                onPressed: () => removed++,
+                                icon: const Icon(Icons.delete_outline),
+                              ),
+                              onTap: () {},
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            Rect arrowRect(String key) => tester.getRect(
+              find.descendant(
+                of: find.byKey(ValueKey(key)),
+                matching: find.byIcon(Icons.chevron_right),
+              ),
+            );
+            final reference = arrowRect('home-reference');
+            expect(
+              tester
+                      .getRect(find.byKey(const ValueKey('home-reference')))
+                      .right -
+                  reference.right,
+              closeTo(8, .01),
+            );
+            for (final key in [
+              'word',
+              'settings',
+              'flat',
+              'branch',
+              'history',
+              'thumbnail',
+              'delete',
+            ]) {
+              final arrow = arrowRect(key);
+              expect(
+                arrow.right,
+                closeTo(reference.right, .01),
+                reason: '$key $width $scale',
+              );
+              expect(arrow.size, const Size(24, 24));
+            }
+            expect(
+              tester
+                  .getSize(
+                    find.widgetWithIcon(IconButton, Icons.volume_up_outlined),
+                  )
+                  .width,
+              greaterThanOrEqualTo(44),
+            );
+            expect(
+              tester
+                  .getSize(
+                    find.ancestor(
+                      of: find.byTooltip('展开目录'),
+                      matching: find.byType(IconButton),
+                    ),
+                  )
+                  .width,
+              greaterThanOrEqualTo(44),
+            );
+            final before = (opened, played, toggled, removed);
+            await tester.ensureVisible(find.text('grandmother'));
+            expect(
+              tester.getRect(find.text('（外）祖母')).bottom,
+              lessThan(tester.getRect(find.byTooltip('朗读单词')).top),
+            );
+            await tester.tap(find.text('grandmother'));
+            await tester.tap(find.byTooltip('朗读单词'));
+            await tester.tapAt(arrowRect('word').center);
+            await tester.ensureVisible(find.byTooltip('展开目录'));
+            await tester.tap(find.byTooltip('展开目录'));
+            await tester.ensureVisible(find.byTooltip('移除作答项'));
+            await tester.tap(find.byTooltip('移除作答项'));
+            expect(
+              (opened, played, toggled, removed),
+              (before.$1 + 2, before.$2 + 1, before.$3 + 1, before.$4 + 1),
+            );
+            expect(tester.takeException(), isNull);
+          }
+        }
+      });
+    }
   }
 
   testWidgets('两行摘要与换行时间保持左右布局，未配置的列表行保留单行默认值', (tester) async {

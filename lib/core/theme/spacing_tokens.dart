@@ -27,6 +27,10 @@ class SpacingTokens {
   // ============ 无障碍：命中区域下限 ============
   static const double minTapTarget = 44.0;
 
+  /// 导航行箭头沿用首页卡片：图标框距纸面末端 8dp，图标为 24dp。
+  static const double navigationArrowInset = sm;
+  static const double navigationArrowSize = lg;
+
   // ============ 阴影 ============
   /// 图片上的透明图标使用细轮廓，补足明暗混合纹理下的辨识度。
   static const double imageIconOutline = 1.0;

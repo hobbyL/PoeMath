@@ -105,7 +105,10 @@ class ColoredCard extends StatelessWidget {
         paper && appearance.space && borderRadius == null && border == null;
     final cutShape = BeveledRectangleBorder(
       borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
-      side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .8)),
+      side: BorderSide(
+        color: scheme.outlineVariant.withValues(alpha: .8),
+        strokeAlign: BorderSide.strokeAlignOutside,
+      ),
     );
     final decoration = BoxDecoration(
       color: gradient == null
