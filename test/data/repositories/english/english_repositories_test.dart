@@ -175,7 +175,7 @@ void main() {
     );
     expect(repository.load().attempts, hasLength(3));
   });
-  test('单词自评分离保存；待复习次日进入词义题，客观答对再推进间隔', () async {
+  test('旧翻卡自评保留，自动整理词汇可继续客观复习并推进间隔', () async {
     final book = englishBook();
     final course = englishCourse(
       book: book,
@@ -210,31 +210,21 @@ void main() {
         recordKey = q.recordKey;
 
     expect(q.target.approved, isFalse);
+    await seedLegacyReview(
+      repository,
+      q,
+      EnglishReviewRecord(
+        fingerprint: q.target.fingerprint,
+        selfCorrect: 1,
+        selfAgain: 1,
+        lastSelfRating: 'again',
+        lastDay: '2026-11-23',
+        nextDay: '2026-11-24',
+      ),
+    );
     await repository.remember(lesson.id, targetId: q.target.id);
-    await repository.selfAssessVocabulary(
-      lesson.id,
-      q.target.id,
-      expectedFingerprint: q.target.fingerprint,
-      mastered: true,
-      now: DateTime(2026, 11, 23),
-    );
+    expect(repository.load().lastTargetId, q.target.id);
     var record = repository.load().reviews[recordKey]!;
-    expect(record.selfCorrect, 1);
-    expect(record.selfAgain, 0);
-    expect(record.lastSelfRating, 'mastered');
-    expect(record.correct, 0);
-    expect(record.incorrect, 0);
-    expect(record.stage, 0);
-    expect(record.nextDay, isNull);
-
-    await repository.selfAssessVocabulary(
-      lesson.id,
-      q.target.id,
-      expectedFingerprint: q.target.fingerprint,
-      mastered: false,
-      now: DateTime(2026, 11, 23),
-    );
-    record = repository.load().reviews[recordKey]!;
     expect(record.selfCorrect, 1);
     expect(record.selfAgain, 1);
     expect(record.lastSelfRating, 'again');
@@ -281,43 +271,25 @@ void main() {
     expect(record.selfCorrect, 1);
     expect(record.selfAgain, 1);
     expect(record.lastSelfRating, 'again');
-    final beforeStaleRating = record;
-    await expectLater(
-      repository.selfAssessVocabulary(
-        lesson.id,
-        q.target.id,
-        expectedFingerprint: 'stale-fingerprint',
-        mastered: true,
-      ),
-      throwsFormatException,
-    );
-    expect(
-      repository.load().reviews[recordKey]!.toJson(),
-      beforeStaleRating.toJson(),
-    );
-    await expectLater(
-      repository.selfAssessVocabulary(
-        lesson.id,
-        'sentence-1',
-        expectedFingerprint: course
-            .target(lesson.id, 'sentence-1')!
-            .fingerprint,
-        mastered: true,
-      ),
-      throwsFormatException,
-    );
   });
-  test('词汇被编辑后，同一目标 ID 不继承旧内容的自评', () async {
+  test('词汇编辑后，客观练习不继承同一目标 ID 的历史自评', () async {
     final book = englishBook(), course = englishCourse();
     await courses.seed(book, course, check: () {});
     final repository = EnglishProgressRepository(book, courses),
         lesson = course.lessons.single;
-    await repository.selfAssessVocabulary(
-      lesson.id,
-      'word-1',
-      expectedFingerprint: course.target(lesson.id, 'word-1')!.fingerprint,
-      mastered: true,
-      now: DateTime(2026, 11, 23),
+    final originalQuestion = buildEnglishQuestions(
+      course,
+      EnglishPracticeKind.meaning,
+      lessonId: lesson.id,
+    ).first;
+    await seedLegacyReview(
+      repository,
+      originalQuestion,
+      EnglishReviewRecord(
+        fingerprint: originalQuestion.target.fingerprint,
+        selfCorrect: 1,
+        lastSelfRating: 'mastered',
+      ),
     );
     final old = repository.load().reviews['${lesson.id}/word-1/meaning']!;
     final changedLesson = lesson.change({
@@ -327,27 +299,59 @@ void main() {
               .toJson(),
       ],
     });
-    await courses.saveLesson(
+    final changedCourse = await courses.saveLesson(
       book,
       changedLesson,
       expectedRevision: course.revision,
       check: () {},
     );
-    await repository.selfAssessVocabulary(
-      lesson.id,
-      'word-1',
-      expectedFingerprint: changedLesson.targets
-          .firstWhere((target) => target.id == 'word-1')
-          .fingerprint,
-      mastered: true,
-      now: DateTime(2026, 11, 24),
+    final question = buildEnglishQuestions(
+      changedCourse,
+      EnglishPracticeKind.meaning,
+      lessonId: lesson.id,
+    ).first;
+    await repository.complete(
+      EnglishAttempt(
+        id: 'changed-word',
+        lessonId: lesson.id,
+        title: '词义练习',
+        kind: 'practice',
+        completedAt: DateTime(2026, 11, 24),
+        durationSeconds: 15,
+        answers: [
+          EnglishAnswer(
+            question: question,
+            answer: question.answers.first,
+            correct: true,
+            hinted: false,
+            skipped: false,
+          ),
+        ],
+      ),
     );
     final current = repository.load().reviews['${lesson.id}/word-1/meaning']!;
     expect(current.fingerprint, changedLesson.targets.first.fingerprint);
     expect(current.fingerprint, isNot(old.fingerprint));
-    expect(current.selfCorrect, 1);
+    expect(current.selfCorrect, 0);
     expect(current.selfAgain, 0);
-    expect(current.correct, 0);
-    expect(current.nextDay, isNull);
+    expect(current.lastSelfRating, isNull);
+    expect(current.correct, 1);
+    expect(current.nextDay, '2026-11-25');
   });
 }
+
+Future<void> seedLegacyReview(
+  EnglishProgressRepository repository,
+  EnglishQuestion question,
+  EnglishReviewRecord record,
+) => HiveBoxes.settings.put(
+  repository.key,
+  jsonEncode(
+    EnglishProgress(
+      profileId: repository.profileId,
+      bookId: repository.book.pdfSha256,
+      editionId: repository.book.learningEditionId,
+      reviews: {question.recordKey: record},
+    ).toJson(),
+  ),
+);

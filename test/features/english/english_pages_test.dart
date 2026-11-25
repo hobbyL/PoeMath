@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,30 +68,20 @@ class _Courses extends EnglishCourseRepository {
 }
 
 class _Progress extends EnglishProgressRepository {
-  _Progress(super.book, super.courses, {this.lastTargetId});
-  final String? lastTargetId;
-  final selfAssessments = <(String, bool)>[];
+  _Progress(super.book, super.courses, {this.beforeRemember});
+  final Future<void> Function()? beforeRemember;
 
   @override
   EnglishProgress load() => EnglishProgress(
     profileId: profileId,
     bookId: book.pdfSha256,
     editionId: book.learningEditionId,
-    lastLessonId: lastTargetId == null ? null : 'unit-1-p2',
-    lastTargetId: lastTargetId,
   );
 
   @override
-  Future<void> remember(String lessonId, {String? targetId}) async {}
-
-  @override
-  Future<void> selfAssessVocabulary(
-    String lessonId,
-    String targetId, {
-    required String expectedFingerprint,
-    required bool mastered,
-    DateTime? now,
-  }) async => selfAssessments.add((targetId, mastered));
+  Future<void> remember(String lessonId, {String? targetId}) async {
+    await beforeRemember?.call();
+  }
 }
 
 class _RetryProgress extends EnglishProgressRepository {
@@ -222,7 +214,7 @@ void main() {
     expect(find.byType(EnglishPracticeHubPage), findsNothing);
     expect(tester.takeException(), isNull);
   });
-  testWidgets('自动整理词汇无需人工审核即可进入词表、翻卡和客观练习', (tester) async {
+  testWidgets('自动整理词汇直接进入词表和单词练习，不再显示翻卡及模式切换', (tester) async {
     final book = englishBook();
     final sourceLesson = courses.course.lessons.single;
     final lesson = sourceLesson.change({
@@ -235,7 +227,6 @@ void main() {
       ],
     });
     courses.course = englishCourse(book: book, lessons: [lesson]);
-    late _Progress learningProgress;
     final router = GoRouter(
       initialLocation: AppRoutes.englishBookOf(
         book.pdfSha256,
@@ -292,11 +283,7 @@ void main() {
           englishProgressRepositoryProvider.overrideWith((ref, id) {
             final book = ref.watch(englishBookProvider(id));
             if (book == null) return null;
-            return learningProgress = _Progress(
-              book,
-              courses,
-              lastTargetId: 'word-2',
-            );
+            return _Progress(book, courses);
           }),
         ],
         child: MaterialApp.router(
@@ -341,7 +328,6 @@ void main() {
     expect(find.text('翻卡自测'), findsNothing);
     expect(find.text('词义选择'), findsOneWidget);
     expect(find.text('拼写练习'), findsOneWidget);
-    expect(learningProgress.selfAssessments, isEmpty);
     expect(find.text('听一听'), findsNothing);
     expect(find.text('看原书'), findsNothing);
     expect(
@@ -389,45 +375,12 @@ void main() {
     router.pop();
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('翻卡自测'));
-    await tester.tap(find.text('翻卡自测'));
-    await tester.pumpAndSettle();
-    expect(find.text('蓝鸟'), findsOneWidget);
-    expect(find.text('blue bird'), findsNothing);
-    await tester.ensureVisible(find.text('下一个'));
-    await tester.tap(find.text('下一个'));
-    await tester.pumpAndSettle();
-    expect(find.text('红风筝'), findsOneWidget);
-    expect(find.text('red kite'), findsNothing);
-    await tester.tap(find.text('上一个'));
-    await tester.pumpAndSettle();
-    expect(find.text('蓝鸟'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('english-vocabulary-reveal')));
-    await tester.pumpAndSettle();
-    expect(find.text('blue bird'), findsOneWidget);
-    expect(find.text('听一听'), findsWidgets);
-    await tester.tap(find.text('看原书'));
-    await tester.pumpAndSettle();
-    expect(find.text('原书第 2 页'), findsOneWidget);
-    router.pop();
-    await tester.pumpAndSettle();
+    expect(find.text('翻卡自测'), findsNothing);
+    expect(find.byKey(const ValueKey('english-vocabulary-mode')), findsNothing);
     expect(
-      find.byKey(const ValueKey('english-vocabulary-self-mastered')),
-      findsOneWidget,
+      tester.widget<AppScaffold>(find.byType(AppScaffold)).bottomNavigationBar,
+      isNull,
     );
-    expect(
-      find.byKey(const ValueKey('english-vocabulary-self-again')),
-      findsOneWidget,
-    );
-    await tester.tap(
-      find.byKey(const ValueKey('english-vocabulary-self-again')),
-    );
-    await tester.pumpAndSettle();
-    expect(learningProgress.selfAssessments, [('word-2', false)]);
-    expect(find.text('红风筝'), findsOneWidget);
-    await tester.ensureVisible(find.text('词表'));
-    await tester.tap(find.text('词表'));
-    await tester.pumpAndSettle();
     expect(find.text('词义选择'), findsNothing);
     await tester.tap(find.text('blue bird'));
     await tester.pumpAndSettle();
@@ -588,6 +541,93 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('词表朗读复用缓存，离页取消音频和等待保存位置的播放请求', (tester) async {
+    final book = englishBook(), lesson = courses.course.lessons.single;
+    final synth = NarrationSynth();
+    final players = <RecordingNarrationPlayer>[];
+    Completer<void>? pendingRemember;
+    final progress = _Progress(
+      book,
+      courses,
+      beforeRemember: () async => await pendingRemember?.future,
+    );
+    final tts = TtsService(
+      NarrationSettings(),
+      flutterTts: NarrationEngine(),
+      fileSynthesizer: synth,
+      narrationPlayerFactory: () {
+        final player = RecordingNarrationPlayer();
+        players.add(player);
+        return player;
+      },
+    );
+    addTearDown(tts.dispose);
+    final container = ProviderContainer(
+      overrides: [
+        ...overrides(),
+        englishVoiceProvider.overrideWith(
+          (ref) => {'locale': 'en-US', 'name': 'test'},
+        ),
+        englishProgressRepositoryProvider.overrideWith((ref, id) => progress),
+        englishAudioProvider.overrideWith(
+          (ref, key) => EnglishAudio(
+            bookId: key.$1,
+            tts: tts,
+            cache: MemoryNarrationCache(),
+            store: EnglishRecordingStore(),
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    Future<void> openList() async {
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: EnglishStudyPage(
+              bookId: book.pdfSha256,
+              lessonId: lesson.id,
+              kind: 'vocabulary',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await openList();
+    final play = find.byTooltip('朗读 red kite');
+    await tester.runAsync(() => tester.tap(play));
+    await until(
+      tester,
+      () => players.isNotEmpty && players.last.audio.isNotEmpty,
+    );
+    expect(synth.texts, ['red kite']);
+    await tester.runAsync(() => tester.tap(find.byTooltip('停止朗读')));
+    await tester.pumpAndSettle();
+    expect(players.last.disposed, isTrue);
+    await tester.runAsync(() => tester.tap(play));
+    await until(
+      tester,
+      () => players.length == 2 && players.last.audio.isNotEmpty,
+    );
+    expect(synth.texts, ['red kite']);
+    await tester.runAsync(() => tester.pumpWidget(const SizedBox()));
+    await tester.pumpAndSettle();
+    expect(players.last.disposed, isTrue);
+
+    await openList();
+    pendingRemember = Completer<void>();
+    await tester.tap(play);
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox());
+    pendingRemember.complete();
+    await tester.pumpAndSettle();
+    expect(players, hasLength(2));
+    expect(synth.texts, ['red kite']);
+  });
+
   testWidgets('单词详情练习入口四主题并排，大字号可换行且导航播放固定可达', (tester) async {
     addTearDown(tester.view.reset);
     final book = englishBook(), lesson = courses.course.lessons.single;
@@ -647,7 +687,7 @@ void main() {
     }
   });
 
-  testWidgets('词表四主题竖屏双列、横屏三列，大字减少列数且底部分段固定', (tester) async {
+  testWidgets('词表四主题竖屏双列、横屏三列，大字减少列数且正文占满可用高度', (tester) async {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final book = englishBook();
@@ -687,20 +727,21 @@ void main() {
             size: layout.size,
             textScale: layout.scale,
           );
-          final mode = find.byKey(const ValueKey('english-vocabulary-mode'));
-          final modeBounds = tester.getRect(mode);
           final list = find.byKey(
             const ValueKey('english-vocabulary-learning'),
           );
-          expect(mode.hitTestable(), findsOneWidget);
+          expect(find.text('翻卡自测'), findsNothing);
           expect(
-            modeBounds.bottom,
-            closeTo(layout.size.height - SpacingTokens.sm, 1),
+            find.byKey(const ValueKey('english-vocabulary-mode')),
+            findsNothing,
           );
           expect(
-            tester.getRect(list).bottom,
-            lessThanOrEqualTo(modeBounds.top),
+            tester
+                .widget<AppScaffold>(find.byType(AppScaffold))
+                .bottomNavigationBar,
+            isNull,
           );
+          expect(tester.getRect(list).bottom, closeTo(layout.size.height, 1));
           final first = tester.getRect(
             find.byKey(const ValueKey('english-vocabulary-word-word-0')),
           );
@@ -767,16 +808,7 @@ void main() {
           }
           await tester.drag(list, const Offset(0, -2000));
           await tester.pumpAndSettle();
-          expect(tester.getRect(mode), modeBounds);
           expect(find.text('vocabulary 11').hitTestable(), findsOneWidget);
-          await tester.tap(find.text('翻卡自测'));
-          await tester.pumpAndSettle();
-          expect(tester.getRect(mode), modeBounds);
-          expect(find.text('grandmother'), findsNothing);
-          await tester.ensureVisible(find.text('翻出英文'));
-          await tester.tap(find.text('翻出英文'));
-          await tester.pumpAndSettle();
-          expect(find.text('grandmother'), findsOneWidget);
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox());
         }
@@ -1465,12 +1497,11 @@ void main() {
     );
     await tester.tap(find.text('单词详情入口'));
     await tester.pumpAndSettle();
-    expect(tester.state(find.byType(EnglishPracticePage)), same(practiceState));
-    expect(tester.element(find.byType(AppScaffold)), same(scaffold));
-    expect(router.routeInformationProvider.value.uri, location);
-    expect(
-      tester.getRect(find.byKey(const ValueKey('english-meaning-actions'))),
-      actions,
+    final practiceState = tester.state(find.byType(EnglishPracticePage));
+    final scaffold = tester.element(find.byType(AppScaffold));
+    final location = router.routeInformationProvider.value.uri;
+    final actions = tester.getRect(
+      find.byKey(const ValueKey('english-meaning-actions')),
     );
     expect(
       find.descendant(of: find.byType(AppBar), matching: find.text('red kite')),
@@ -1489,11 +1520,12 @@ void main() {
     await tester.runAsync(() => tester.tap(find.byTooltip('下一题')));
     await until(tester, () => find.text('blue bird').evaluate().isNotEmpty);
     await tester.pumpAndSettle();
-    final practiceState = tester.state(find.byType(EnglishPracticePage));
-    final scaffold = tester.element(find.byType(AppScaffold));
-    final location = router.routeInformationProvider.value.uri;
-    final actions = tester.getRect(
-      find.byKey(const ValueKey('english-meaning-actions')),
+    expect(tester.state(find.byType(EnglishPracticePage)), same(practiceState));
+    expect(tester.element(find.byType(AppScaffold)), same(scaffold));
+    expect(router.routeInformationProvider.value.uri, location);
+    expect(
+      tester.getRect(find.byKey(const ValueKey('english-meaning-actions'))),
+      actions,
     );
     expect(
       tester

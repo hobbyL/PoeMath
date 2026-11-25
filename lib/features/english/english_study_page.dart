@@ -41,25 +41,27 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
   late final EnglishAudio _audio;
   late final _audioKey = englishAudioKey(widget.bookId);
   StreamSubscription<String>? _profiles;
-  String _vocabularyMode = 'list';
-  int? _vocabularyIndex;
-  bool _vocabularyRevealed = false, _vocabularyBusy = false;
+  int _vocabularyPlaybackRevision = 0;
   @override
   void initState() {
     super.initState();
     _audio = ref.read(englishAudioProvider(_audioKey));
     WidgetsBinding.instance.addObserver(this);
-    _profiles = ProfileScope.changes.listen((_) => unawaited(_audio.stop()));
+    _profiles = ProfileScope.changes.listen(
+      (_) => unawaited(_stopVocabularyAudio()),
+    );
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) unawaited(_audio.stop());
+    if (state != AppLifecycleState.resumed) {
+      unawaited(_stopVocabularyAudio());
+    }
   }
 
   @override
   void dispose() {
-    unawaited(_audio.stop());
+    unawaited(_stopVocabularyAudio());
     _profiles?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -76,60 +78,21 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
     }
   }
 
-  Future<void> _moveVocabulary(List<EnglishTarget> targets, int delta) async {
-    if (_vocabularyBusy) return;
-    final index = _vocabularyIndex ?? 0;
-    final nextIndex = (index + delta + targets.length) % targets.length;
-    setState(() {
-      _vocabularyIndex = nextIndex;
-      _vocabularyRevealed = false;
-    });
-    await _remember(targets[nextIndex].id);
-  }
-
-  Future<void> _rateVocabulary(
-    List<EnglishTarget> targets,
-    EnglishTarget target, {
-    required bool mastered,
-  }) async {
-    if (_vocabularyBusy) return;
-    setState(() => _vocabularyBusy = true);
-    try {
-      await _audio.stop();
-      await ref
-          .read(englishProgressRepositoryProvider(widget.bookId))
-          ?.selfAssessVocabulary(
-            widget.lessonId,
-            target.id,
-            expectedFingerprint: target.fingerprint,
-            mastered: mastered,
-          );
-      if (!mounted) return;
-      setState(() {
-        _vocabularyIndex = ((_vocabularyIndex ?? 0) + 1) % targets.length;
-        _vocabularyRevealed = false;
-      });
-      await _remember(targets[_vocabularyIndex!].id);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(mastered ? '已记录自评' : '已安排明日复习')));
-      }
-    } on Object catch (e) {
-      if (mounted) englishMessage(context, e);
-    } finally {
-      if (mounted) setState(() => _vocabularyBusy = false);
-    }
+  Future<void> _stopVocabularyAudio() {
+    _vocabularyPlaybackRevision++;
+    return _audio.stop();
   }
 
   Future<void> _playVocabulary(
     EnglishTarget target,
     Map<String, String>? voice,
   ) async {
+    final revision = ++_vocabularyPlaybackRevision;
     await _remember(target.id);
-    if (!mounted) return;
+    if (!mounted || revision != _vocabularyPlaybackRevision) return;
     final played = await _audio.speak(target.text, voice);
     if (mounted &&
+        revision == _vocabularyPlaybackRevision &&
         widget.targetId != null &&
         !played &&
         !_audio.busy &&
@@ -138,22 +101,9 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
     }
   }
 
-  Future<void> _openVocabularySource(
-    BuildContext context,
-    EnglishTarget target,
-  ) async {
-    await _remember(target.id);
-    await _audio.stop();
-    if (context.mounted) {
-      context.push(
-        AppRoutes.englishBookOf(widget.bookId, page: target.sources.first.page),
-      );
-    }
-  }
-
   Future<void> _openVocabularyDetail(EnglishTarget target) async {
     await _remember(target.id);
-    await _audio.stop();
+    await _stopVocabularyAudio();
     if (!mounted) return;
     context.push(
       AppRoutes.englishVocabularyOf(
@@ -169,7 +119,7 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
     EnglishPracticeKind kind,
   ) async {
     await _remember(target.id);
-    await _audio.stop();
+    await _stopVocabularyAudio();
     if (!mounted) return;
     context.push(
       AppRoutes.englishBookOf(
@@ -189,23 +139,26 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
         theme = Theme.of(context);
     final isVocabularyDetail =
         widget.kind == 'vocabulary' && widget.targetId != null;
-    final detailTarget = isVocabularyDetail
+    final vocabularyTargets = widget.kind == 'vocabulary'
         ? ref
-              .watch(englishCourseProvider(widget.bookId))
-              .asData
-              ?.value
-              ?.lesson(widget.lessonId)
-              ?.targets
-              .where(
-                (target) =>
-                    target.id == widget.targetId &&
-                    target.isLearnableVocabulary,
-              )
+                  .watch(englishCourseProvider(widget.bookId))
+                  .asData
+                  ?.value
+                  ?.lesson(widget.lessonId)
+                  ?.targets
+                  .where((target) => target.isLearnableVocabulary)
+                  .toList() ??
+              const <EnglishTarget>[]
+        : const <EnglishTarget>[];
+    final detailTarget = isVocabularyDetail
+        ? vocabularyTargets
+              .where((target) => target.id == widget.targetId)
               .firstOrNull
         : null;
     return AppScaffold(
       backgroundScene: PineInkScene.study,
       appBar: AppBar(
+        centerTitle: true,
         title: Text(
           widget.kind != 'vocabulary'
               ? '学一学'
@@ -220,7 +173,7 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
                 : null,
             tooltip: isVocabularyDetail && !audio.busy ? '听一听' : '停止朗读',
             onPressed: audio.busy
-                ? () => audio.stop()
+                ? _stopVocabularyAudio
                 : detailTarget != null && detailTarget.hasSpeech
                 ? () => _playVocabulary(detailTarget, voice)
                 : null,
@@ -232,36 +185,6 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
           ),
         ],
       ),
-      bottomNavigationBar:
-          widget.kind == 'vocabulary' && widget.targetId == null
-          ? SafeArea(
-              top: false,
-              minimum: const EdgeInsets.fromLTRB(
-                SpacingTokens.md,
-                SpacingTokens.sm,
-                SpacingTokens.md,
-                SpacingTokens.sm,
-              ),
-              child: SegmentedButton<String>(
-                key: const ValueKey('english-vocabulary-mode'),
-                expandedInsets: EdgeInsets.zero,
-                style: SegmentedButton.styleFrom(
-                  padding: const EdgeInsets.all(SpacingTokens.sm),
-                ),
-                segments: const [
-                  ButtonSegment(value: 'list', label: Text('词表')),
-                  ButtonSegment(value: 'flashcard', label: Text('翻卡自测')),
-                ],
-                selected: {_vocabularyMode},
-                showSelectedIcon: false,
-                onSelectionChanged: (selection) => setState(() {
-                  if (_vocabularyBusy) return;
-                  _vocabularyMode = selection.first;
-                  _vocabularyRevealed = false;
-                }),
-              ),
-            )
-          : null,
       body: SafeArea(
         top: false,
         child: EnglishCourseBody(
@@ -274,15 +197,16 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
                 title: '课时已移除',
               );
             }
-            final targets = lesson.targets
-                .where(
-                  (target) => widget.kind == 'vocabulary'
-                      ? target.isLearnableVocabulary
-                      : target.approved &&
+            final targets = widget.kind == 'vocabulary'
+                ? vocabularyTargets
+                : lesson.targets
+                      .where(
+                        (target) =>
+                            target.approved &&
                             (widget.kind == null ||
                                 target.kind.name == widget.kind),
-                )
-                .toList();
+                      )
+                      .toList();
             if (widget.kind == 'vocabulary') {
               if (widget.targetId != null) {
                 final target = detailTarget;
@@ -301,15 +225,7 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
                   theme,
                 );
               }
-              return _vocabularyLearning(
-                context,
-                book,
-                lesson,
-                targets,
-                audio,
-                voice,
-                theme,
-              );
+              return _vocabularyLearning(targets, audio, voice, theme);
             }
             return ListView(
               padding: const EdgeInsets.all(SpacingTokens.md),
@@ -408,9 +324,6 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
   }
 
   Widget _vocabularyLearning(
-    BuildContext context,
-    Textbook book,
-    EnglishLesson lesson,
     List<EnglishTarget> targets,
     EnglishAudio audio,
     Map<String, String>? voice,
@@ -422,18 +335,6 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
         title: '本课还没有可学习的单词',
       );
     }
-    final progress = ref.watch(englishProgressProvider(widget.bookId));
-    if (_vocabularyIndex == null) {
-      final rememberedId = progress?.lastLessonId == lesson.id
-          ? progress?.lastTargetId
-          : null;
-      final rememberedIndex = targets.indexWhere(
-        (target) => target.id == rememberedId,
-      );
-      _vocabularyIndex = rememberedIndex < 0 ? 0 : rememberedIndex;
-    } else {
-      _vocabularyIndex = _vocabularyIndex!.clamp(0, targets.length - 1);
-    }
     return ListView(
       key: const ValueKey('english-vocabulary-learning'),
       padding: const EdgeInsets.all(SpacingTokens.md),
@@ -443,46 +344,36 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
             padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
             child: Text(audio.message),
           ),
-        if (_vocabularyMode == 'list')
-          ResponsiveCardGrid(
-            preferredTileWidth: ResponsiveLayout.compactCardWidth,
-            children: [
-              for (final target in targets)
-                AppTile(
-                  key: ValueKey('english-vocabulary-word-${target.id}'),
-                  layout: AppTileLayout.stacked,
-                  iconColor: theme.colorScheme.primary,
-                  title: target.text,
-                  titleWrap: true,
-                  subtitle: target.meaning,
-                  trailingPrefix: target.hasSpeech
-                      ? IconButton(
-                          tooltip: '朗读 ${target.text}',
-                          alignment: AlignmentDirectional.centerEnd,
-                          padding: EdgeInsets.zero,
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size.square(
-                              SpacingTokens.minTapTarget,
-                            ),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ResponsiveCardGrid(
+          preferredTileWidth: ResponsiveLayout.compactCardWidth,
+          children: [
+            for (final target in targets)
+              AppTile(
+                key: ValueKey('english-vocabulary-word-${target.id}'),
+                layout: AppTileLayout.stacked,
+                iconColor: theme.colorScheme.primary,
+                title: target.text,
+                titleWrap: true,
+                subtitle: target.meaning,
+                trailingPrefix: target.hasSpeech
+                    ? IconButton(
+                        tooltip: '朗读 ${target.text}',
+                        alignment: AlignmentDirectional.centerEnd,
+                        padding: EdgeInsets.zero,
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size.square(
+                            SpacingTokens.minTapTarget,
                           ),
-                          onPressed: () => _playVocabulary(target, voice),
-                          icon: const Icon(Icons.volume_up_outlined),
-                        )
-                      : null,
-                  onTap: () => _openVocabularyDetail(target),
-                ),
-            ],
-          )
-        else
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: ResponsiveLayout.mediumBreakpoint,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => _playVocabulary(target, voice),
+                        icon: const Icon(Icons.volume_up_outlined),
+                      )
+                    : null,
+                onTap: () => _openVocabularyDetail(target),
               ),
-              child: _vocabularyFlashcard(context, book, targets, voice, theme),
-            ),
-          ),
+          ],
+        ),
       ],
     );
   }
@@ -565,119 +456,6 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
           ],
         ),
       ),
-    );
-  }
-
-  Widget _vocabularyFlashcard(
-    BuildContext context,
-    Textbook book,
-    List<EnglishTarget> targets,
-    Map<String, String>? voice,
-    ThemeData theme,
-  ) {
-    final index = _vocabularyIndex ?? 0, target = targets[index];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ColoredCard(
-          color: theme.colorScheme.primary,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(target.meaning, style: theme.textTheme.headlineSmall),
-              if (_vocabularyRevealed) ...[
-                const SizedBox(height: SpacingTokens.md),
-                SelectableText(
-                  target.text,
-                  style: theme.textTheme.headlineMedium,
-                ),
-                if (target.picture != null)
-                  EnglishSourceImage(book: book, source: target.picture!),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: SpacingTokens.sm),
-        Wrap(
-          spacing: SpacingTokens.sm,
-          runSpacing: SpacingTokens.xs,
-          children: [
-            OutlinedButton.icon(
-              key: const ValueKey('english-vocabulary-reveal'),
-              onPressed: _vocabularyBusy
-                  ? null
-                  : () => setState(
-                      () => _vocabularyRevealed = !_vocabularyRevealed,
-                    ),
-              icon: Icon(
-                _vocabularyRevealed
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-              ),
-              label: Text(_vocabularyRevealed ? '遮住英文' : '翻出英文'),
-            ),
-            if (_vocabularyRevealed && target.hasSpeech)
-              TextButton.icon(
-                onPressed: () => _playVocabulary(target, voice),
-                icon: const Icon(Icons.volume_up_outlined),
-                label: const Text('听一听'),
-              ),
-            if (_vocabularyRevealed)
-              TextButton(
-                onPressed: () => _openVocabularyDetail(target),
-                child: const Text('单词详情'),
-              ),
-            if (_vocabularyRevealed)
-              TextButton(
-                onPressed: () => _openVocabularySource(context, target),
-                child: const Text('看原书'),
-              ),
-          ],
-        ),
-        if (_vocabularyRevealed) ...[
-          const SizedBox(height: SpacingTokens.md),
-          Wrap(
-            spacing: SpacingTokens.sm,
-            runSpacing: SpacingTokens.sm,
-            children: [
-              OutlinedButton.icon(
-                key: const ValueKey('english-vocabulary-self-mastered'),
-                onPressed: _vocabularyBusy
-                    ? null
-                    : () => _rateVocabulary(targets, target, mastered: true),
-                icon: const Icon(Icons.check_circle_outline),
-                label: const Text('掌握'),
-              ),
-              FilledButton.icon(
-                key: const ValueKey('english-vocabulary-self-again'),
-                onPressed: _vocabularyBusy
-                    ? null
-                    : () => _rateVocabulary(targets, target, mastered: false),
-                icon: const Icon(Icons.event_repeat),
-                label: const Text('待复习'),
-              ),
-            ],
-          ),
-        ],
-        const SizedBox(height: SpacingTokens.sm),
-        Wrap(
-          spacing: SpacingTokens.sm,
-          children: [
-            TextButton(
-              onPressed: _vocabularyBusy
-                  ? null
-                  : () => _moveVocabulary(targets, -1),
-              child: const Text('上一个'),
-            ),
-            TextButton(
-              onPressed: _vocabularyBusy
-                  ? null
-                  : () => _moveVocabulary(targets, 1),
-              child: const Text('下一个'),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }
