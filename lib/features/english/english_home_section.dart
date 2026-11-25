@@ -40,9 +40,11 @@ class EnglishHomeSection extends ConsumerWidget {
                 : scope.substring(book.pdfSha256.length + 1);
             entries.add(
               AppTile(
+                flat: theme.appearance.ink,
                 icon: practice ? Icons.edit_note : Icons.mic_none,
                 iconColor: theme.colorScheme.primary,
                 title: practice ? '继续练习' : '继续跟读',
+                titleMaxLines: 1,
                 subtitle:
                     '${book.volumeLabel} · ${lesson == null ? '全书练习' : course.lesson(lesson)?.title ?? '原课时'}',
                 onTap: () => context.push(
@@ -74,6 +76,7 @@ class EnglishHomeSection extends ConsumerWidget {
       if (last != null) {
         entries.add(
           AppTile(
+            flat: theme.appearance.ink,
             icon: Icons.auto_stories_outlined,
             iconColor: theme.colorScheme.primary,
             title: '继续学习',
@@ -88,6 +91,7 @@ class EnglishHomeSection extends ConsumerWidget {
       if (due > 0) {
         entries.add(
           AppTile(
+            flat: theme.appearance.ink,
             icon: Icons.event_repeat,
             iconColor: theme.colorScheme.primary,
             title: '到期复习 · $due 项',

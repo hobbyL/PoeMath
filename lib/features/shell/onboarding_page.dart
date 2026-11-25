@@ -12,6 +12,7 @@ import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/learning_background_fields.dart';
+import 'package:poemath/core/widgets/app_scaffold.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
@@ -91,7 +92,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     final theme = Theme.of(context);
     final isLast = _currentPage == _pages.length;
 
-    return Scaffold(
+    return AppScaffold(
       body: SafeArea(
         child: Column(
           children: [
