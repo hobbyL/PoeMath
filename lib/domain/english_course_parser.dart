@@ -406,12 +406,9 @@ class EnglishCourseParser {
         pendingSource = null;
       }
     }
-    result.sort((a, b) {
-      final page = a.source.page.compareTo(b.source.page);
-      if (page != 0) return page;
-      final top = a.source.top.compareTo(b.source.top);
-      return top == 0 ? a.source.left.compareTo(b.source.left) : top;
-    });
+    // `ordered` already preserves source traversal: column one top-to-bottom,
+    // then column two top-to-bottom. A global geometric sort here would
+    // incorrectly interleave the two printed columns by row.
     return result;
   }
 
