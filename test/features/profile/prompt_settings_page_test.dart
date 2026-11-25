@@ -14,6 +14,7 @@ import 'package:poemath/core/prompts/assistant_prompt_defaults.dart';
 import 'package:poemath/core/prompts/explain_prompt_defaults.dart';
 import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
+import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -52,6 +53,7 @@ Future<void> _pumpPage(
   WidgetTester tester, {
   Size size = const Size(800, 2400),
   double scale = 1,
+  ThemeData? theme,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -63,6 +65,7 @@ Future<void> _pumpPage(
         ),
       ],
       child: MaterialApp(
+        theme: theme,
         home: const PromptSettingsPage(),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context)
@@ -129,13 +132,14 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  testWidgets('未自定义时：七个场景展示内置默认全文与「内置默认」标注', (tester) async {
+  testWidgets('未自定义时：八个场景展示内置默认全文与「内置默认」标注', (tester) async {
     await _pumpPage(tester);
 
     expect(find.text('AI 生成应用题'), findsOneWidget);
     expect(find.text('看图说话生图'), findsOneWidget);
     expect(find.text('根据图片出题'), findsOneWidget);
     expect(_fieldText(tester, 'AI 生成应用题'), kWordProblemGenerationSystemPrompt);
+    expect(_fieldText(tester, '英语短语'), kEnglishPhraseGenerationSystemPrompt);
     expect(
       _fieldText(tester, '看图说话生图'),
       kPictureStoryImageGenerationSystemPrompt,
@@ -147,7 +151,7 @@ void main() {
     expect(find.text('诗词讲解'), findsOneWidget);
     expect(find.text('口算解析'), findsOneWidget);
     expect(find.text('AI 助手人设'), findsOneWidget);
-    expect(find.text('内置默认'), findsNWidgets(7));
+    expect(find.text('内置默认'), findsNWidgets(8));
     expect(find.text('已自定义'), findsNothing);
 
     expect(_fieldText(tester, '诗词讲解'), kPoemExplainSystemPrompt);
@@ -161,7 +165,7 @@ void main() {
     await _pumpPage(tester);
 
     expect(find.text('已自定义'), findsOneWidget);
-    expect(find.text('内置默认'), findsNWidgets(6));
+    expect(find.text('内置默认'), findsNWidgets(7));
     expect(_fieldText(tester, '诗词讲解'), '我的诗词风格');
     expect(_fieldText(tester, '口算解析'), kMathExplainSystemPrompt);
     expect(_fieldText(tester, 'AI 助手人设'), kAssistantSystemPrompt);
@@ -194,7 +198,7 @@ void main() {
     await _tapReal(tester, _sectionButton('口算解析', '保存'));
 
     expect(HiveBoxes.settings.get('llm_math_explain_prompt'), isNull);
-    expect(find.text('内置默认'), findsNWidgets(7));
+    expect(find.text('内置默认'), findsNWidgets(8));
     expect(find.text('已恢复默认'), findsOneWidget);
     expect(_fieldText(tester, '口算解析'), kMathExplainSystemPrompt);
 
@@ -243,7 +247,7 @@ void main() {
     await _tapReal(tester, find.widgetWithText(FilledButton, '恢复默认'));
 
     expect(HiveBoxes.settings.get('llm_poem_explain_prompt'), isNull);
-    expect(find.text('内置默认'), findsNWidgets(7));
+    expect(find.text('内置默认'), findsNWidgets(8));
     expect(_fieldText(tester, '诗词讲解'), kPoemExplainSystemPrompt);
 
     await tester.pump(const Duration(seconds: 5));
@@ -287,6 +291,13 @@ void main() {
   });
 
   for (final (title, key, defaultText, maxLength, keepsMarker) in [
+    (
+      '英语短语',
+      'llm_english_phrase_prompt',
+      kEnglishPhraseGenerationSystemPrompt,
+      kEnglishPhrasePromptMaxLength,
+      false,
+    ),
     (
       'AI 生成应用题',
       'llm_word_problem_prompt',
@@ -399,10 +410,11 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('七个场景在小屏大字号下均可滚动到编辑和操作按钮，无布局溢出', (tester) async {
+  testWidgets('八个场景在小屏大字号下均可滚动到编辑和操作按钮，无布局溢出', (tester) async {
     await _pumpPage(tester, size: const Size(320, 900), scale: 2);
     for (final title in [
       'AI 生成应用题',
+      '英语短语',
       '看图说话生图',
       '根据图片出题',
       '看图说话点评',
@@ -417,6 +429,58 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   });
+
+  for (final subject in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('英语提示词 ${subject.name} ${brightness.name} 手机横屏大字可编辑保存', (
+        tester,
+      ) async {
+        addTearDown(tester.view.reset);
+        final theme = AppTheme.resolve(
+          subject: subject,
+          brightness: brightness,
+        );
+        for (final layout in [
+          (size: const Size(390, 844), scale: 1.0),
+          (size: const Size(320, 740), scale: 2.0),
+          (size: const Size(844, 390), scale: 2.0),
+        ]) {
+          await _pumpPage(
+            tester,
+            size: layout.size,
+            scale: layout.scale,
+            theme: theme,
+          );
+          final card = find.ancestor(
+            of: find.text('英语短语'),
+            matching: find.byType(ColoredCard),
+          );
+          expect(
+            tester.widget<ColoredCard>(card).color,
+            theme.colorScheme.primary,
+          );
+          await tester.ensureVisible(_sectionField('英语短语'));
+          await tester.pumpAndSettle();
+          await tester.enterText(_sectionField('英语短语'), '适合低年级的家庭短语');
+          await _tapReal(tester, _sectionButton('英语短语', '保存'));
+          expect(
+            HiveBoxes.settings.get('llm_english_phrase_prompt'),
+            '适合低年级的家庭短语',
+          );
+          await tester.pump(const Duration(seconds: 5));
+          await tester.ensureVisible(_sectionButton('英语短语', '恢复默认'));
+          await tester.pumpAndSettle();
+          expect(_sectionButton('英语短语', '恢复默认').hitTestable(), findsOneWidget);
+          await _tapReal(tester, _sectionButton('英语短语', '恢复默认'));
+          expect(find.text(kEnglishPhraseGenerationSystemPrompt), findsOneWidget);
+          await _tapReal(tester, find.widgetWithText(TextButton, '取消'));
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        }
+      });
+    }
+  }
 
   testWidgets('点评提示词可独立保存和恢复默认', (tester) async {
     await _pumpPage(tester);
@@ -458,7 +522,7 @@ void main() {
 
     expect(_fieldText(tester, 'AI 助手人设'), '你是严格老师');
     expect(find.text('已自定义'), findsOneWidget);
-    expect(find.text('内置默认'), findsNWidgets(6));
+    expect(find.text('内置默认'), findsNWidgets(7));
   });
 
   testWidgets('助手人设区块：清空保存 = 恢复默认，框回 kAssistantSystemPrompt', (tester) async {
@@ -472,7 +536,7 @@ void main() {
 
     expect(HiveBoxes.settings.get('llm_assistant_prompt'), isNull);
     expect(_fieldText(tester, 'AI 助手人设'), kAssistantSystemPrompt);
-    expect(find.text('内置默认'), findsNWidgets(7));
+    expect(find.text('内置默认'), findsNWidgets(8));
 
     await tester.pump(const Duration(seconds: 5));
   });

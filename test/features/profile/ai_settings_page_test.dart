@@ -132,6 +132,7 @@ void main() {
     await tester.tap(find.text('提示词设置'));
     await tester.pumpAndSettle();
     expect(find.byType(PromptSettingsPage), findsOneWidget);
+    expect(find.text('英语短语'), findsOneWidget);
     expect(find.text('看图说话生图'), findsOneWidget);
     expect(find.text('根据图片出题'), findsOneWidget);
   });

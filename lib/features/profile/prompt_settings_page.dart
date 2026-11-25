@@ -1,7 +1,7 @@
 // lib/features/profile/prompt_settings_page.dart
 //
 // 层级：features/profile
-// 职责：AI 提示词设置页 —— 生图、出题、诗词讲解、口算解析和助手人设的提示词
+// 职责：AI 提示词设置页 —— 生图、出题、英语短语、讲解和助手人设的提示词
 //       的查看、编辑与一键恢复默认。画面和教学要求可编辑；具体场景、
 //       图片与阶段输出结构由程序拼装，不在此页面范围。
 //
@@ -38,6 +38,12 @@ enum _PromptScene {
     hintText: '输入应用题出题提示词',
     resetTitle: '恢复应用题出题默认',
     explanation: '调整应用题的生活情境与素材选择偏好。',
+  ),
+  englishPhrase(
+    title: '英语短语',
+    hintText: '输入英语短语的教学要求',
+    resetTitle: '恢复英语短语提示词默认',
+    explanation: '调整短语的难度、搭配与中文释义，用于下一次生成。',
   ),
   pictureStoryImage(
     title: '看图说话生图',
@@ -90,6 +96,7 @@ enum _PromptScene {
   final String explanation;
 
   int get maxLength => switch (this) {
+    _PromptScene.englishPhrase => kEnglishPhrasePromptMaxLength,
     _PromptScene.pictureStoryImage => kPictureStoryImagePromptMaxLength,
     _PromptScene.pictureStoryFeedback => kPictureStoryFeedbackPromptMaxLength,
     _ => kPromptMaxLength,
@@ -97,6 +104,7 @@ enum _PromptScene {
 
   /// 内置默认全文。
   String get defaultText => switch (this) {
+        _PromptScene.englishPhrase => kEnglishPhraseGenerationSystemPrompt,
         _PromptScene.wordProblem => kWordProblemGenerationSystemPrompt,
         _PromptScene.pictureStoryImage =>
           kPictureStoryImageGenerationSystemPrompt,
@@ -110,6 +118,8 @@ enum _PromptScene {
 
   /// 当前生效内容：用户覆盖值 ?? 内置默认。
   String currentText(SettingsRepository repo) => switch (this) {
+        _PromptScene.englishPhrase => repo.englishPhraseGenerationPromptOverride ??
+            kEnglishPhraseGenerationSystemPrompt,
         _PromptScene.wordProblem => repo.wordProblemGenerationPromptOverride ??
             kWordProblemGenerationSystemPrompt,
         _PromptScene.pictureStoryImage =>
@@ -130,6 +140,7 @@ enum _PromptScene {
 
   /// 当前是否有用户覆盖（null = 内置默认态）。
   String? overrideOf(SettingsRepository repo) => switch (this) {
+        _PromptScene.englishPhrase => repo.englishPhraseGenerationPromptOverride,
         _PromptScene.wordProblem => repo.wordProblemGenerationPromptOverride,
         _PromptScene.pictureStoryImage =>
           repo.pictureStoryImageGenerationPromptOverride,
@@ -142,6 +153,7 @@ enum _PromptScene {
       };
 
   Future<void> save(SettingsRepository repo, String value) => switch (this) {
+        _PromptScene.englishPhrase => repo.setEnglishPhraseGenerationPrompt(value),
         _PromptScene.wordProblem => repo.setWordProblemGenerationPrompt(value),
         _PromptScene.pictureStoryImage =>
           repo.setPictureStoryImageGenerationPrompt(value),
@@ -154,6 +166,7 @@ enum _PromptScene {
       };
 
   Future<void> reset(SettingsRepository repo) => switch (this) {
+        _PromptScene.englishPhrase => repo.resetEnglishPhraseGenerationPrompt(),
         _PromptScene.wordProblem => repo.resetWordProblemGenerationPrompt(),
         _PromptScene.pictureStoryImage =>
           repo.resetPictureStoryImageGenerationPrompt(),
@@ -297,7 +310,7 @@ class _PromptSettingsPageState extends ConsumerState<PromptSettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '分别调整 AI 生图、出题、讲解的要求与助手人设，'
+              '分别调整 AI 生图、出题、英语短语、讲解的要求与助手人设，'
               '改得不如意可随时恢复内置默认。',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
