@@ -27,6 +27,7 @@ import 'package:poemath/features/english/english_study_page.dart';
 import 'package:poemath/features/english/english_tab_page.dart';
 import 'package:poemath/features/english/english_target_editor.dart';
 import 'package:poemath/features/english/english_widgets.dart';
+import 'package:poemath/features/english/widgets/english_spelling_practice_content.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_learning_providers.dart';
 
@@ -175,6 +176,33 @@ void main() {
           .widget<FilledButton>(find.widgetWithText(FilledButton, '提交答案'))
           .onPressed !=
       null;
+  EnglishSpellingPracticeContent spellingContent(WidgetTester tester) =>
+      tester.widget<EnglishSpellingPracticeContent>(
+        find.byType(EnglishSpellingPracticeContent),
+      );
+  String spellingInput(WidgetTester tester) => tester
+      .widget<Text>(find.byKey(const ValueKey('english-spelling-input')))
+      .data!;
+  Future<void> chooseSpelling(WidgetTester tester, String text) async {
+    for (final letter in text.split('')) {
+      final content = spellingContent(tester);
+      final index = content.question.options
+          .asMap()
+          .entries
+          .firstWhere(
+            (entry) =>
+                entry.value == letter && !content.tokens.contains(entry.key),
+          )
+          .key;
+      final token = find.byKey(ValueKey('english-token-$index'));
+      await tester.ensureVisible(token);
+      await tester.pumpAndSettle();
+      await tester.runAsync(() => tester.tap(token));
+      await tester.pump();
+      await until(tester, () => !spellingContent(tester).busy);
+    }
+  }
+
   testWidgets('英语 Tab 暂时仅保留课本入口', (tester) async {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -1172,7 +1200,226 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await drainHiveWritesForTesting(tester);
   });
-  testWidgets('单词练习左右切换保留独立草稿，返回仍到原入口', (tester) async {
+  testWidgets('拼写恢复旧字母草稿，切词独立保存，撤回清空与提示证据兼容且失败可重试', (tester) async {
+    final book = englishBook();
+    final progress = _RetryProgress(book, courses);
+    final question = buildEnglishQuestions(
+      courses.course,
+      EnglishPracticeKind.spelling,
+    ).first;
+    final scope =
+        '${book.pdfSha256}/unit-1-p2/spelling/false/false/${question.recordKey}';
+    final drafts = PracticeDraftRepository();
+    drafts.claim('englishPractice', scope: scope);
+    await tester.runAsync(
+      () => drafts.save('englishPractice', {
+        'sessionId': 'legacy-spelling',
+        'questions': [question.toJson()],
+        'answers': <Object>[],
+        'input': '',
+        'tokens': [question.options.indexOf('r')],
+        'hint': true,
+        'seconds': 2,
+      }, scope: scope),
+    );
+    final path = AppRoutes.englishBookOf(
+      book.pdfSha256,
+      action: 'practice',
+      kind: 'spelling',
+      lesson: 'unit-1-p2',
+      targetKey: question.recordKey,
+    );
+    final router = GoRouter(
+      initialLocation: path,
+      routes: [
+        GoRoute(
+          path: AppRoutes.englishPractice,
+          builder: (_, state) => EnglishPracticePage(
+            key: ValueKey(state.uri.toString()),
+            bookId: state.pathParameters['id']!,
+            kind: state.pathParameters['kind']!,
+            lessonId: state.uri.queryParameters['lesson'],
+            targetKey: state.uri.queryParameters['targetKey'],
+          ),
+        ),
+        GoRoute(
+          path: AppRoutes.englishRecord,
+          builder: (_, _) => const Scaffold(body: Text('保存完成')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ...overrides(),
+          englishProgressRepositoryProvider.overrideWith((ref, id) => progress),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('拼写练习'), findsNothing);
+    expect(find.text('红风筝'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('红风筝')),
+      findsOneWidget,
+    );
+    expect(find.text('red kite'), findsNothing);
+    expect(spellingInput(tester), 'r');
+    expect(submitReady(tester), isFalse);
+    final practiceState = tester.state(find.byType(EnglishPracticePage));
+    final scaffold = tester.element(find.byType(AppScaffold));
+    final location = router.routeInformationProvider.value.uri;
+    final actions = tester.getRect(
+      find.byKey(const ValueKey('english-spelling-actions')),
+    );
+    await tester.runAsync(() => tester.tap(find.byTooltip('下一题')));
+    await until(
+      tester,
+      () => spellingContent(tester).question.target.id == 'word-2',
+    );
+    await tester.pumpAndSettle();
+    expect(spellingInput(tester), '点选字母');
+    expect(tester.state(find.byType(EnglishPracticePage)), same(practiceState));
+    expect(tester.element(find.byType(AppScaffold)), same(scaffold));
+    expect(router.routeInformationProvider.value.uri, location);
+    expect(
+      tester.getRect(find.byKey(const ValueKey('english-spelling-actions'))),
+      actions,
+    );
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('蓝鸟')),
+      findsOneWidget,
+    );
+    await chooseSpelling(tester, 'b');
+    await tester.runAsync(() => tester.tap(find.byTooltip('上一题')));
+    await until(
+      tester,
+      () => spellingContent(tester).question.target.id == 'word-1',
+    );
+    await tester.pumpAndSettle();
+    expect(spellingInput(tester), 'r');
+    expect(HiveBoxes.learningActivities.values, isEmpty);
+    await tester.runAsync(() => tester.tap(find.byTooltip('撤回一个字母')));
+    await until(tester, () => spellingInput(tester) == '点选字母');
+    await chooseSpelling(tester, 're');
+    await tester.runAsync(() => tester.tap(find.text('清空')));
+    await until(tester, () => spellingInput(tester) == '点选字母');
+    await chooseSpelling(tester, 'red kite');
+    expect(spellingContent(tester).tokens.toSet(), hasLength(8));
+    expect(submitReady(tester), isTrue);
+    await tester.runAsync(() => tester.tap(find.text('提交答案')));
+    await until(tester, () => find.text('完成练习').evaluate().isNotEmpty);
+    expect(spellingInput(tester), 'red kite');
+    expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+    expect(find.text('答对了'), findsNothing);
+    await tester.runAsync(() => tester.tap(find.text('完成练习')));
+    await until(tester, () => find.text('保存失败，请重试').evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(SnackBar), const Offset(0, 100));
+    await tester.pumpAndSettle();
+    router.go('/missing');
+    await tester.pumpAndSettle();
+    router.go(path);
+    await tester.pumpAndSettle();
+    expect(spellingInput(tester), 'red kite');
+    expect(find.text('完成练习'), findsOneWidget);
+    await tester.runAsync(() => tester.tap(find.text('完成练习')));
+    await until(tester, () => find.text('保存完成').evaluate().isNotEmpty);
+    final attempt = progress.load().attempts.single;
+    expect(attempt.id, 'legacy-spelling');
+    expect(attempt.answers.single.answer, 'red kite');
+    expect(attempt.answers.single.hinted, isTrue);
+    expect(attempt.answers.single.objectiveCorrect, isFalse);
+    expect(HiveBoxes.learningActivities.values.single.totalItems, 1);
+    expect(HiveBoxes.learningActivities.values.single.successfulItems, 0);
+    expect(drafts.get('englishPractice', scope: scope), isNull);
+    final other = drafts.get(
+      'englishPractice',
+      scope:
+          '${book.pdfSha256}/unit-1-p2/spelling/false/false/unit-1-p2/word-2/spelling',
+    )!;
+    expect(other['answers'], isEmpty);
+    expect(other['tokens'], hasLength(1));
+    await tester.pumpWidget(const SizedBox());
+    await drainHiveWritesForTesting(tester);
+  });
+
+  testWidgets('拼写整组允许乱序切词，答错在原卡核对，跳过和成绩仅记录各自单词', (tester) async {
+    final book = englishBook();
+    final path = AppRoutes.englishBookOf(
+      book.pdfSha256,
+      action: 'practice',
+      kind: 'spelling',
+    );
+    final router = GoRouter(
+      initialLocation: path,
+      routes: [
+        GoRoute(
+          path: AppRoutes.englishPractice,
+          builder: (_, _) =>
+              EnglishPracticePage(bookId: book.pdfSha256, kind: 'spelling'),
+        ),
+        GoRoute(
+          path: AppRoutes.englishRecord,
+          builder: (_, _) => const Scaffold(body: Text('保存完成')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: overrides(),
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await chooseSpelling(tester, 'r');
+    await tester.runAsync(() => tester.tap(find.byTooltip('下一题')));
+    await until(
+      tester,
+      () => spellingContent(tester).question.target.id == 'word-2',
+    );
+    await chooseSpelling(tester, 'drib eulb');
+    await tester.runAsync(() => tester.tap(find.text('提交答案')));
+    await until(tester, () => find.text('继续练习').evaluate().isNotEmpty);
+    expect(spellingInput(tester), 'drib eulb');
+    expect(find.text('blue bird'), findsOneWidget);
+    expect(find.byIcon(Icons.cancel_outlined), findsOneWidget);
+    router.go('/missing');
+    await tester.pumpAndSettle();
+    router.go(path);
+    await tester.pumpAndSettle();
+    expect(spellingContent(tester).question.target.id, 'word-2');
+    expect(spellingInput(tester), 'drib eulb');
+    await tester.runAsync(() => tester.tap(find.text('继续练习')));
+    await until(
+      tester,
+      () => spellingContent(tester).question.target.id == 'word-1',
+    );
+    expect(spellingInput(tester), 'r');
+    await tester.runAsync(() => tester.tap(find.text('跳过')));
+    await until(tester, () => find.text('完成练习').evaluate().isNotEmpty);
+    expect(find.text('red kite'), findsOneWidget);
+    expect(find.text('答对了'), findsNothing);
+    await tester.runAsync(() => tester.tap(find.text('完成练习')));
+    await until(tester, () => find.text('保存完成').evaluate().isNotEmpty);
+    final answers = EnglishProgressRepository(
+      book,
+      courses,
+    ).load().attempts.single.answers;
+    expect(answers.map((a) => a.question.target.id), ['word-2', 'word-1']);
+    expect(answers.first.correct, isFalse);
+    expect(answers.last.skipped, isTrue);
+    expect(answers.last.correct, isNull);
+    expect(HiveBoxes.learningActivities.values.single.totalItems, 2);
+    expect(HiveBoxes.learningActivities.values.single.successfulItems, 0);
+    await tester.pumpWidget(const SizedBox());
+    await drainHiveWritesForTesting(tester);
+  });
+
+  testWidgets('单词练习原页切换保留独立草稿和底栏位置，返回仍到原入口', (tester) async {
     final book = englishBook();
     final firstPath = AppRoutes.englishBookOf(
       book.pdfSha256,
@@ -1203,6 +1450,10 @@ void main() {
             targetKey: state.uri.queryParameters['targetKey'],
           ),
         ),
+        GoRoute(
+          path: AppRoutes.englishRecord,
+          builder: (_, _) => const Scaffold(body: Text('保存完成')),
+        ),
       ],
     );
     addTearDown(router.dispose);
@@ -1214,6 +1465,13 @@ void main() {
     );
     await tester.tap(find.text('单词详情入口'));
     await tester.pumpAndSettle();
+    expect(tester.state(find.byType(EnglishPracticePage)), same(practiceState));
+    expect(tester.element(find.byType(AppScaffold)), same(scaffold));
+    expect(router.routeInformationProvider.value.uri, location);
+    expect(
+      tester.getRect(find.byKey(const ValueKey('english-meaning-actions'))),
+      actions,
+    );
     expect(
       find.descendant(of: find.byType(AppBar), matching: find.text('red kite')),
       findsOneWidget,
@@ -1231,6 +1489,12 @@ void main() {
     await tester.runAsync(() => tester.tap(find.byTooltip('下一题')));
     await until(tester, () => find.text('blue bird').evaluate().isNotEmpty);
     await tester.pumpAndSettle();
+    final practiceState = tester.state(find.byType(EnglishPracticePage));
+    final scaffold = tester.element(find.byType(AppScaffold));
+    final location = router.routeInformationProvider.value.uri;
+    final actions = tester.getRect(
+      find.byKey(const ValueKey('english-meaning-actions')),
+    );
     expect(
       tester
           .widget<IconButton>(
@@ -1278,6 +1542,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('完成练习'), findsOneWidget);
     expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+    await tester.runAsync(() => tester.tap(find.text('完成练习')));
+    await until(tester, () => find.text('保存完成').evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+    final attempt = EnglishProgressRepository(
+      book,
+      courses,
+    ).load().attempts.single;
+    expect(attempt.id, second['sessionId']);
+    expect(attempt.answers.single.question.target.id, 'word-2');
+    expect(HiveBoxes.learningActivities.values.single.totalItems, 1);
+    expect(HiveBoxes.learningActivities.values.single.successfulItems, 1);
+    expect(
+      drafts.get('englishPractice', scope: '$prefix/unit-1-p2/word-2/meaning'),
+      isNull,
+    );
+    expect(
+      drafts.get(
+        'englishPractice',
+        scope: '$prefix/unit-1-p2/word-1/meaning',
+      )!['input'],
+      '红风筝',
+    );
     router.pop();
     await tester.pumpAndSettle();
     expect(find.text('单词详情入口'), findsOneWidget);

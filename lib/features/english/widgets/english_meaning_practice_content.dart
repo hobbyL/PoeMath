@@ -4,6 +4,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/domain/english_practice.dart';
+import 'package:poemath/features/english/widgets/english_practice_actions.dart';
 
 /// 词义选择题面和固定操作区；作答与草稿仍由练习页管理。
 class EnglishMeaningPracticeContent extends StatelessWidget {
@@ -43,83 +44,18 @@ class EnglishMeaningPracticeContent extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(child: _body(context)),
-            Padding(
+            EnglishPracticeActions(
               key: const ValueKey('english-meaning-actions'),
-              padding: const EdgeInsets.fromLTRB(
-                SpacingTokens.md,
-                SpacingTokens.sm,
-                SpacingTokens.md,
-                SpacingTokens.sm,
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: '上一题',
-                    constraints: const BoxConstraints.tightFor(
-                      width: SpacingTokens.minTapTarget,
-                      height: SpacingTokens.minTapTarget,
-                    ),
-                    visualDensity: VisualDensity.standard,
-                    onPressed: busy ? null : onPrevious,
-                    icon: const Icon(Icons.chevron_left),
-                  ),
-                  IconButton(
-                    tooltip: '下一题',
-                    constraints: const BoxConstraints.tightFor(
-                      width: SpacingTokens.minTapTarget,
-                      height: SpacingTokens.minTapTarget,
-                    ),
-                    visualDensity: VisualDensity.standard,
-                    onPressed: busy ? null : onNext,
-                    icon: const Icon(Icons.chevron_right),
-                  ),
-                  const SizedBox(width: SpacingTokens.xs),
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(
-                        SpacingTokens.minTapTarget,
-                        SpacingTokens.minTapTarget,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: SpacingTokens.xs,
-                      ),
-                    ),
-                    onPressed: busy || answer != null ? null : onSkip,
-                    child: const Text('跳过', textAlign: TextAlign.center),
-                  ),
-                  const SizedBox(width: SpacingTokens.sm),
-                  Expanded(
-                    child: FilledButton(
-                      key: const ValueKey('english-meaning-submit'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(
-                          SpacingTokens.minTapTarget,
-                          SpacingTokens.minTapTarget,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: SpacingTokens.sm,
-                          vertical: SpacingTokens.sm,
-                        ),
-                      ),
-                      onPressed: busy
-                          ? null
-                          : answer != null
-                          ? onContinue
-                          : question.options.contains(selected)
-                          ? onSubmit
-                          : null,
-                      child: Text(
-                        answer == null
-                            ? '提交答案'
-                            : lastQuestion
-                            ? '完成练习'
-                            : '继续练习',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              submitKey: const ValueKey('english-meaning-submit'),
+              busy: busy,
+              answered: answer != null,
+              canSubmit: question.options.contains(selected),
+              complete: lastQuestion,
+              onPrevious: onPrevious,
+              onNext: onNext,
+              onSkip: onSkip,
+              onSubmit: onSubmit,
+              onContinue: onContinue,
             ),
           ],
         ),
