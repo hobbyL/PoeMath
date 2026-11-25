@@ -12,6 +12,7 @@ import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_cache_manager_sheet.dart';
+import 'package:poemath/features/textbook/widgets/textbook_cleanup_icon.dart';
 import 'package:poemath/features/textbook/widgets/textbook_cover_grid.dart';
 import 'package:poemath/features/textbook/widgets/textbook_import_dialog.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_cover.dart';
@@ -263,28 +264,26 @@ class _TextbookManagementPageState
                       ),
                       // 每本书独立的缓存入口：封面整卡仍是「打开书籍」，
                       // 这里只负责查看占用与清理可重建数据。
-                      Positioned(
+                      PositionedDirectional(
                         top: SpacingTokens.xs,
-                        right: SpacingTokens.xs,
+                        end: SpacingTokens.xs,
                         child: IconButton(
                           key: ValueKey('textbook-cache-${book.pdfSha256}'),
                           tooltip: '缓存管理',
                           onPressed: () =>
                               showTextbookCacheSheet(context, book),
                           style: IconButton.styleFrom(
-                            backgroundColor: theme.colorScheme.surface
-                                .withValues(alpha: 0.9),
+                            backgroundColor: Colors.transparent,
                             foregroundColor: theme.colorScheme.onSurface,
+                            iconSize: SpacingTokens.lg,
                             fixedSize: const Size.square(
                               SpacingTokens.minTapTarget,
                             ),
                             padding: EdgeInsets.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.standard,
                           ),
-                          icon: const Icon(
-                            Icons.cleaning_services_outlined,
-                            size: SpacingTokens.md,
-                          ),
+                          icon: const TextbookCleanupIcon(),
                         ),
                       ),
                     ],
