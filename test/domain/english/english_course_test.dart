@@ -78,6 +78,35 @@ void main() {
     ).first;
     expect(spelling.accepts('RED   KITE'), isTrue);
     expect(spelling.accepts('redkite'), isFalse);
+    final restoredSpelling = EnglishQuestion.fromJson(spelling.toJson());
+    expect(restoredSpelling.options, spelling.options);
+    expect(
+      restoredSpelling.options.where((token) => token == ' '),
+      hasLength(1),
+    );
+    expect(
+      restoredSpelling.options.where((token) => token == 'e'),
+      hasLength(2),
+    );
+    expect(restoredSpelling.toJson(), spelling.toJson());
+    validateEnglishQuestion(course, restoredSpelling);
+    for (final invalid in ['', '  ']) {
+      expect(
+        () => EnglishQuestion.fromJson({
+          ...spelling.toJson(),
+          'options': [invalid],
+        }),
+        throwsFormatException,
+      );
+    }
+    expect(
+      () => EnglishQuestion.fromJson({
+        ...spelling.toJson(),
+        'kind': 'meaning',
+        'options': [' '],
+      }),
+      throwsFormatException,
+    );
     expect(normalizeEnglishAnswer('  can’t '), "can't");
     expect(
       buildEnglishQuestions(
@@ -153,8 +182,10 @@ void main() {
       isNot(contains('parent-draft')),
     );
     expect(
-      buildEnglishQuestions(course, EnglishPracticeKind.spelling)
-          .map((question) => question.target.id),
+      buildEnglishQuestions(
+        course,
+        EnglishPracticeKind.spelling,
+      ).map((question) => question.target.id),
       containsAll(['auto-one', 'auto-two']),
     );
   });

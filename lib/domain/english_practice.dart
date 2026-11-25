@@ -84,7 +84,15 @@ class EnglishQuestion {
       target: EnglishTarget.fromJson(j['target']),
       kind: kind,
       prompt: englishString(j['prompt']),
-      options: englishList(j['options'], (v) => englishString(v), max: 100),
+      options: englishList(
+        j['options'],
+        (v) => englishString(
+          v,
+          // A phrase's space is a selectable spelling token, not empty text.
+          empty: kind == EnglishPracticeKind.spelling && v == ' ',
+        ),
+        max: 100,
+      ),
       answers: englishList(j['answers'], (v) => englishString(v), max: 20),
       audioText: j['audioText'] == null ? null : englishString(j['audioText']),
       voiceKey: j['voiceKey'] == null ? null : englishString(j['voiceKey']),
