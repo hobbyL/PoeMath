@@ -687,8 +687,9 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage>
                 label: const Text('整理与审核英语课时'),
               )
             else ...[
-              for (final lesson in lessons)
+              for (final lesson in lessons) ...[
                 TextButton(
+                  key: ValueKey('english-lesson-study-${lesson.id}'),
                   onPressed: !_turning && _previewVisible
                       ? () => _openRoute(
                           AppRoutes.englishBookOf(
@@ -702,6 +703,26 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage>
                     '${lessons.length > 1 ? '${lesson.title} · ' : ''}学一学',
                   ),
                 ),
+                if (lesson.targets.any(
+                  (target) => target.isLearnableVocabulary,
+                ))
+                  TextButton(
+                    key: ValueKey('english-lesson-vocabulary-${lesson.id}'),
+                    onPressed: !_turning && _previewVisible
+                        ? () => _openRoute(
+                            AppRoutes.englishBookOf(
+                              widget.bookId,
+                              lesson: lesson.id,
+                              action: 'study',
+                              kind: EnglishTargetKind.vocabulary.name,
+                            ),
+                          )
+                        : null,
+                    child: Text(
+                      '${lessons.length > 1 ? '${lesson.title} · ' : ''}单词与短语',
+                    ),
+                  ),
+              ],
             ],
           ],
         );

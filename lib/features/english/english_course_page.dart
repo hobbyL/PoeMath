@@ -143,7 +143,7 @@ class _EnglishCoursePageState extends ConsumerState<EnglishCoursePage>
                                 titleMaxLines: 2,
                                 subtitle: widget.review
                                     ? 'PDF ${lesson.startPage}–${lesson.endPage} · 已核对 ${lesson.approvedCount}/${lesson.targets.length}${lesson.prepared ? '' : ' · 待整理'}${course.pending.any((l) => l.id == lesson.id) ? ' · 有新稿' : ''}'
-                                    : 'PDF ${lesson.startPage}–${lesson.endPage} · ${lesson.approvedCount} 项可学',
+                                    : 'PDF ${lesson.startPage}–${lesson.endPage} · ${lesson.availableCount} 项可学',
                                 onTap: () => _open(lesson),
                               ),
                           ],
@@ -412,7 +412,7 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
                   style: theme.textTheme.headlineSmall,
                 ),
                 Text(
-                  'PDF ${lesson.startPage}–${lesson.endPage} · 已核对 ${lesson.approvedCount}/${lesson.targets.length}',
+                  'PDF ${lesson.startPage}–${lesson.endPage} · ${lesson.availableCount} 项可学',
                 ),
                 const SizedBox(height: SpacingTokens.md),
                 Wrap(
@@ -442,7 +442,7 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
                   children: [
                     for (final kind in EnglishTargetKind.values)
                       if (lesson.targets.any(
-                        (t) => t.kind == kind && t.approved,
+                        (t) => t.kind == kind && t.isAvailableForChild,
                       ))
                         AppTile(
                           icon: kind == EnglishTargetKind.letter
@@ -451,7 +451,7 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
                           iconColor: theme.colorScheme.primary,
                           title: kind.label,
                           subtitle:
-                              '${lesson.targets.where((t) => t.kind == kind && t.approved).length} 项可学',
+                              '${lesson.targets.where((t) => t.kind == kind && t.isAvailableForChild).length} 项可学',
                           onTap: () => context.push(
                             AppRoutes.englishBookOf(
                               bookId,
@@ -477,11 +477,10 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
                       ),
                   ],
                 ),
-                if (lesson.approvedCount == 0)
+                if (lesson.availableCount == 0)
                   const AppEmptyState(
                     icon: Icons.pending_actions,
-                    title: '本课还没有核对好的内容',
-                    description: '先看原书，待家长核对后开放学习。',
+                    title: '本课还没有可学习的内容',
                   ),
               ],
             );
@@ -515,14 +514,9 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
     final pageNumbers = <int>{
       for (var page = lesson.startPage; page <= lesson.endPage; page++) page,
     };
-    final approvedVocabulary = readOnlyContent
+    final learnableVocabulary = readOnlyContent
         ? lesson.targets
-              .where(
-                (target) =>
-                    target.approved &&
-                    target.kind == EnglishTargetKind.vocabulary &&
-                    target.meaning.isNotEmpty,
-              )
+              .where((target) => target.isLearnableVocabulary)
               .toList()
         : const <EnglishTarget>[];
     final targetsByPage = <int, List<EnglishTarget>>{};
@@ -532,7 +526,7 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
     };
     for (final target in lesson.targets) {
       if (readOnlyContent &&
-          !target.approved &&
+          !target.isAvailableForChild &&
           target.kind != EnglishTargetKind.sentence) {
         continue;
       }
@@ -594,15 +588,15 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (approvedVocabulary.isNotEmpty) ...[
+          if (learnableVocabulary.isNotEmpty) ...[
             AppTileGroup(
               children: [
                 AppTile(
-                  key: const ValueKey('english-approved-vocabulary-entry'),
+                  key: const ValueKey('english-vocabulary-entry'),
                   icon: Icons.abc,
                   iconColor: theme.colorScheme.primary,
                   title: '单词与短语',
-                  subtitle: '${approvedVocabulary.length} 项可学',
+                  subtitle: '${learnableVocabulary.length} 项可学',
                   onTap: () => context.push(
                     AppRoutes.englishBookOf(
                       bookId,
@@ -729,7 +723,7 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
           if (readOnlyContent &&
               !lesson.targets.any(
                 (target) =>
-                    target.approved ||
+                    target.isAvailableForChild ||
                     target.kind == EnglishTargetKind.sentence,
               ))
             const AppEmptyState(
@@ -797,7 +791,7 @@ class _EnglishLessonPageState extends ConsumerState<EnglishLessonPage>
     subtitle: [
       target.kind.label,
       if (target.meaning.isNotEmpty) target.meaning,
-      target.approved ? '已核对' : '待核对',
+      if (!readOnlyContent) target.approved ? '已核对' : '待核对',
     ].join(' · '),
     subtitleMaxLines: 3,
     onTap: readOnlyContent

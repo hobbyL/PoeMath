@@ -470,6 +470,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('全书课程'), findsNothing);
+    expect(find.text('单词与短语'), findsNothing);
     expect(find.text('学一学'), findsOneWidget);
     expect(
       textbookPageTapPosition(
@@ -590,7 +591,7 @@ void main() {
     );
     expect(find.text('1. Who is he?'), findsOneWidget);
     expect(find.text('2. Draft sentence'), findsOneWidget);
-    expect(find.textContaining('待核对'), findsOneWidget);
+    expect(find.textContaining('待核对'), findsNothing);
     await tester.tap(find.text('1. Who is he?'));
     await tester.pumpAndSettle();
     expect(narrationPlayers.expand((player) => player.audio), hasLength(4));
@@ -604,6 +605,169 @@ void main() {
       isFalse,
     );
     expect(find.byTooltip('补充内容'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('英语课本详情按章节显示单词入口并打开对应课时', (tester) async {
+    final english = textbookFixture(
+      title: '英语词汇直达测试教材',
+      subject: TextbookSubject.english,
+    );
+    final lesson = englishLesson(
+      id: 'unit-one-p2',
+      unit: 'Unit 1 Garden',
+      targets: [
+        englishWord(
+          id: 'garden-word',
+          text: 'garden',
+          meaning: '花园',
+          approved: false,
+        ),
+      ],
+    ).change({'title': 'Lesson 1', 'endPage': 2});
+    final unavailableLesson = englishLesson(
+      id: 'unit-two-p2',
+      unit: 'Unit 2 Park',
+      targets: [
+        englishWord(
+          id: 'draft-word',
+          text: 'draft word',
+          approved: false,
+          origin: 'parent',
+        ),
+        englishWord(id: 'empty-meaning', meaning: '', approved: false),
+      ],
+    ).change({'title': 'Lesson 2', 'endPage': 2});
+    final course = englishCourse(
+      book: english,
+      lessons: [lesson, unavailableLesson],
+    );
+    final tts = TtsService(NarrationSettings(), flutterTts: NarrationEngine());
+    final audio = EnglishAudio(
+      bookId: english.pdfSha256,
+      tts: tts,
+      cache: MemoryNarrationCache(),
+      store: EnglishRecordingStore(),
+    );
+    repo.books[english.pdfSha256] = english;
+    repo.readings['default:${english.pdfSha256}'] = const TextbookReading(
+      page: 2,
+    );
+    files.paths[english.pdfSha256] = '/english-vocabulary.pdf';
+
+    final router = GoRouter(
+      initialLocation: AppRoutes.textbookDetailOf(english.pdfSha256),
+      routes: [
+        GoRoute(
+          path: AppRoutes.textbookDetail,
+          builder: (_, state) =>
+              TextbookDetailPage(bookId: state.pathParameters['id']!),
+        ),
+        GoRoute(
+          path: AppRoutes.englishStudy,
+          builder: (_, state) {
+            final route =
+                '${state.pathParameters['id']}|'
+                '${state.pathParameters['lesson']}|'
+                '${state.uri.queryParameters['kind']}';
+            return Scaffold(body: Center(child: Text(route)));
+          },
+        ),
+      ],
+    );
+    final pageTheme = ValueNotifier(
+      AppTheme.resolve(subject: AppSubject.poem, brightness: Brightness.light),
+    );
+    addTearDown(pageTheme.dispose);
+    addTearDown(tts.dispose);
+    addTearDown(router.dispose);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await audio.stop();
+      await drainHiveWritesForTesting(tester);
+    });
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          textbookRepositoryProvider.overrideWithValue(repo),
+          textbookFileServiceProvider.overrideWithValue(files),
+          textbookPrintedPageProvider.overrideWith(
+            (ref, key) async => key.page,
+          ),
+          textbookCourseProvider(english.pdfSha256)
+              .overrideWith((ref) async => null),
+          englishCourseProvider(english.pdfSha256)
+              .overrideWith((ref) async => course),
+          englishAudioProvider(englishAudioKey(english.pdfSha256))
+              .overrideWith((ref) => audio),
+          englishVoiceProvider.overrideWithValue(const {
+            'locale': 'en-US',
+            'name': 'English',
+          }),
+          textbookPreviewBuilderProvider.overrideWithValue(
+            (_, options) => _Viewer(options),
+          ),
+        ],
+        child: ValueListenableBuilder<ThemeData>(
+          valueListenable: pageTheme,
+          builder: (context, theme, _) => MaterialApp.router(
+            routerConfig: router,
+            theme: theme,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const TextScaler.linear(2)),
+              child: child!,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final vocabularyEntry = find.byKey(
+      const ValueKey('english-lesson-vocabulary-unit-one-p2'),
+    );
+    for (final subject in AppSubject.values) {
+      for (final brightness in Brightness.values) {
+        for (final size in [const Size(320, 740), const Size(844, 390)]) {
+          tester.view.physicalSize = size;
+          pageTheme.value = AppTheme.resolve(
+            subject: subject,
+            brightness: brightness,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            vocabularyEntry,
+            findsOneWidget,
+            reason: '$subject/$brightness $size',
+          );
+          expect(
+            find.byKey(const ValueKey('english-lesson-study-unit-one-p2')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('english-lesson-vocabulary-unit-two-p2')),
+            findsNothing,
+          );
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: '$subject/$brightness $size',
+          );
+        }
+      }
+    }
+
+    await tester.tap(vocabularyEntry);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('${english.pdfSha256}|${lesson.id}|vocabulary'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

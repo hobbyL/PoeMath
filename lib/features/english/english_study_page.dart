@@ -8,6 +8,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
@@ -27,9 +28,10 @@ class EnglishStudyPage extends ConsumerStatefulWidget {
     required this.bookId,
     required this.lessonId,
     this.kind,
+    this.targetId,
   });
   final String bookId, lessonId;
-  final String? kind;
+  final String? kind, targetId;
   @override
   ConsumerState<EnglishStudyPage> createState() => _EnglishStudyPageState();
 }
@@ -125,7 +127,15 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
     Map<String, String>? voice,
   ) async {
     await _remember(target.id);
-    if (mounted) await _audio.speak(target.text, voice);
+    if (!mounted) return;
+    final played = await _audio.speak(target.text, voice);
+    if (mounted &&
+        widget.targetId != null &&
+        !played &&
+        !_audio.busy &&
+        _audio.message.isNotEmpty) {
+      englishMessage(context, StateError(_audio.message));
+    }
   }
 
   Future<void> _openVocabularySource(
@@ -141,22 +151,117 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
     }
   }
 
+  Future<void> _openVocabularyDetail(EnglishTarget target) async {
+    await _remember(target.id);
+    await _audio.stop();
+    if (!mounted) return;
+    context.push(
+      AppRoutes.englishVocabularyOf(
+        widget.bookId,
+        lesson: widget.lessonId,
+        target: target.id,
+      ),
+    );
+  }
+
+  Future<void> _practiceVocabulary(
+    EnglishTarget target,
+    EnglishPracticeKind kind,
+  ) async {
+    await _remember(target.id);
+    await _audio.stop();
+    if (!mounted) return;
+    context.push(
+      AppRoutes.englishBookOf(
+        widget.bookId,
+        action: 'practice',
+        kind: kind.name,
+        lesson: widget.lessonId,
+        targetKey: '${widget.lessonId}/${target.id}/${kind.name}',
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final audio = ref.watch(englishAudioProvider(_audioKey)),
         voice = ref.watch(englishVoiceProvider),
         theme = Theme.of(context);
+    final isVocabularyDetail =
+        widget.kind == 'vocabulary' && widget.targetId != null;
+    final detailTarget = isVocabularyDetail
+        ? ref
+              .watch(englishCourseProvider(widget.bookId))
+              .asData
+              ?.value
+              ?.lesson(widget.lessonId)
+              ?.targets
+              .where(
+                (target) =>
+                    target.id == widget.targetId &&
+                    target.isLearnableVocabulary,
+              )
+              .firstOrNull
+        : null;
     return AppScaffold(
+      backgroundScene: PineInkScene.study,
       appBar: AppBar(
-        title: Text(widget.kind == 'vocabulary' ? '单词与短语' : '学一学'),
+        title: Text(
+          widget.kind != 'vocabulary'
+              ? '学一学'
+              : widget.targetId == null
+              ? '单词与短语'
+              : '单词详情',
+        ),
         actions: [
           IconButton(
-            tooltip: '停止朗读',
-            onPressed: audio.busy ? () => audio.stop() : null,
-            icon: const Icon(Icons.stop_circle_outlined),
+            key: isVocabularyDetail
+                ? const ValueKey('english-vocabulary-playback')
+                : null,
+            tooltip: isVocabularyDetail && !audio.busy ? '听一听' : '停止朗读',
+            onPressed: audio.busy
+                ? () => audio.stop()
+                : detailTarget != null && detailTarget.hasSpeech
+                ? () => _playVocabulary(detailTarget, voice)
+                : null,
+            icon: Icon(
+              isVocabularyDetail && !audio.busy
+                  ? Icons.volume_up_outlined
+                  : Icons.stop_circle_outlined,
+            ),
           ),
         ],
       ),
+      bottomNavigationBar:
+          widget.kind == 'vocabulary' && widget.targetId == null
+          ? SafeArea(
+              top: false,
+              minimum: const EdgeInsets.fromLTRB(
+                SpacingTokens.md,
+                SpacingTokens.sm,
+                SpacingTokens.md,
+                SpacingTokens.sm,
+              ),
+              child: SegmentedButton<String>(
+                key: const ValueKey('english-vocabulary-mode'),
+                expandedInsets: EdgeInsets.zero,
+                style: SegmentedButton.styleFrom(
+                  padding: const EdgeInsets.all(SpacingTokens.sm),
+                ),
+                segments: const [
+                  ButtonSegment(value: 'list', label: Text('词表')),
+                  ButtonSegment(value: 'flashcard', label: Text('翻卡自测')),
+                ],
+                selected: {_vocabularyMode},
+                showSelectedIcon: false,
+                onSelectionChanged: (selection) => setState(() {
+                  if (_vocabularyBusy) return;
+                  _vocabularyMode = selection.first;
+                  _vocabularyRevealed = false;
+                }),
+              ),
+            )
+          : null,
       body: SafeArea(
         top: false,
         child: EnglishCourseBody(
@@ -171,17 +276,34 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
             }
             final targets = lesson.targets
                 .where(
-                  (t) =>
-                      t.approved &&
-                      (widget.kind == null || t.kind.name == widget.kind) &&
-                      (widget.kind != 'vocabulary' || t.meaning.isNotEmpty),
+                  (target) => widget.kind == 'vocabulary'
+                      ? target.isLearnableVocabulary
+                      : target.approved &&
+                            (widget.kind == null ||
+                                target.kind.name == widget.kind),
                 )
                 .toList();
             if (widget.kind == 'vocabulary') {
+              if (widget.targetId != null) {
+                final target = detailTarget;
+                if (target == null) {
+                  return const AppEmptyState(
+                    icon: Icons.menu_book_outlined,
+                    title: '这个词暂不可学习',
+                  );
+                }
+                return _vocabularyDetail(
+                  context,
+                  book,
+                  course,
+                  target,
+                  voice,
+                  theme,
+                );
+              }
               return _vocabularyLearning(
                 context,
                 book,
-                course,
                 lesson,
                 targets,
                 audio,
@@ -288,7 +410,6 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
   Widget _vocabularyLearning(
     BuildContext context,
     Textbook book,
-    EnglishCourse course,
     EnglishLesson lesson,
     List<EnglishTarget> targets,
     EnglishAudio audio,
@@ -298,7 +419,7 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
     if (targets.isEmpty) {
       return const AppEmptyState(
         icon: Icons.pending_actions,
-        title: '本课还没有核对好的单词',
+        title: '本课还没有可学习的单词',
       );
     }
     final progress = ref.watch(englishProgressProvider(widget.bookId));
@@ -313,122 +434,137 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
     } else {
       _vocabularyIndex = _vocabularyIndex!.clamp(0, targets.length - 1);
     }
-    final meaningAvailable = buildEnglishQuestions(
-      course,
-      EnglishPracticeKind.meaning,
-      lessonId: lesson.id,
-    ).isNotEmpty;
-    final spellingAvailable = buildEnglishQuestions(
-      course,
-      EnglishPracticeKind.spelling,
-      lessonId: lesson.id,
-    ).isNotEmpty;
     return ListView(
       key: const ValueKey('english-vocabulary-learning'),
       padding: const EdgeInsets.all(SpacingTokens.md),
       children: [
-        Text(
-          '${lesson.unitTitle} · ${lesson.title}',
-          style: theme.textTheme.titleLarge,
-        ),
         if (audio.message.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: SpacingTokens.sm),
+            padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
             child: Text(audio.message),
           ),
-        const SizedBox(height: SpacingTokens.md),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: 'list', label: Text('词表')),
-            ButtonSegment(value: 'flashcard', label: Text('翻卡自测')),
-          ],
-          selected: {_vocabularyMode},
-          showSelectedIcon: false,
-          onSelectionChanged: (selection) => setState(() {
-            if (_vocabularyBusy) return;
-            _vocabularyMode = selection.first;
-            _vocabularyRevealed = false;
-          }),
-        ),
-        if (meaningAvailable || spellingAvailable) ...[
-          const SizedBox(height: SpacingTokens.md),
-          Wrap(
-            spacing: SpacingTokens.sm,
-            runSpacing: SpacingTokens.sm,
+        if (_vocabularyMode == 'list')
+          ResponsiveCardGrid(
+            preferredTileWidth: ResponsiveLayout.compactCardWidth,
             children: [
-              if (meaningAvailable)
-                OutlinedButton.icon(
-                  key: const ValueKey('english-vocabulary-meaning-practice'),
-                  onPressed: () => context.push(
-                    AppRoutes.englishBookOf(
-                      widget.bookId,
-                      action: 'practice',
-                      kind: EnglishPracticeKind.meaning.name,
-                      lesson: lesson.id,
-                    ),
-                  ),
-                  icon: const Icon(Icons.checklist_outlined),
-                  label: const Text('词义选择'),
-                ),
-              if (spellingAvailable)
-                OutlinedButton.icon(
-                  key: const ValueKey('english-vocabulary-spelling-practice'),
-                  onPressed: () => context.push(
-                    AppRoutes.englishBookOf(
-                      widget.bookId,
-                      action: 'practice',
-                      kind: EnglishPracticeKind.spelling.name,
-                      lesson: lesson.id,
-                    ),
-                  ),
-                  icon: const Icon(Icons.spellcheck_outlined),
-                  label: const Text('拼写练习'),
+              for (final target in targets)
+                AppTile(
+                  key: ValueKey('english-vocabulary-word-${target.id}'),
+                  layout: AppTileLayout.stacked,
+                  iconColor: theme.colorScheme.primary,
+                  title: target.text,
+                  titleWrap: true,
+                  subtitle: target.meaning,
+                  trailingPrefix: target.hasSpeech
+                      ? IconButton(
+                          tooltip: '朗读 ${target.text}',
+                          alignment: AlignmentDirectional.centerEnd,
+                          padding: EdgeInsets.zero,
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size.square(
+                              SpacingTokens.minTapTarget,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () => _playVocabulary(target, voice),
+                          icon: const Icon(Icons.volume_up_outlined),
+                        )
+                      : null,
+                  onTap: () => _openVocabularyDetail(target),
                 ),
             ],
-          ),
-        ],
-        const SizedBox(height: SpacingTokens.md),
-        if (_vocabularyMode == 'list')
-          for (final target in targets)
-            Padding(
-              padding: const EdgeInsets.only(bottom: SpacingTokens.md),
-              child: ColoredCard(
-                color: theme.colorScheme.primary,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SelectableText(
-                      target.text,
-                      style: theme.textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: SpacingTokens.xs),
-                    Text(target.meaning),
-                    if (target.picture != null)
-                      EnglishSourceImage(book: book, source: target.picture!),
-                    Wrap(
-                      spacing: SpacingTokens.sm,
-                      runSpacing: SpacingTokens.xs,
-                      children: [
-                        if (target.hasSpeech)
-                          TextButton.icon(
-                            onPressed: () => _playVocabulary(target, voice),
-                            icon: const Icon(Icons.volume_up_outlined),
-                            label: const Text('听一听'),
-                          ),
-                        TextButton(
-                          onPressed: () =>
-                              _openVocabularySource(context, target),
-                          child: const Text('看原书'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            )
+          )
         else
-          _vocabularyFlashcard(context, book, targets, voice, theme),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: ResponsiveLayout.mediumBreakpoint,
+              ),
+              child: _vocabularyFlashcard(context, book, targets, voice, theme),
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _vocabularyDetail(
+    BuildContext context,
+    Textbook book,
+    EnglishCourse course,
+    EnglishTarget target,
+    Map<String, String>? voice,
+    ThemeData theme,
+  ) {
+    final play = target.hasSpeech ? () => _playVocabulary(target, voice) : null;
+    final practiceKinds =
+        [EnglishPracticeKind.meaning, EnglishPracticeKind.spelling]
+            .where(
+              (kind) => buildEnglishQuestions(
+                course,
+                kind,
+                lessonId: widget.lessonId,
+                targetKeys: {'${widget.lessonId}/${target.id}/${kind.name}'},
+              ).isNotEmpty,
+            )
+            .toList();
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: ResponsiveLayout.mediumBreakpoint,
+        ),
+        child: ListView(
+          padding: const EdgeInsets.all(SpacingTokens.md),
+          children: [
+            ColoredCard(
+              key: const ValueKey('english-vocabulary-detail-card'),
+              color: theme.colorScheme.primary,
+              onTap: play,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    target.text,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                  Text(
+                    target.meaning,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  if (target.picture != null) ...[
+                    const SizedBox(height: SpacingTokens.md),
+                    EnglishSourceImage(book: book, source: target.picture!),
+                  ],
+                ],
+              ),
+            ),
+            if (practiceKinds.isNotEmpty) ...[
+              const SizedBox(height: SpacingTokens.md),
+              ResponsiveCardGrid(
+                preferredTileWidth: ResponsiveLayout.compactCardWidth,
+                children: [
+                  for (final kind in practiceKinds)
+                    AppTile(
+                      key: ValueKey('english-vocabulary-${kind.name}-practice'),
+                      icon: kind == EnglishPracticeKind.meaning
+                          ? Icons.checklist_outlined
+                          : Icons.spellcheck_outlined,
+                      iconColor: theme.colorScheme.primary,
+                      title: kind == EnglishPracticeKind.meaning
+                          ? '词义选择'
+                          : kind.label,
+                      titleWrap: true,
+                      subtitle: '',
+                      onTap: () => _practiceVocabulary(target, kind),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -485,6 +621,11 @@ class _EnglishStudyPageState extends ConsumerState<EnglishStudyPage>
                 onPressed: () => _playVocabulary(target, voice),
                 icon: const Icon(Icons.volume_up_outlined),
                 label: const Text('听一听'),
+              ),
+            if (_vocabularyRevealed)
+              TextButton(
+                onPressed: () => _openVocabularyDetail(target),
+                child: const Text('单词详情'),
               ),
             if (_vocabularyRevealed)
               TextButton(

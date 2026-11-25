@@ -210,6 +210,16 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.home}) {
         ),
       ),
       GoRoute(
+        path: AppRoutes.englishVocabulary,
+        builder: (_, s) => EnglishStudyPage(
+          key: ValueKey('${s.uri}:${ProfileScope.revision}'),
+          bookId: s.pathParameters['id']!,
+          lessonId: s.pathParameters['lesson']!,
+          kind: 'vocabulary',
+          targetId: s.pathParameters['target']!,
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.englishSpeaking,
         builder: (_, s) => EnglishSpeakingPage(
           key: ValueKey('${s.uri}:${ProfileScope.revision}'),

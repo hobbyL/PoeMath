@@ -20,6 +20,8 @@ class AppRoutes {
   static const englishLessonContent =
       '/english/book/:id/lesson/:lesson/content';
   static const englishStudy = '/english/book/:id/lesson/:lesson/study';
+  static const englishVocabulary =
+      '/english/book/:id/lesson/:lesson/vocabulary/:target';
   static const englishSpeaking = '/english/book/:id/lesson/:lesson/speaking';
   static const englishPracticeHub = '/english/book/:id/practice';
   static const englishPractice = '/english/book/:id/practice/:kind';
@@ -32,6 +34,23 @@ class AppRoutes {
   static const englishTargetEdit =
       '/profile/settings/books/:id/english/:lesson/target/:target';
   static const englishVoice = '/profile/settings/english-voice';
+
+  static String englishVocabularyOf(
+    String id, {
+    required String lesson,
+    required String target,
+  }) => Uri(
+    pathSegments: [
+      '',
+      'english',
+      'book',
+      id,
+      'lesson',
+      lesson,
+      'vocabulary',
+      target,
+    ],
+  ).toString();
 
   static String englishBookOf(
     String id, {
