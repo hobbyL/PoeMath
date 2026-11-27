@@ -10,12 +10,12 @@ enum CloudUsageKind {
   llm('AI', 'llm', 30),
   asr('语音识别', 'asr', 60),
   tts('云朗读', 'tts', 120),
-  imageGeneration('图片生成', 'image', 10);
+  imageGeneration('图片生成', 'image', null);
 
   const CloudUsageKind(this.label, this.key, this.defaultLimit);
   final String label;
   final String key;
-  final int defaultLimit;
+  final int? defaultLimit;
 
   /// AI 改为统计成功结果，旧请求计数不能推断成功次数，保留原值但不沿用。
   String get counterKey => this == llm ? 'llm_success_v1' : key;
@@ -49,6 +49,7 @@ class DailyCloudUsage {
 }
 
 /// 设备本地的用量限制；AI 按成功结果计次，其余服务按发送请求计次。
+/// 图片生成只统计用量，不设置应用内每日上限。
 /// 不是供应商账单，也不随备份恢复归零。
 class CloudUsageService {
   CloudUsageService({DateTime Function()? clock})
@@ -64,6 +65,7 @@ class CloudUsageService {
   String get dayKey => _dateKey(_clock());
 
   int? limit(CloudUsageKind kind) {
+    if (kind == CloudUsageKind.imageGeneration) return null;
     if (!_ready) return kind.defaultLimit;
     final value = HiveBoxes.settings.get('cloud_daily_limit_${kind.key}');
     if (value == -1) return null;
@@ -114,6 +116,9 @@ class CloudUsageService {
 
   Future<void> setLimit(CloudUsageKind kind, int? value) async {
     ParentAccessService.instance.assertAllowed();
+    if (kind == CloudUsageKind.imageGeneration && value != null) {
+      throw const FormatException('图片生成不设置应用内每日上限');
+    }
     if (value != null && (value < 0 || value > 100000)) {
       throw const FormatException('每日额度须为 0–100000，留空表示不限');
     }

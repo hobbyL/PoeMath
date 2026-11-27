@@ -90,8 +90,10 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
           !_access.canSetPin) {
         return;
       }
-      final recovery =
-          await _access.configure(pin, isCurrent: _isCurrentConfiguration);
+      final recovery = await _access.configure(
+        pin,
+        isCurrent: _isCurrentConfiguration,
+      );
       if (!mounted ||
           ModalRoute.of(context)?.isCurrent == false ||
           !_access.isUnlocked) {
@@ -139,8 +141,9 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
   Future<void> _changeLimit(CloudUsageKind kind) async {
     if (!await ensureParentAccess(context) || !mounted) return;
     final usage = CloudUsageService.instance;
-    final input =
-        TextEditingController(text: usage.limit(kind)?.toString() ?? '');
+    final input = TextEditingController(
+      text: usage.limit(kind)?.toString() ?? '',
+    );
     final value = await showDialog<String>(
       context: context,
       builder: (dialog) => AlertDialog(
@@ -283,8 +286,9 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
                       ),
                     ),
                   ),
-                  borderRadius:
-                      BorderRadius.circular(SpacingTokens.radiusSmall),
+                  borderRadius: BorderRadius.circular(
+                    SpacingTokens.radiusSmall,
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: SpacingTokens.xs,
@@ -331,14 +335,18 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
                 title: kind.label,
                 subtitle:
                     '${kind == CloudUsageKind.llm ? '已成功' : '已用'} ${usage.used(kind)} 次 · ${usage.limit(kind) == null ? '不限' : '每日上限 ${usage.limit(kind)} 次'}',
-                onTap: () => _changeLimit(kind),
+                onTap: kind == CloudUsageKind.imageGeneration
+                    ? null
+                    : () => _changeLimit(kind),
               ),
             ],
             const SizedBox(height: SpacingTokens.md),
-            const Text('默认每天 AI 成功 30 次、图片生成 10 次、语音识别 60 次、云朗读 120 次。可按需调整、暂停或设为不限。'),
+            const Text(
+              '默认每天 AI 成功 30 次、语音识别 60 次、云朗读 120 次。图片生成不设应用内每日上限；其余项目可按需调整、暂停或设为不限。',
+            ),
             const SizedBox(height: SpacingTokens.sm),
             const Text(
-              'AI 按成功结果计次：一次完整回答、讲解或有效生成扣 1 次，同轮工具探测、自动重试、失败、取消和连接测试不扣。旧版 AI 请求计数不沿用。图片生成、识别和云朗读仍按实际请求计次，失败、验证与重试也计数；朗读缓存和本地朗读不计。次数跨重启保留，不随备份重置，调整上限后下次操作立即生效。额度不是精确费用账单，请同时设置供应商账户预算。',
+              'AI 按成功结果计次：一次完整回答、讲解或有效生成扣 1 次，同轮工具探测、自动重试、失败、取消和连接测试不扣。旧版 AI 请求计数不沿用。图片生成、识别和云朗读按实际请求计次，失败、验证与重试也计数；朗读缓存和本地朗读不计。用量跨重启保留，不随备份重置。图片生成的可用性和费用仍受供应商账户配额与计费规则影响。',
             ),
           ],
         ],
@@ -346,7 +354,7 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
     );
   }
 
-  /// 三类云用量各自的图标。
+  /// 按云服务用途区分用量图标。
   ///
   /// 原实现三张卡都用 `Icons.cloud_outlined`，一行看下来毫无辨识度，
   /// 用户得读文字才知道哪张是哪类。按「做什么」区分：
@@ -354,12 +362,13 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
   /// - 语音识别：麦克风（听用户说）—— 注意不要与 TTS 共用
   ///   `record_voice_over`，否则两张卡又长得一样
   /// - 云朗读：人物说话（读给用户听，沿用 TTS 设置页的既有图标）
+  /// - 图片生成：图片
   static IconData _usageIcon(CloudUsageKind kind) => switch (kind) {
-        CloudUsageKind.llm => Icons.smart_toy_outlined,
-        CloudUsageKind.asr => Icons.mic_none_rounded,
-        CloudUsageKind.tts => Icons.record_voice_over_outlined,
-        CloudUsageKind.imageGeneration => Icons.image_outlined,
-      };
+    CloudUsageKind.llm => Icons.smart_toy_outlined,
+    CloudUsageKind.asr => Icons.mic_none_rounded,
+    CloudUsageKind.tts => Icons.record_voice_over_outlined,
+    CloudUsageKind.imageGeneration => Icons.image_outlined,
+  };
 }
 
 class _ChangeParentPinDialog extends StatefulWidget {
@@ -402,45 +411,45 @@ class _ChangeParentPinDialogState extends State<_ChangeParentPinDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: const Text('修改家长密码'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _pin,
-                autofocus: true,
-                enabled: !_submitted,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: '新的 6 位数字 PIN'),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-              TextField(
-                controller: _confirmation,
-                enabled: !_submitted,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.done,
-                decoration: InputDecoration(
-                  labelText: '再次输入 PIN',
-                  errorText: _error,
-                ),
-                onSubmitted: (_) => _submit(),
-              ),
-            ],
+    title: const Text('修改家长密码'),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _pin,
+            autofocus: true,
+            enabled: !_submitted,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(labelText: '新的 6 位数字 PIN'),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: _submitted ? null : _close,
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: _submitted ? null : _submit,
-            child: const Text('保存'),
+          const SizedBox(height: SpacingTokens.md),
+          TextField(
+            controller: _confirmation,
+            enabled: !_submitted,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              labelText: '再次输入 PIN',
+              errorText: _error,
+            ),
+            onSubmitted: (_) => _submit(),
           ),
         ],
-      );
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: _submitted ? null : _close,
+        child: const Text('取消'),
+      ),
+      FilledButton(
+        onPressed: _submitted ? null : _submit,
+        child: const Text('保存'),
+      ),
+    ],
+  );
 }

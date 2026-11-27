@@ -423,13 +423,19 @@ void main() {
   });
 
   test('生产 Provider 接线在规划成功后立即回写，后续生图失败仍保留成功模型', () async {
-    // 阻止实际图片 HTTP，但保留生产服务与其大模型工厂的真实接线。
-    await CloudUsageService.instance.setLimit(
-      CloudUsageKind.imageGeneration,
-      0,
-    );
+    // 保留生产服务和客户端工厂，用 HTTP 替身模拟生图失败。
+    // 图片不再设置本机额度，不能靠零额度阻断图片请求。
     service = container.read(pictureStoryGenerationServiceProvider);
-    final draft = await generate();
+    final draft = await http.runWithClient(
+      generate,
+      () => MockClient((request) async {
+        expect(request.url.host, 'image.example.com');
+        expect(settings.llmActiveProviderId, 'p2');
+        expect(container.read(llmSelectionVersionProvider), 1);
+        imageRequests++;
+        return http.Response('', 503);
+      }),
+    );
     expect(draft.candidates.first.stage, PictureStoryGenerationStage.failed);
     expect(settings.llmActiveProviderId, 'p2');
     expect(settings.llmProviders.last.model, 'gpt-4o-mini');
@@ -440,7 +446,8 @@ void main() {
       ('good.example.com', 'gpt-4o-mini', 'plan', true),
     ]);
     expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
-    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 0);
+    expect(imageRequests, 1);
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
   });
 
   test('场景数量未通过校验不回写模型，也不发出图片请求', () async {

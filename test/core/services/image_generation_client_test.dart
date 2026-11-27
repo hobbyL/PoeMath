@@ -17,8 +17,10 @@ const _provider = ImageGenerationProviderConfig(
   baseUrl: 'https://image.example.com/v1',
   model: 'image-model',
 );
-const _config =
-    ImageGenerationConfig(provider: _provider, apiKey: 'private-image-key');
+const _config = ImageGenerationConfig(
+  provider: _provider,
+  apiKey: 'private-image-key',
+);
 
 class _WaitingUsage extends CloudUsageService {
   final reached = Completer<void>();
@@ -43,9 +45,11 @@ void main() {
       'https://image.example.com/v1/images/generations/',
     ]) {
       expect(
-        ImageGenerationProviderConfig(name: '', baseUrl: base, model: 'img')
-            .endpoint
-            .toString(),
+        ImageGenerationProviderConfig(
+          name: '',
+          baseUrl: base,
+          model: 'img',
+        ).endpoint.toString(),
         'https://image.example.com/v1/images/generations',
       );
     }
@@ -64,9 +68,10 @@ void main() {
         throwsFormatException,
       );
     }
-    final restored = ImageGenerationProviderConfig.fromJson(
-      {..._provider.toJson(), 'apiKey': 'must-not-travel'},
-    );
+    final restored = ImageGenerationProviderConfig.fromJson({
+      ..._provider.toJson(),
+      'apiKey': 'must-not-travel',
+    });
     expect(restored.encode(), isNot(contains('must-not-travel')));
     expect(restored.toJson().keys, ['name', 'baseUrl', 'model']);
     expect(_config.toString(), isNot(contains(_config.apiKey)));
@@ -122,7 +127,7 @@ void main() {
                 {
                   'url':
                       'https://cdn.example.com/picture.png?signature=private',
-                }
+                },
               ],
             }),
             200,
@@ -188,28 +193,36 @@ void main() {
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 4);
   });
 
-  test('额度为零和请求前取消均不会发出 HTTP', () async {
+  test('旧生图额度为零不再阻止请求，但请求前取消仍不会发出 HTTP', () async {
     var sends = 0;
     final transport = MockClient((_) async {
       sends++;
-      return http.Response('{}', 200);
+      return http.Response(
+        jsonEncode({
+          'data': [
+            {
+              'b64_json': base64Encode([1, 2, 3]),
+            },
+          ],
+        }),
+        200,
+      );
     });
     await HiveBoxes.settings.put('cloud_daily_limit_image', 0);
     final client = ImageGenerationClient(httpClient: transport);
     addTearDown(client.close);
-    await expectLater(
-      client.generate(config: _config, prompt: '画面'),
-      throwsA(isA<CloudQuotaExceededException>()),
+    expect(await client.generate(config: _config, prompt: '画面'), [1, 2, 3]);
+    final cancelled = ImageGenerationClient(
+      httpClient: transport,
+      isActive: () => false,
     );
-    final cancelled =
-        ImageGenerationClient(httpClient: transport, isActive: () => false);
     addTearDown(cancelled.close);
     await expectLater(
       cancelled.generate(config: _config, prompt: '画面'),
       throwsA(isA<ImageGenerationCancelled>()),
     );
-    expect(sends, 0);
-    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 0);
+    expect(sends, 1);
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
   });
 
   test('等待预留额度时授权失效，队列恢复后仍不发出请求', () async {
@@ -226,8 +239,10 @@ void main() {
     );
     addTearDown(client.close);
     final work = client.generate(config: _config, prompt: '画面');
-    final expectation =
-        expectLater(work, throwsA(isA<ImageGenerationCancelled>()));
+    final expectation = expectLater(
+      work,
+      throwsA(isA<ImageGenerationCancelled>()),
+    );
     await usage.reached.future;
     active = false;
     usage.proceed.complete();

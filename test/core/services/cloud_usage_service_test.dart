@@ -56,10 +56,10 @@ void main() {
     expect(usage.used(CloudUsageKind.llm), 1);
   });
 
-  test('默认每日AI30/识别60/云朗读120/生图10，可暂停或明确设为不限', () async {
+  test('默认每日AI30/识别60/云朗读120，生图不设应用内每日上限', () async {
     await unlockParentForTesting();
     final usage = CloudUsageService();
-    expect(CloudUsageKind.values.map(usage.limit), [30, 60, 120, 10]);
+    expect(CloudUsageKind.values.map(usage.limit), [30, 60, 120, null]);
     await usage.setLimit(CloudUsageKind.llm, 0);
     await expectLater(
       usage.reserve(CloudUsageKind.llm),
@@ -68,6 +68,23 @@ void main() {
     await usage.setLimit(CloudUsageKind.llm, null);
     expect(usage.limit(CloudUsageKind.llm), isNull);
     await usage.reserve(CloudUsageKind.llm);
+  });
+
+  test('生图忽略旧备份额度并允许持续预留，只保留请求用量统计', () async {
+    await unlockParentForTesting();
+    final usage = CloudUsageService();
+    await HiveBoxes.settings.put('cloud_daily_limit_image', 0);
+
+    expect(usage.limit(CloudUsageKind.imageGeneration), isNull);
+    await expectLater(
+      usage.setLimit(CloudUsageKind.imageGeneration, 1),
+      throwsA(isA<FormatException>()),
+    );
+    await usage.reserve(CloudUsageKind.imageGeneration);
+    await usage.reserve(CloudUsageKind.imageGeneration);
+
+    expect(usage.used(CloudUsageKind.imageGeneration), 2);
+    expect(usage.limit(CloudUsageKind.imageGeneration), isNull);
   });
 
   test('多个实例并发请求也不能超额，拒绝的请求不计数', () async {
@@ -120,7 +137,7 @@ void main() {
     expect(usage.used(CloudUsageKind.asr), 1);
   });
 
-  test('三类真实客户端的0额度均在HTTP之前拒绝', () async {
+  test('AI/识别/云朗读的0额度均在HTTP之前拒绝', () async {
     await unlockParentForTesting();
     var sends = 0;
     final httpClient = MockClient((request) async {
@@ -128,7 +145,9 @@ void main() {
       return http.Response('', 500);
     });
     final usage = CloudUsageService();
-    for (final kind in CloudUsageKind.values) {
+    for (final kind in CloudUsageKind.values.where(
+      (kind) => kind != CloudUsageKind.imageGeneration,
+    )) {
       await usage.setLimit(kind, 0);
     }
     final llm = LlmClient(httpClient: httpClient, usage: usage);

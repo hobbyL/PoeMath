@@ -154,7 +154,7 @@ void main() {
   });
 
   for (final quota in [false, true]) {
-    test('${quota ? '首个请求失败后本机额度耗尽' : '暂停'}不继续切换，不误保存成功选择', () async {
+    test('${quota ? '旧本机生图额度为1' : '暂停'}不会被误当成供应商回退条件', () async {
       if (quota) await HiveBoxes.settings.put('cloud_daily_limit_image', 1);
       var active = true;
       var requests = 0;
@@ -178,11 +178,11 @@ void main() {
           ),
           throwsA(
             quota
-                ? isA<CloudQuotaExceededException>()
+                ? isA<ImageGenerationException>()
                 : isA<ImageGenerationCancelled>(),
           ),
         );
-        expect(requests, 1);
+        expect(requests, quota ? 4 : 1);
         expect(saves, 0);
       } finally {
         client.close();
