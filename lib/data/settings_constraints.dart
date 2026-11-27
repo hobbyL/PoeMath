@@ -5,6 +5,7 @@ import 'package:poemath/domain/answer_feedback_sound.dart';
 import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/data/models/profile_avatar.dart';
 import 'package:poemath/data/models/profile_nickname.dart';
+import 'package:poemath/math_engine/math_engine_api.dart';
 
 /// UI、备份导入与历史读取共用的普通设置范围。
 class SettingsConstraints {
@@ -35,6 +36,7 @@ class SettingsConstraints {
       'active_subject' => AppSubject.fromId(value) != null,
       'selected_semester' => const ['上', '下'].contains(value),
       'math_difficulty' => const ['easy', 'medium', 'hard'].contains(value),
+      'math_operation_counts' => _validOperationCounts(value),
       'math_practice_mode' => const [
         'findResult',
         'findMissing',
@@ -66,6 +68,16 @@ class SettingsConstraints {
   static bool _validDailyGoalTypes(String raw) {
     try {
       DailyGoalActivity.decode(raw);
+      return true;
+    } on FormatException {
+      return false;
+    }
+  }
+
+  static bool _validOperationCounts(Object value) {
+    if (value is! String) return false;
+    try {
+      OperationCounts.decode(value);
       return true;
     } on FormatException {
       return false;

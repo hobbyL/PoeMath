@@ -33,13 +33,21 @@ enum MathSkill {
         problem.operands.any((n) => !n.isInteger || n.isNegative)) {
       return false;
     }
-    var a = problem.operands[0].asInteger;
-    var b = problem.operands[1].asInteger;
+    return hasIntegerRegrouping(
+      problem.operands[0].asInteger,
+      problem.operands[1].asInteger,
+      problem.operators.single,
+    );
+  }
+
+  /// 同样用于多步题求值轨迹中的一次加减，避免重复进退位算法。
+  static bool hasIntegerRegrouping(int a, int b, Operator operator) {
+    if (a < 0 || b < 0) return false;
     while (a > 0 || b > 0) {
-      if (problem.operators.single == Operator.add && a % 10 + b % 10 >= 10) {
+      if (operator == Operator.add && a % 10 + b % 10 >= 10) {
         return true;
       }
-      if (problem.operators.single == Operator.subtract && a % 10 < b % 10) {
+      if (operator == Operator.subtract && a % 10 < b % 10) {
         return true;
       }
       a ~/= 10;

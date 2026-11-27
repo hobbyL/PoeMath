@@ -12,7 +12,13 @@ import '../models/math_problem.dart';
 import '../models/number_value.dart';
 
 /// 求值中间步骤：一次二元折叠的表达式与精确结果。
-typedef EvaluationStep = ({String expression, Fraction value});
+typedef EvaluationStep = ({
+  String expression,
+  Fraction value,
+  Fraction left,
+  Fraction right,
+  Operator operator,
+});
 
 /// 求值轨迹：逐步折叠序列 + 最终值（末步 value 即最终结果）。
 class EvaluationTrace {
@@ -81,12 +87,13 @@ class ExpressionEvaluator {
         if (op == Operator.multiply || op == Operator.divide) {
           final applied = _apply(bVals[i], bVals[i + 1], op);
           if (applied == null) return null;
-          steps.add(
-            (
-              expression: '(${bExprs[i]} ${op.symbol} ${bExprs[i + 1]})',
-              value: applied,
-            ),
-          );
+          steps.add((
+            expression: '(${bExprs[i]} ${op.symbol} ${bExprs[i + 1]})',
+            value: applied,
+            left: bVals[i],
+            right: bVals[i + 1],
+            operator: op,
+          ));
           bVals[i] = applied;
           bExprs[i] = _format(applied);
           bVals.removeAt(i + 1);
@@ -101,12 +108,13 @@ class ExpressionEvaluator {
         final op = bOps.first;
         final applied = _apply(bVals[0], bVals[1], op);
         if (applied == null) return null;
-        steps.add(
-          (
-            expression: '(${bExprs[0]} ${op.symbol} ${bExprs[1]})',
-            value: applied,
-          ),
-        );
+        steps.add((
+          expression: '(${bExprs[0]} ${op.symbol} ${bExprs[1]})',
+          value: applied,
+          left: bVals[0],
+          right: bVals[1],
+          operator: op,
+        ));
         bVals[0] = applied;
         bExprs[0] = _format(applied);
         bVals.removeAt(1);
@@ -130,9 +138,13 @@ class ExpressionEvaluator {
       if (op == Operator.multiply || op == Operator.divide) {
         final applied = _apply(vals[i], vals[i + 1], op);
         if (applied == null) return null;
-        steps.add(
-          (expression: '${exprs[i]} ${op.symbol} ${exprs[i + 1]}', value: applied),
-        );
+        steps.add((
+          expression: '${exprs[i]} ${op.symbol} ${exprs[i + 1]}',
+          value: applied,
+          left: vals[i],
+          right: vals[i + 1],
+          operator: op,
+        ));
         vals[i] = applied;
         exprs[i] = _format(applied);
         vals.removeAt(i + 1);
@@ -148,9 +160,13 @@ class ExpressionEvaluator {
       final op = ops.first;
       final applied = _apply(vals[0], vals[1], op);
       if (applied == null) return null;
-      steps.add(
-        (expression: '${exprs[0]} ${op.symbol} ${exprs[1]}', value: applied),
-      );
+      steps.add((
+        expression: '${exprs[0]} ${op.symbol} ${exprs[1]}',
+        value: applied,
+        left: vals[0],
+        right: vals[1],
+        operator: op,
+      ));
       vals[0] = applied;
       exprs[0] = _format(applied);
       vals.removeAt(1);

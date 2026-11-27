@@ -1,28 +1,136 @@
 // lib/math_engine/generators/mixed_operation_gen.dart
 //
-// 混合运算生成器（3-4 年级）。
+// 混合运算生成器：自动模式沿用年级预设；自选次数支持各年级已允许的运算。
 //
 // 核心不变量：「题面显示语义 = 判分答案」。
 // withBrackets 题的 result 必须等于按显示语义（先算括号，括号内与
 // 括号外均先乘除后加减、同级从左到右）的精确求值结果；整数题的中间
-// 与最终结果必须为整数，否则确定性降级为 chain 形态产出（不递归重试）。
+// 与最终结果必须为整数。自动模式可降级为 chain；显式次数和括号请求
+// 必须严格兑现，无法生成时有界失败（不递归重试）。
 
 import '../models/math_problem.dart';
 import '../models/number_value.dart';
 import '../validators/expression_evaluator.dart';
+import '../validators/constraint_checker.dart';
 import 'base_generator.dart';
 
 /// 混合运算生成器（两到三步运算）。
 class MixedOperationGen extends BaseGenerator {
-  MixedOperationGen(super.config, {super.random});
+  MixedOperationGen(
+    super.config, {
+    super.random,
+    this.operationCount,
+    this.requestedMode,
+  });
+
+  final int? operationCount;
+  final ProblemMode? requestedMode;
 
   /// 生成尝试上限（防御未来预设改动导致死循环）。
   static const _maxAttempts = 200;
 
   @override
   MathProblem generate() {
+    if (operationCount != null) return _exactSteps(operationCount!);
     final stepCount = randomInt(2, config.maxOperands.clamp(2, 3));
     return stepCount == 2 ? _twoStep() : _threeStep();
+  }
+
+  MathProblem _exactSteps(int count) {
+    if (count < 2 || count > 3) {
+      throw ArgumentError.value(count, 'operationCount', '组合题须为 2 或 3 次');
+    }
+    final brackets =
+        requestedMode == ProblemMode.withBrackets ||
+        (requestedMode != ProblemMode.chain &&
+            config.allowBrackets &&
+            config.allowedModes.contains(ProblemMode.withBrackets) &&
+            randomInt(0, 2) == 0);
+    if (brackets && !config.allowBrackets) {
+      throw ArgumentError('当前范围未开放括号');
+    }
+    // 先固定形态，再挑数值；不能因某种形态较难生成而静默移除它。
+    final bracketLength = brackets ? randomInt(2, count) : 0;
+    final bracketStart = brackets ? randomInt(0, count + 1 - bracketLength) : 0;
+    final bracketRange = brackets
+        ? (bracketStart, bracketStart + bracketLength)
+        : null;
+
+    for (var attempt = 0; attempt < _maxAttempts; attempt++) {
+      final operators = _pickOperators(count);
+      final max = config.maxOperand.clamp(1, 100);
+      final min = config.minOperand.clamp(1, max);
+      final values = List.generate(count + 1, (_) => randomInt(min, max));
+      for (var i = 0; i < count; i++) {
+        if (operators[i] == Operator.multiply) {
+          final factorMax = config.maxMultiplier.clamp(min, max).clamp(min, 9);
+          values[i] = randomInt(min, factorMax);
+          values[i + 1] = randomInt(min, factorMax);
+        } else if (operators[i] == Operator.divide) {
+          final dividendMax = config.maxDividend.clamp(min, max);
+          final divisor = randomInt(min.clamp(2, 9), dividendMax.clamp(2, 9));
+          final quotientMax = (dividendMax ~/ divisor).clamp(1, 9);
+          values[i] = divisor * randomInt(1, quotientMax);
+          values[i + 1] = divisor;
+        }
+      }
+      final candidate = _checkedExact(values, operators, bracketRange);
+      if (candidate != null) return candidate;
+    }
+
+    // 小数值结构作为有界兜底；同样核验中间值、括号和次数。
+    // 不允许把三步降为两步，或把带括号降为无括号。
+    for (final operator in config.allowedOperators) {
+      for (
+        var value = config.minOperand.clamp(1, 9);
+        value <= config.maxOperand.clamp(1, 9);
+        value++
+      ) {
+        final values = List<int>.filled(count + 1, value);
+        if (operator == Operator.subtract) values[0] = count * value;
+        final candidate = _checkedExact(
+          values,
+          List<Operator>.filled(count, operator),
+          bracketRange,
+        );
+        if (candidate != null) return candidate;
+      }
+    }
+    throw StateError('无法生成满足所选次数和数值范围的组合题');
+  }
+
+  MathProblem? _checkedExact(
+    List<int> values,
+    List<Operator> operators,
+    (int, int)? bracketRange,
+  ) {
+    final operands = values.map(NumberValue.fromInt).toList();
+    final trace = ExpressionEvaluator.evaluateWithSteps(
+      operands,
+      operators,
+      bracketRange: bracketRange,
+    );
+    if (ConstraintChecker.checkIntegerSteps(trace, config) != null) return null;
+    final problem = MathProblem(
+      operands: operands,
+      operators: operators,
+      result: NumberValue.fromInt(trace!.value.asInteger),
+      mode: bracketRange == null ? ProblemMode.chain : ProblemMode.withBrackets,
+      grade: config.grade,
+      difficulty: scoreDifficulty(operands, operators),
+      bracketRange: bracketRange,
+    );
+    if (ConstraintChecker.check(problem, config) != null) return null;
+    if (requestedMode == null) {
+      final mode = randomInt(0, 4);
+      if (mode == 0 && config.allowedModes.contains(ProblemMode.findMissing)) {
+        return toFindMissing(problem);
+      }
+      if (mode == 1 && config.allowedModes.contains(ProblemMode.compare)) {
+        return toCompare(problem);
+      }
+    }
+    return problem;
   }
 
   MathProblem _twoStep() {

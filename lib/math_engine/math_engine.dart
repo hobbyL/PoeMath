@@ -12,6 +12,7 @@ import 'models/math_problem.dart';
 import 'models/math_skill.dart';
 import 'models/vertical_attempt.dart';
 import 'models/number_value.dart';
+import 'models/operation_counts.dart';
 import 'generators/base_generator.dart';
 import 'generators/addition_subtraction_gen.dart';
 import 'generators/multiplication_table_gen.dart';
@@ -83,13 +84,16 @@ class MathEngine {
     required int grade,
     required String semester,
     DifficultyLevel? difficulty,
+    bool explicitOperationCounts = false,
   }) {
     final base = GradePresets.get(grade, semester);
-    return Set.unmodifiable(
-      difficulty == null
-          ? base.allowedModes
-          : DifficultyAdjuster.adjust(base, difficulty).allowedModes,
-    );
+    final config = difficulty == null
+        ? base
+        : DifficultyAdjuster.adjust(base, difficulty);
+    return Set.unmodifiable({
+      ...config.allowedModes,
+      if (explicitOperationCounts) ProblemMode.chain,
+    });
   }
 
   /// 生成一道题目。
@@ -107,7 +111,16 @@ class MathEngine {
     String? skillId,
     bool verticalProcessOnly = false,
     GradeConfig? curriculum,
+    int? operationCount,
   }) {
+    if (operationCount != null &&
+        (!OperationCounts.supportedForMode(mode).contains(operationCount) ||
+            mode == ProblemMode.vertical ||
+            skillId != null ||
+            curriculum != null ||
+            verticalProcessOnly)) {
+      throw ArgumentError('运算次数与当前练习范围不兼容');
+    }
     if (verticalProcessOnly && mode != ProblemMode.vertical) {
       throw ArgumentError('逐列过程练习必须使用竖式模式');
     }
@@ -121,6 +134,11 @@ class MathEngine {
     if (difficulty != null && curriculum == null) {
       config = DifficultyAdjuster.adjust(config, difficulty);
     }
+    if (operationCount != null) {
+      config = config.withAllowed(
+        modes: {...config.allowedModes, ProblemMode.chain},
+      );
+    }
     if (mode != null && !config.allowedModes.contains(mode)) {
       throw ArgumentError.value(mode, 'mode', '该学期不支持此练习模式');
     }
@@ -128,13 +146,23 @@ class MathEngine {
     if (skillId != null && requestedSkill == null) {
       throw ArgumentError.value(skillId, 'skillId', '未知知识点');
     }
-    final generators = _buildGenerators(config, random: rng)
-        .where(
-          (g) =>
-              requestedSkill == null ||
-              _generatorSkills(g).contains(requestedSkill),
-        )
-        .toList();
+    final generators =
+        (operationCount != null && operationCount > 1
+                ? <BaseGenerator>[
+                    MixedOperationGen(
+                      config,
+                      random: rng,
+                      operationCount: operationCount,
+                      requestedMode: mode,
+                    ),
+                  ]
+                : _buildGenerators(config, random: rng))
+            .where(
+              (g) =>
+                  requestedSkill == null ||
+                  _generatorSkills(g).contains(requestedSkill),
+            )
+            .toList();
     if (generators.isEmpty) throw ArgumentError('当前册次不支持此知识点');
 
     MathProblem? best;
@@ -154,6 +182,10 @@ class MathEngine {
       // 若指定了模式，强制转换
       final converted = _applyMode(problem, mode, config, generator);
       if (converted == null) continue; // 模式不兼容，重试
+      if (operationCount != null &&
+          converted.operators.length != operationCount) {
+        continue;
+      }
       // 综合属于普通方案；竖式只能由用户明确选择后进入。
       if (mode == null && converted.mode == ProblemMode.vertical) continue;
       if (verticalProcessOnly && !VerticalAttempt.supportsProcess(converted)) {
@@ -182,7 +214,9 @@ class MathEngine {
 
     if (best != null) return best;
 
-    if (requestedSkill != null || verticalProcessOnly) {
+    if (requestedSkill != null ||
+        verticalProcessOnly ||
+        (operationCount != null && operationCount > 1)) {
       throw StateError('无法生成满足当前册次、模式和知识点的专项题，请调整选择');
     }
 
@@ -280,6 +314,63 @@ class MathEngine {
     String? skillId,
     bool verticalProcessOnly = false,
     GradeConfig? curriculum,
+    OperationCounts? operationCounts,
+  }) {
+    if (count < 0) throw RangeError.value(count, 'count');
+    final rng = random ?? Random();
+    if (operationCounts == null) {
+      return _generateBatch(
+        grade: grade,
+        semester: semester,
+        count: count,
+        mode: mode,
+        difficulty: difficulty,
+        random: rng,
+        skillId: skillId,
+        verticalProcessOnly: verticalProcessOnly,
+        curriculum: curriculum,
+      );
+    }
+    if (skillId != null ||
+        curriculum != null ||
+        verticalProcessOnly ||
+        mode == ProblemMode.vertical ||
+        operationCounts.values.any(
+          (n) => !OperationCounts.supportedForMode(mode).contains(n),
+        )) {
+      throw ArgumentError('运算次数与当前练习范围不兼容');
+    }
+    final counts = operationCounts.values.toList()..shuffle(rng);
+    final problems = <MathProblem>[];
+    for (var i = 0; i < counts.length; i++) {
+      final quota =
+          count ~/ counts.length + (i < count % counts.length ? 1 : 0);
+      problems.addAll(
+        _generateBatch(
+          grade: grade,
+          semester: semester,
+          count: quota,
+          mode: mode,
+          difficulty: difficulty,
+          random: rng,
+          operationCount: counts[i],
+        ),
+      );
+    }
+    return problems..shuffle(rng);
+  }
+
+  static List<MathProblem> _generateBatch({
+    required int grade,
+    required String semester,
+    int count = 10,
+    ProblemMode? mode,
+    DifficultyLevel? difficulty,
+    Random? random,
+    String? skillId,
+    bool verticalProcessOnly = false,
+    GradeConfig? curriculum,
+    int? operationCount,
   }) {
     if (count < 0) throw RangeError.value(count, 'count');
     if (count == 0) return [];
@@ -295,6 +386,7 @@ class MathEngine {
         skillId: skillId,
         verticalProcessOnly: verticalProcessOnly,
         curriculum: curriculum,
+        operationCount: operationCount,
       );
       pool.putIfAbsent(_expressionKey(problem), () => problem);
     }

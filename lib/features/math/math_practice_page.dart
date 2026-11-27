@@ -352,6 +352,14 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     _request = MathPracticeRequest.fromJson(
       draft['request'] as Map<String, dynamic>,
     );
+    final operationCounts = _request!.operationCounts;
+    if (operationCounts != null &&
+        (problems.length != _request!.count ||
+            problems.any(
+              (p) => !operationCounts.contains(p.operators.length),
+            ))) {
+      throw const FormatException('草稿题目与运算次数不一致');
+    }
     if (widget.adventureNode != null &&
         (problems.length != _request!.count ||
             problems.any(
@@ -520,6 +528,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           count: batchSize,
           mode: ref.read(mathPracticeModeProvider),
           difficulty: defaultDifficulty,
+          operationCounts:
+              ref.read(mathPracticeModeProvider) == ProblemMode.vertical
+              ? null
+              : settingsRepo.mathOperationCounts?.forMode(
+                  ref.read(mathPracticeModeProvider),
+                ),
         );
     final grade = request.grade;
     final semester = request.semester;
@@ -531,6 +545,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           grade: grade,
           semester: semester,
           difficulty: difficulty,
+          explicitOperationCounts: request.operationCounts != null,
         ).contains(practiceMode)) {
       if (request.skillId != null) {
         setState(() => _generationError = '当前年级或难度不支持此专项模式，请返回选择其他练习');
@@ -554,6 +569,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         difficulty: difficulty,
         skillId: request.skillId,
         verticalProcessOnly: request.verticalProcessOnly,
+        operationCounts: request.operationCounts,
       );
     } catch (_) {
       ref.read(mathProblemsProvider.notifier).state = [];

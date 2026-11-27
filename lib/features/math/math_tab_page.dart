@@ -89,12 +89,18 @@ class MathTabPage extends ConsumerWidget {
     final semester = ref.read(mathSemesterProvider);
     final settings = ref.read(settingsRepositoryProvider);
     final difficulty = DifficultyLevel.values.byName(settings.mathDifficulty);
+    final operationCounts = settings.mathOperationCounts;
     final supported = MathEngine.supportedModes(
       grade: grade,
       semester: semester,
       difficulty: difficulty,
+      explicitOperationCounts: operationCounts != null,
     );
     final preferred = ref.read(mathPracticeModeProvider);
+    final mode =
+        preferred != ProblemMode.vertical && supported.contains(preferred)
+        ? preferred
+        : null;
     ref
         .read(nextMathPracticeRequestProvider.notifier)
         .setNext(
@@ -103,11 +109,8 @@ class MathTabPage extends ConsumerWidget {
             semester: semester,
             count: settings.mathBatchSize,
             difficulty: difficulty,
-            mode:
-                preferred != ProblemMode.vertical &&
-                    supported.contains(preferred)
-                ? preferred
-                : null,
+            mode: mode,
+            operationCounts: operationCounts?.forMode(mode),
           ),
         );
     context.push(AppRoutes.mathPractice);
@@ -374,6 +377,10 @@ class MathTabPage extends ConsumerWidget {
   ) {
     final appearance = _appearance(kind);
     var description = appearance.subtitle;
+    if (kind == MathEntryKind.arithmetic) {
+      final counts = ref.watch(settingsRepositoryProvider).mathOperationCounts;
+      if (counts != null) description = counts.label;
+    }
     if (kind == MathEntryKind.vertical) {
       final difficulty = DifficultyLevel.values.byName(
         ref.read(settingsRepositoryProvider).mathDifficulty,

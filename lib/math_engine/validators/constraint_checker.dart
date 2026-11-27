@@ -12,6 +12,42 @@ import 'expression_evaluator.dart';
 class ConstraintChecker {
   const ConstraintChecker._();
 
+  /// 自选次数的整数口算：约束实际运算步骤，不能仅检查最终答案。
+  static String? checkIntegerSteps(EvaluationTrace? trace, GradeConfig config) {
+    if (trace == null) return '表达式无法求值';
+    for (final step in trace.steps) {
+      if (!config.allowedOperators.contains(step.operator)) {
+        return '运算符超出学期范围';
+      }
+      if (!step.value.isInteger) return '中间结果不是整数';
+      final a = step.left.asInteger;
+      final b = step.right.asInteger;
+      final value = step.value.asInteger;
+      if ((!config.allowNegative && value < 0) ||
+          value.abs() > config.maxResult) {
+        return '中间结果超出范围';
+      }
+      if ((step.operator == Operator.add && !config.allowCarry ||
+              step.operator == Operator.subtract && !config.allowBorrow) &&
+          MathSkill.hasIntegerRegrouping(a, b, step.operator)) {
+        return '中间步骤需要进退位';
+      }
+      if (step.operator == Operator.multiply &&
+          (a.abs() > config.maxMultiplier || b.abs() > config.maxMultiplier)) {
+        return '乘法因数超出范围';
+      }
+      if (step.operator == Operator.divide &&
+          (b == 0 ||
+              a.abs() > config.maxDividend ||
+              (config.grade == 2 &&
+                  (b.abs() > config.maxMultiplier ||
+                      value.abs() > config.maxMultiplier)))) {
+        return '除法超出范围';
+      }
+    }
+    return null;
+  }
+
   /// 检查题目是否满足所有约束。返回 null 表示通过，否则返回原因。
   static String? check(MathProblem problem, GradeConfig config) {
     // 1. 结果非负（除非允许负数）
@@ -115,8 +151,8 @@ class ConstraintChecker {
         final relation = problem.result > target
             ? CompareRelation.greaterThan
             : problem.result < target
-                ? CompareRelation.lessThan
-                : CompareRelation.equal;
+            ? CompareRelation.lessThan
+            : CompareRelation.equal;
         if (problem.compareRelation != relation) return '比较关系与表达式不一致';
       }
     }

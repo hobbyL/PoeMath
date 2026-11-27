@@ -12,6 +12,7 @@ class MathPracticeRequest {
     this.skillId,
     this.verticalProcessOnly = false,
     this.adventureProfileId,
+    this.operationCounts,
   });
 
   final int grade;
@@ -22,6 +23,7 @@ class MathPracticeRequest {
   final String? skillId;
   final bool verticalProcessOnly;
   final String? adventureProfileId;
+  final OperationCounts? operationCounts;
   MathAdventureNode? get adventureNode => adventureProfileId == null
       ? null
       : MathAdventureNode(grade: grade, semester: semester, skillId: skillId!);
@@ -34,6 +36,7 @@ class MathPracticeRequest {
     'mode': mode?.name,
     'skillId': skillId,
     'verticalProcessOnly': verticalProcessOnly,
+    if (operationCounts != null) 'operationCounts': operationCounts!.toJson(),
     if (adventureProfileId != null)
       'adventure': {
         'v': 1,
@@ -46,6 +49,20 @@ class MathPracticeRequest {
     final grade = json['grade'] as int;
     final semester = json['semester'] as String;
     final count = json['count'] as int;
+    final operationCounts = json['operationCounts'] == null
+        ? null
+        : OperationCounts.fromJson(json['operationCounts']);
+    final mode = json['mode'] == null
+        ? null
+        : ProblemMode.values.byName(json['mode'] as String);
+    if (operationCounts != null &&
+        (json['skillId'] != null ||
+            json['adventure'] != null ||
+            json['mode'] == ProblemMode.vertical.name ||
+            json['verticalProcessOnly'] == true ||
+            operationCounts != operationCounts.forMode(mode))) {
+      throw const FormatException('专项练习不能使用普通口算次数偏好');
+    }
     if (grade < 1 ||
         grade > 6 ||
         !const ['上', '下'].contains(semester) ||
@@ -78,12 +95,11 @@ class MathPracticeRequest {
       semester: semester,
       count: count,
       difficulty: DifficultyLevel.values.byName(json['difficulty'] as String),
-      mode: json['mode'] == null
-          ? null
-          : ProblemMode.values.byName(json['mode'] as String),
+      mode: mode,
       skillId: json['skillId'] as String?,
       verticalProcessOnly: json['verticalProcessOnly'] as bool? ?? false,
       adventureProfileId: adventureProfileId,
+      operationCounts: operationCounts,
     );
   }
 }

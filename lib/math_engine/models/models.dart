@@ -7,5 +7,6 @@ export 'difficulty_level.dart';
 export 'grade_config.dart';
 export 'math_problem.dart';
 export 'number_value.dart';
+export 'operation_counts.dart';
 export 'problem_skeleton.dart';
 export 'word_problem_plan.dart';

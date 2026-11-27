@@ -31,6 +31,7 @@ import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/domain/completion_sound.dart';
 import 'package:poemath/domain/answer_feedback_sound.dart';
+import 'package:poemath/math_engine/math_engine_api.dart';
 
 class SettingsRepository {
   static final Set<Object> _pendingLlmSaves = {};
@@ -685,6 +686,7 @@ class SettingsRepository {
   static const String _keyMathBatchSize = 'math_batch_size';
   static const String _keyMathDifficulty = 'math_difficulty';
   static const String _keyMathPracticeMode = 'math_practice_mode';
+  static const String _keyMathOperationCounts = 'math_operation_counts';
   static const String _keyMathEntryKinds = 'math_entry_kinds';
   static const String _keyHasOnboarded = 'has_onboarded';
   static const String _keyTencentAsrCredentialFingerprint =
@@ -1874,6 +1876,25 @@ class SettingsRepository {
       await HiveBoxes.settings.delete(_keyMathPracticeMode);
     } else {
       await _putValidated(_keyMathPracticeMode, mode);
+    }
+  }
+
+  /// 缺省或无效数据沿用自动出题，不对旧设置进行强制迁移。
+  OperationCounts? get mathOperationCounts {
+    final raw = HiveBoxes.settings.get(_keyMathOperationCounts);
+    if (raw is! String) return null;
+    try {
+      return OperationCounts.decode(raw);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<void> setMathOperationCounts(OperationCounts? counts) async {
+    if (counts == null) {
+      await HiveBoxes.settings.delete(_keyMathOperationCounts);
+    } else {
+      await _putValidated(_keyMathOperationCounts, counts.encode());
     }
   }
 

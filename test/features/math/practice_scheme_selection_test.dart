@@ -43,9 +43,7 @@ void main() {
       );
       expect(
         tester
-            .widget<SegmentedButton<bool>>(
-              find.byType(SegmentedButton<bool>),
-            )
+            .widget<SegmentedButton<bool>>(find.byType(SegmentedButton<bool>))
             .selected,
         {sample.$4},
       );
@@ -53,9 +51,9 @@ void main() {
   }
 
   for (final vertical in [false, true]) {
-    testWidgets(
-        '卡片直接进入${vertical ? '竖式' : '普通口算'}练习：沿用当前册次题量且不改偏好',
-        (tester) async {
+    testWidgets('卡片直接进入${vertical ? '竖式' : '普通口算'}练习：沿用当前册次题量且不改偏好', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -65,6 +63,7 @@ void main() {
         await HiveBoxes.settings.put('math_difficulty', 'medium');
         // 偏好指向竖式 —— 验证口算卡片不照办（回落综合），竖式卡片照办。
         await HiveBoxes.settings.put('math_practice_mode', 'vertical');
+        await HiveBoxes.settings.put('math_operation_counts', '2,3');
         // 册次只能经学习背景写入（口算页的就地选择已移除），故此处直接
         // 落 Hive —— 保证它在下面的 `before` 快照内，配得出「练习不写盘」。
         await HiveBoxes.settings.put('selected_grade', 2);
@@ -106,6 +105,15 @@ void main() {
       final problems = container.read(mathProblemsProvider);
       expect(problems, hasLength(10));
       expect(problems.every((p) => p.grade == 2 && p.semester == '上'), isTrue);
+      expect(
+        problems.every(
+          (p) => vertical
+              ? p.operators.length == 1
+              : const [2, 3].contains(p.operators.length),
+        ),
+        isTrue,
+        reason: '普通口算采用次数偏好，竖式继续使用一步题',
+      );
       expect(
         problems.every((p) => (p.mode == ProblemMode.vertical) == vertical),
         isTrue,

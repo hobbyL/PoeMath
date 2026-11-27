@@ -97,6 +97,7 @@ Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
   'math_batch_size': 20,
   'math_difficulty': 'hard',
   'math_practice_mode': 'findResult',
+  'math_operation_counts': '2,3',
   'llm_provider_name': 'DeepSeek', // LLM 供应商名称（纯展示，非敏感）
   'has_onboarded': true,
   // 通知设置（notification_service 直读写，随备份迁移）。
@@ -555,6 +556,29 @@ void main() {
         expect(HiveBoxes.settings.get(entry.key), entry.value);
       }
     }
+  });
+
+  test('次数备份缺键或坏值保留本机选择，有效集合覆盖', () async {
+    await HiveBoxes.settings.put('math_operation_counts', '2,3');
+    for (final settings in <Map<String, dynamic>>[
+      {},
+      for (final value in <Object>[
+        '',
+        '2,2',
+        '1,4',
+        '1,,3',
+        [2, 3],
+        2,
+      ])
+        {'math_operation_counts': value},
+    ]) {
+      await backupService.restoreFromJson(await backupWithSettings(settings));
+      expect(HiveBoxes.settings.get('math_operation_counts'), '2,3');
+    }
+    await backupService.restoreFromJson(
+      await backupWithSettings({'math_operation_counts': '1,3'}),
+    );
+    expect(HiveBoxes.settings.get('math_operation_counts'), '1,3');
   });
 
   test('完成音效备份缺键或坏值保留本机选择，有效值覆盖', () async {
