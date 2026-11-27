@@ -131,6 +131,26 @@ void main() {
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 4);
   });
 
+  for (final quotaStatus in [402, 403, 429]) {
+    test('服务商 HTTP $quotaStatus 后继续尝试其他服务商', () async {
+      final png = await pictureStoryPng();
+      final calls = <String>[];
+      final client = ImageGenerationClient(
+        httpClient: MockClient((request) async {
+          final model = (jsonDecode(request.body) as Map)['model'] as String;
+          calls.add(model);
+          if (model == 'a1') return http.Response('', quotaStatus);
+          if (model == 'a2') return http.Response('', 503);
+          return imageResponse(png);
+        }),
+      );
+      addTearDown(client.close);
+
+      expect(await client.generate(config: config, prompt: '场景'), png);
+      expect(calls, ['a1', 'b1']);
+    });
+  }
+
   test('401 跳过同厂商其他模型，每个失败候选只请求一次', () async {
     final calls = <String>[];
     final client = ImageGenerationClient(

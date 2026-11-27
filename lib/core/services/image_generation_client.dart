@@ -248,14 +248,18 @@ class ImageGenerationClient {
 
   static void _checkStatus(int status, {bool fromProvider = true}) {
     if (status == 200) return;
-    throw ImageGenerationException(switch (status) {
-      401 => '生图密钥无效，请检查 API Key',
-      403 => '生图服务拒绝访问，请检查模型权限',
-      408 || 504 => '生图服务请求超时，请稍后重试',
-      429 => '生图服务暂时限流或额度不足，请稍后重试',
-      >= 500 => '生图服务暂时不可用，请稍后重试',
-      _ => '生图请求失败（HTTP $status），请检查接口和模型',
-    }, skipProvider: fromProvider && status == 401);
+    throw ImageGenerationException(
+      switch (status) {
+        401 => '生图密钥无效，请检查 API Key',
+        403 => '生图服务拒绝访问，请检查模型权限',
+        402 => '生图服务额度不足，请检查服务商账户',
+        408 || 504 => '生图服务请求超时，请稍后重试',
+        429 => '生图服务暂时限流或额度不足，请稍后重试',
+        >= 500 => '生图服务暂时不可用，请稍后重试',
+        _ => '生图请求失败（HTTP $status），请检查接口和模型',
+      },
+      skipProvider: fromProvider && const {401, 402, 403, 429}.contains(status),
+    );
   }
 
   void close() {
