@@ -30,6 +30,18 @@ Future<void> _pumpPastSplashAndAnimations(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 3));
 }
 
+Future<void> _pumpUntilVisible(WidgetTester tester, Finder target) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 10));
+  while (target.evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
+    await tester.runAsync(() async {
+      await tester.pump(const Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    });
+  }
+  expect(target, findsOneWidget);
+  await tester.runAsync(() => tester.pump(const Duration(milliseconds: 400)));
+}
+
 /// 当前高亮的 tab 下标 —— 「页面真的切了」的可观测证据。
 ///
 /// `MainShell` 不自己存选中态，`selectedIndex` 由 `_indexFromRoute(context)`
@@ -133,7 +145,7 @@ void main() {
     await drainHiveWritesForTesting(tester);
   });
 
-  testWidgets('我的页设置按钮在未配置时先打开家长设置', (tester) async {
+  testWidgets('我的页先进入设置首页，仅管理分组引导设置家长密码', (tester) async {
     await tester.pumpWidget(
       ProviderScope(overrides: [staticDayKeyOverride()], child: const App()),
     );
@@ -151,26 +163,31 @@ void main() {
     expect(_selectedTab(tester), 4);
     expect(find.byTooltip('设置').hitTestable(), findsOneWidget);
 
-    // 家长验证入口会读取本地设置，交替推进真实 I/O 与导航帧。
+    // 设置首页无需 PIN；进入管理分组后才引导家长设置。
     await tester.runAsync(() async {
       await tester.tap(find.byTooltip('设置'));
       await tester.pump();
     });
-    for (
-      var i = 0;
-      i < 100 && find.byType(ParentProtectionPage).evaluate().isEmpty;
-      i++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)),
-      );
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    await tester.pump(const Duration(milliseconds: 400));
+    await _pumpUntilVisible(tester, find.byType(SettingsPage));
+    expect(
+      find.byType(ParentProtectionPage, skipOffstage: false),
+      findsNothing,
+    );
+    expect(find.text('外观与反馈'), findsOneWidget);
+    expect(find.text('应用与提醒'), findsOneWidget);
+    expect(ParentAccessService.instance.isUnlocked, isFalse);
+
+    await tester.runAsync(() async {
+      await tester.tap(find.text('学习与内容'));
+      await tester.pump();
+    });
+    await _pumpUntilVisible(tester, find.byType(ParentProtectionPage));
 
     expect(find.byType(ParentProtectionPage), findsOneWidget);
-    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
-    expect(find.textContaining('设置与管理需要家长密码，请先设置'), findsOneWidget);
+    expect(find.byType(SettingsPage, skipOffstage: false), findsOneWidget);
+    expect(find.text('学习背景', skipOffstage: false), findsNothing);
+    expect(find.widgetWithText(TextField, '新的 6 位数字 PIN'), findsOneWidget);
+    expect(ParentAccessService.instance.isUnlocked, isFalse);
 
     // 消耗剩余 flutter_animate 计时器
     await tester.pump(const Duration(seconds: 2));

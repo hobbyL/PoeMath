@@ -86,7 +86,12 @@ void defineAppJourneyTests({
       tester,
       find.byType(AnimatedFavoriteButton),
       isReady: () =>
-          HiveBoxes.poemFavorites.containsKey('default_integration_poem'),
+          HiveBoxes.poemFavorites.containsKey('default_integration_poem') &&
+          tester
+              .widget<AnimatedFavoriteButton>(
+                find.byType(AnimatedFavoriteButton),
+              )
+              .isFavorite,
     );
     expect(
       HiveBoxes.poemFavorites.containsKey('default_integration_poem'),
@@ -161,11 +166,19 @@ void defineAppJourneyTests({
     await _tap(tester, find.text('长方形面积'));
     await _pumpUntil(tester, find.byType(AnimatedFavoriteButton));
     await _tap(tester, find.byType(AnimatedFavoriteButton));
+    // Hive 内存先更新；等收藏按钮刷新，才能确认写入后的回调已完成。
     await _pumpUntil(
       tester,
       find.byType(AnimatedFavoriteButton),
       isReady: () =>
-          HiveBoxes.formulaFavorites.containsKey('default_integration_formula'),
+          HiveBoxes.formulaFavorites.containsKey(
+            'default_integration_formula',
+          ) &&
+          tester
+              .widget<AnimatedFavoriteButton>(
+                find.byType(AnimatedFavoriteButton),
+              )
+              .isFavorite,
     );
 
     expect(
@@ -220,8 +233,15 @@ void defineAppJourneyTests({
     await _tapTab(tester, '我的');
     await _pumpUntil(tester, find.byTooltip('设置'));
     await _tap(tester, find.byTooltip('设置'));
+    await _pumpUntil(tester, find.byType(SettingsPage));
+    expect(find.byType(ParentProtectionPage), findsNothing);
+    expect(ParentAccessService.instance.isUnlocked, isFalse);
+    await tester.ensureVisible(find.text('家长与数据'));
+    await _tap(tester, find.text('家长与数据'));
     await _pumpUntil(tester, find.byType(ParentProtectionPage));
-    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
+    expect(find.byType(SettingsPage, skipOffstage: false), findsOneWidget);
+    expect(find.text('备份与恢复', skipOffstage: false), findsNothing);
+    expect(find.byType(BackupRestorePage, skipOffstage: false), findsNothing);
     expect(ParentAccessService.instance.isUnlocked, isFalse);
     await tester.enterText(
       find.widgetWithText(TextField, '新的 6 位数字 PIN'),
@@ -234,12 +254,9 @@ void defineAppJourneyTests({
     await _tap(tester, find.widgetWithText(FilledButton, '设置家长密码'));
     await _pumpUntil(tester, find.text('保存一次性恢复码'));
     await _tap(tester, find.widgetWithText(FilledButton, '我已保存'));
-    await _pumpUntil(tester, find.byType(SettingsPage));
+    await _pumpUntil(tester, find.text('备份与恢复'));
     expect(find.byType(ParentProtectionPage), findsNothing);
     expect(ParentAccessService.instance.isUnlocked, isTrue);
-    await tester.ensureVisible(find.text('家长与数据'));
-    await _tap(tester, find.text('家长与数据'));
-    await _pumpUntil(tester, find.text('备份与恢复'));
     await _tap(tester, find.text('备份与恢复'));
     await _pumpUntil(tester, find.text('导出备份'));
     expect(find.text('从备份恢复'), findsOneWidget);
