@@ -24,6 +24,7 @@ import 'package:poemath/features/profile/picture_story_generate_page.dart';
 import 'package:poemath/features/profile/image_generation_settings_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
+import 'package:poemath/features/english/english_study_page.dart';
 import 'package:poemath/features/textbook/textbook_course_review_page.dart';
 import 'package:poemath/features/textbook/textbook_detail_page.dart';
 import 'package:poemath/features/textbook/textbook_management_page.dart';
@@ -154,10 +155,91 @@ void main() {
     await tearDownHiveForTesting();
   });
 
+  for (final configured in [false, true]) {
+    testWidgets('设置首页与开放分组在${configured ? '已配置但锁定' : '尚未设置PIN'}时直接可用', (
+      tester,
+    ) async {
+      if (configured) await tester.runAsync(unlockParentForTesting);
+      access.lock();
+      final router = createAppRouter(initialLocation: AppRoutes.profile);
+      await _mount(tester, router);
+      await tester.runAsync(() => tester.tap(find.byTooltip('设置')));
+      await _pumpUntil(tester, () => find.text('外观与反馈').evaluate().isNotEmpty);
+      expect(router.routerDelegate.state.uri.path, AppRoutes.settings);
+      expect(
+        find.byType(ParentAccessBoundary, skipOffstage: false),
+        findsNothing,
+      );
+      expect(
+        find.byType(ParentProtectionPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(access.isUnlocked, isFalse);
+
+      await tester.runAsync(() => tester.tap(find.text('外观与反馈')));
+      await _pumpUntil(tester, () => find.text('主题设置').evaluate().isNotEmpty);
+      await tester.runAsync(() => tester.tap(find.text('主题设置')));
+      await _pumpUntil(tester, () => find.text('主题风格').evaluate().isNotEmpty);
+      await tester.runAsync(() => tester.tap(find.text('奶糖乐园')));
+      await _pumpUntil(
+        tester,
+        () => SettingsRepository().activeSubject == 'candy',
+      );
+      await tester.runAsync(() => tester.tap(find.text('外观模式')));
+      await _pumpUntil(tester, () => find.text('深色').evaluate().isNotEmpty);
+      await tester.runAsync(() => tester.tap(find.text('深色')));
+      await _pumpUntil(tester, () => SettingsRepository().themeMode == 'dark');
+      await _background(tester);
+      await _foreground(tester);
+      expect(find.text('主题设置'), findsOneWidget);
+      expect(_unlockButton, findsNothing);
+      expect(access.isUnlocked, isFalse);
+      await tester.runAsync(() => tester.pageBack());
+      await _pumpUntil(tester, () => find.text('应用与提醒').evaluate().isNotEmpty);
+      await tester.runAsync(() => tester.tap(find.text('应用与提醒')));
+      await _pumpUntil(tester, () => find.text('通知提醒').evaluate().isNotEmpty);
+      expect(find.text('关于韵算'), findsOneWidget);
+      expect(
+        find.byType(ParentAccessBoundary, skipOffstage: false),
+        findsNothing,
+      );
+      expect(_unlockButton, findsNothing);
+      expect(access.isUnlocked, isFalse);
+      expect(access.enabled, configured);
+      await drainHiveWritesForTesting(tester);
+    });
+
+    for (final (section, content) in [
+      ('学习与内容', '学习背景'),
+      ('AI 与语音', 'AI 设置'),
+      ('家长与数据', '备份与恢复'),
+    ]) {
+      testWidgets('$section 在${configured ? '锁定' : '未设置PIN'}时不能挂载管理内容', (
+        tester,
+      ) async {
+        if (configured) await tester.runAsync(unlockParentForTesting);
+        access.lock();
+        final router = createAppRouter(initialLocation: AppRoutes.settings);
+        await _mount(tester, router);
+        expect(find.byType(ParentAccessBoundary), findsNothing);
+        await tester.runAsync(() => tester.tap(find.text(section)));
+        await _pumpUntil(
+          tester,
+          () => configured
+              ? _unlockButton.evaluate().isNotEmpty
+              : find.byType(ParentProtectionPage).evaluate().isNotEmpty,
+        );
+        expect(find.text(content, skipOffstage: false), findsNothing);
+        expect(find.byType(SettingsPage, skipOffstage: false), findsOneWidget);
+        expect(access.isUnlocked, isFalse);
+      });
+    }
+  }
+
   for (final (location, pageType) in <(String, Type)>[
-    (AppRoutes.settings, SettingsPage),
     (AppRoutes.llmSettings, LlmProviderSettingsPage),
     (AppRoutes.speechRecognitionSettings, SpeechRecognitionSettingsPage),
+    (AppRoutes.englishVoice, EnglishVoicePage),
     (AppRoutes.textbookManagement, TextbookManagementPage),
     (AppRoutes.textbookManageDetailOf('synthetic'), TextbookDetailPage),
     (AppRoutes.textbookReviewOf('synthetic'), TextbookCourseReviewPage),
@@ -203,9 +285,8 @@ void main() {
       unawaited(
         Navigator.of(profile, rootNavigator: true).push<void>(
           MaterialPageRoute<void>(
-            builder: (_) => const ParentAccessBoundary(
-              child: LlmProviderSettingsPage(),
-            ),
+            builder: (_) =>
+                const ParentAccessBoundary(child: LlmProviderSettingsPage()),
           ),
         ),
       );
@@ -245,6 +326,8 @@ void main() {
   testWidgets('首次设置校验确认PIN，保存恢复码后回到原设置入口', (tester) async {
     final router = createAppRouter(initialLocation: AppRoutes.settings);
     await _mount(tester, router);
+    expect(find.byType(ParentAccessBoundary), findsNothing);
+    await tester.runAsync(() => tester.tap(find.text('AI 与语音')));
     await _pumpUntil(
       tester,
       () => find.byType(ParentProtectionPage).evaluate().isNotEmpty,
@@ -262,19 +345,17 @@ void main() {
     expect(find.text('请输入两次相同的 6 位数字 PIN'), findsOneWidget);
     expect(access.enabled, isFalse);
     await _configurePin(tester);
-    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
+    expect(find.text('AI 设置', skipOffstage: false), findsNothing);
     await tester.runAsync(() => tester.tap(find.text('我已保存')));
     await _pumpUntil(
       tester,
       () =>
-          find.byType(SettingsPage).evaluate().isNotEmpty &&
+          find.text('AI 设置').evaluate().isNotEmpty &&
           find.byType(ParentProtectionPage).evaluate().isEmpty,
     );
     expect(router.routerDelegate.state.uri.path, AppRoutes.settings);
     expect(find.byType(ParentProtectionPage), findsNothing);
     expect(access.isUnlocked, isTrue);
-    await tester.runAsync(() => tester.tap(find.text('AI 与语音')));
-    await _pumpUntil(tester, () => find.text('AI 设置').evaluate().isNotEmpty);
     await tester.runAsync(() => tester.tap(find.text('AI 设置')));
     await _pumpUntil(
       tester,
@@ -339,6 +420,8 @@ void main() {
     access.lock();
     final router = createAppRouter(initialLocation: AppRoutes.settings);
     await _mount(tester, router);
+    expect(_unlockButton, findsNothing);
+    await tester.runAsync(() => tester.tap(find.text('AI 与语音')));
     await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
     await tester.enterText(
       find.widgetWithText(TextField, '6 位数字 PIN'),
@@ -346,7 +429,7 @@ void main() {
     );
     await tester.runAsync(() => tester.tap(_unlockButton));
     await _pumpUntil(tester, () => find.text('PIN 不正确').evaluate().isNotEmpty);
-    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
+    expect(find.text('AI 设置', skipOffstage: false), findsNothing);
     await tester.runAsync(() => tester.tap(find.text('取消')));
     await _drainFrames(tester);
     expect(router.routerDelegate.state.uri.path, AppRoutes.profile);
@@ -355,26 +438,20 @@ void main() {
     await tester.runAsync(() async {
       unawaited(router.push<void>(AppRoutes.settings));
     });
+    await _pumpUntil(tester, () => find.text('AI 与语音').evaluate().isNotEmpty);
+    await tester.runAsync(() => tester.tap(find.text('AI 与语音')));
     await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
     await tester.enterText(
       find.widgetWithText(TextField, '6 位数字 PIN'),
       testParentPin,
     );
     await tester.runAsync(() => tester.tap(_unlockButton));
-    await _pumpUntil(
-      tester,
-      () => find.byType(SettingsPage).evaluate().isNotEmpty,
-    );
-    await tester.runAsync(() => tester.tap(find.text('AI 与语音')));
     await _pumpUntil(tester, () => find.text('语音识别设置').evaluate().isNotEmpty);
     expect(_unlockButton, findsNothing);
     await tester.runAsync(() => tester.pageBack());
     await _drainFrames(tester);
     await tester.runAsync(() => tester.tap(find.text('家长与数据')));
-    await _pumpUntil(
-      tester,
-      () => find.text('家长保护与云额度').evaluate().isNotEmpty,
-    );
+    await _pumpUntil(tester, () => find.text('家长保护与云额度').evaluate().isNotEmpty);
     expect(_unlockButton, findsNothing);
     await tester.runAsync(() => tester.pageBack());
     await _drainFrames(tester);
@@ -443,101 +520,99 @@ void main() {
 
   for (final navigatorPush in [false, true]) {
     testWidgets(
-        '${navigatorPush ? 'Navigator' : 'GoRouter'}子页复用有效授权，首帧不显示保护页且不重复读取安全存储',
-        (tester) async {
-      final store = _HeldStore();
-      final controlled = ParentAccessService(store: store);
-      addTearDown(controlled.dispose);
-      await tester.runAsync(() async {
-        await controlled.configure(testParentPin);
-        controlled.lock();
-        expect(await controlled.authenticate(testParentPin), isTrue);
-      });
-      var authorizedActions = 0;
-      Widget childPage() => ParentAccessBoundary(
-            service: controlled,
-            child: Builder(
-              builder: (context) => Scaffold(
-                appBar: AppBar(title: const Text('真实子页面')),
-                body: FilledButton(
-                  onPressed: () async {
-                    if (await ensureParentAccess(
-                      context,
-                      service: controlled,
-                    )) {
-                      authorizedActions++;
-                    }
-                  },
-                  child: const Text('管理操作'),
-                ),
+      '${navigatorPush ? 'Navigator' : 'GoRouter'}子页复用有效授权，首帧不显示保护页且不重复读取安全存储',
+      (tester) async {
+        final store = _HeldStore();
+        final controlled = ParentAccessService(store: store);
+        addTearDown(controlled.dispose);
+        await tester.runAsync(() async {
+          await controlled.configure(testParentPin);
+          controlled.lock();
+          expect(await controlled.authenticate(testParentPin), isTrue);
+        });
+        var authorizedActions = 0;
+        Widget childPage() => ParentAccessBoundary(
+          service: controlled,
+          child: Builder(
+            builder: (context) => Scaffold(
+              appBar: AppBar(title: const Text('真实子页面')),
+              body: FilledButton(
+                onPressed: () async {
+                  if (await ensureParentAccess(context, service: controlled)) {
+                    authorizedActions++;
+                  }
+                },
+                child: const Text('管理操作'),
               ),
             ),
-          );
+          ),
+        );
 
-      final router = GoRouter(
-        initialLocation: AppRoutes.settings,
-        routes: [
-          GoRoute(
-            path: AppRoutes.settings,
-            builder: (_, state) => ParentAccessBoundary(
-              service: controlled,
-              child: Builder(
-                builder: (context) => Scaffold(
-                  appBar: AppBar(title: const Text('已解锁的设置')),
-                  body: FilledButton(
-                    onPressed: () {
-                      if (navigatorPush) {
-                        unawaited(
-                          Navigator.of(context).push<void>(
-                            MaterialPageRoute<void>(
-                              builder: (_) => childPage(),
+        final router = GoRouter(
+          initialLocation: AppRoutes.settings,
+          routes: [
+            GoRoute(
+              path: AppRoutes.settings,
+              builder: (_, state) => ParentAccessBoundary(
+                service: controlled,
+                child: Builder(
+                  builder: (context) => Scaffold(
+                    appBar: AppBar(title: const Text('已解锁的设置')),
+                    body: FilledButton(
+                      onPressed: () {
+                        if (navigatorPush) {
+                          unawaited(
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute<void>(
+                                builder: (_) => childPage(),
+                              ),
                             ),
-                          ),
-                        );
-                      } else {
-                        unawaited(context.push<void>(AppRoutes.llmSettings));
-                      }
-                    },
-                    child: const Text('进入子页'),
+                          );
+                        } else {
+                          unawaited(context.push<void>(AppRoutes.llmSettings));
+                        }
+                      },
+                      child: const Text('进入子页'),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          GoRoute(
-            path: AppRoutes.llmSettings,
-            builder: (_, state) => childPage(),
-          ),
-        ],
-      );
-      await _mount(tester, router);
-      final readsBeforeNavigation = store.reads;
-      final release = Completer<void>();
-      store.nextRead = release;
-      addTearDown(() {
-        if (!release.isCompleted) release.complete();
-      });
+            GoRoute(
+              path: AppRoutes.llmSettings,
+              builder: (_, state) => childPage(),
+            ),
+          ],
+        );
+        await _mount(tester, router);
+        final readsBeforeNavigation = store.reads;
+        final release = Completer<void>();
+        store.nextRead = release;
+        addTearDown(() {
+          if (!release.isCompleted) release.complete();
+        });
 
-      await tester.runAsync(() => tester.tap(find.text('进入子页')));
-      await tester.runAsync(() => tester.pump());
-      expect(
-        find.byType(ParentAccessBoundary, skipOffstage: false),
-        findsNWidgets(2),
-      );
-      expect(find.text('真实子页面', skipOffstage: false), findsOneWidget);
-      expect(find.text('家长保护', skipOffstage: false), findsNothing);
-      expect(store.reads, readsBeforeNavigation);
+        await tester.runAsync(() => tester.tap(find.text('进入子页')));
+        await tester.runAsync(() => tester.pump());
+        expect(
+          find.byType(ParentAccessBoundary, skipOffstage: false),
+          findsNWidgets(2),
+        );
+        expect(find.text('真实子页面', skipOffstage: false), findsOneWidget);
+        expect(find.text('家长保护', skipOffstage: false), findsNothing);
+        expect(store.reads, readsBeforeNavigation);
 
-      // 安全存储即使两秒后仍未响应，也不应阻塞仍有效的授权。
-      await tester.runAsync(() => tester.pump(const Duration(seconds: 2)));
-      await tester.runAsync(() => tester.tap(find.text('管理操作')));
-      await _drainFrames(tester);
-      expect(find.text('真实子页面'), findsOneWidget);
-      expect(authorizedActions, 1);
-      expect(store.reads, readsBeforeNavigation);
-      expect(find.text('家长保护', skipOffstage: false), findsNothing);
-      expect(controlled.isUnlocked, isTrue);
-    });
+        // 安全存储即使两秒后仍未响应，也不应阻塞仍有效的授权。
+        await tester.runAsync(() => tester.pump(const Duration(seconds: 2)));
+        await tester.runAsync(() => tester.tap(find.text('管理操作')));
+        await _drainFrames(tester);
+        expect(find.text('真实子页面'), findsOneWidget);
+        expect(authorizedActions, 1);
+        expect(store.reads, readsBeforeNavigation);
+        expect(find.text('家长保护', skipOffstage: false), findsNothing);
+        expect(controlled.isUnlocked, isTrue);
+      },
+    );
   }
 
   testWidgets('授权精确到期后新页面重新验证，读取期间不挂载管理内容', (tester) async {
@@ -571,18 +646,12 @@ void main() {
     );
     await _mount(tester, router);
     expect(entered.isCompleted, isTrue);
-    expect(
-      find.text('已过期授权不能查看的管理内容', skipOffstage: false),
-      findsNothing,
-    );
+    expect(find.text('已过期授权不能查看的管理内容', skipOffstage: false), findsNothing);
     await tester.runAsync(() async => release.complete());
     await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
     expect(controlled.isUnlocked, isFalse);
     expect(find.byType(AlertDialog), findsOneWidget);
-    expect(
-      find.text('已过期授权不能查看的管理内容', skipOffstage: false),
-      findsNothing,
-    );
+    expect(find.text('已过期授权不能查看的管理内容', skipOffstage: false), findsNothing);
   });
 
   testWidgets('一次性恢复码只进入重设，保持原目标锁定且不会误退底层页', (tester) async {
@@ -625,20 +694,14 @@ void main() {
       () => find.byType(SettingsPage).evaluate().isNotEmpty,
     );
     await tester.runAsync(() => tester.tap(find.text('家长与数据')));
-    await _pumpUntil(
-      tester,
-      () => find.text('家长保护与云额度').evaluate().isNotEmpty,
-    );
+    await _pumpUntil(tester, () => find.text('家长保护与云额度').evaluate().isNotEmpty);
     await tester.runAsync(() => tester.tap(find.text('家长保护与云额度')));
     await _pumpUntil(
       tester,
       () => find.byType(ParentProtectionPage).evaluate().isNotEmpty,
     );
     expect(find.text('移除家长密码'), findsNothing);
-    expect(
-      find.widgetWithText(TextField, '新的 6 位数字 PIN'),
-      findsNothing,
-    );
+    expect(find.widgetWithText(TextField, '新的 6 位数字 PIN'), findsNothing);
     await tester.runAsync(() => tester.tap(find.byTooltip('修改家长密码')));
     await _pumpUntil(
       tester,
@@ -660,17 +723,11 @@ void main() {
       () => find.text('请输入两次相同的 6 位数字 PIN').evaluate().isNotEmpty,
     );
     expect(find.text('保存一次性恢复码'), findsNothing);
-    await tester.enterText(
-      find.widgetWithText(TextField, '再次输入 PIN'),
-      newPin,
-    );
+    await tester.enterText(find.widgetWithText(TextField, '再次输入 PIN'), newPin);
     await tester.runAsync(
       () => tester.tap(find.widgetWithText(FilledButton, '保存')),
     );
-    await _pumpUntil(
-      tester,
-      () => find.text('保存一次性恢复码').evaluate().isNotEmpty,
-    );
+    await _pumpUntil(tester, () => find.text('保存一次性恢复码').evaluate().isNotEmpty);
     final newRecovery = tester
         .widget<SelectableText>(
           find.descendant(
@@ -681,10 +738,7 @@ void main() {
         .data!;
     expect(newRecovery, isNot(oldRecovery));
     await tester.runAsync(() => tester.tap(find.text('我已保存')));
-    await _pumpUntil(
-      tester,
-      () => find.text('保存一次性恢复码').evaluate().isEmpty,
-    );
+    await _pumpUntil(tester, () => find.text('保存一次性恢复码').evaluate().isEmpty);
     expect(access.enabled, isTrue);
     expect(access.isUnlocked, isTrue);
     await tester.runAsync(() => tester.pageBack());
@@ -732,10 +786,7 @@ void main() {
       find.widgetWithText(TextField, '新的 6 位数字 PIN'),
       newPin,
     );
-    await tester.enterText(
-      find.widgetWithText(TextField, '再次输入 PIN'),
-      newPin,
-    );
+    await tester.enterText(find.widgetWithText(TextField, '再次输入 PIN'), newPin);
     await tester.runAsync(() => tester.tap(find.text('取消')));
     await _pumpUntil(tester, () => find.byType(AlertDialog).evaluate().isEmpty);
     expect(await tester.runAsync(store.readParentProtection), oldRecord);
@@ -751,10 +802,7 @@ void main() {
       find.widgetWithText(TextField, '新的 6 位数字 PIN'),
       newPin,
     );
-    await tester.enterText(
-      find.widgetWithText(TextField, '再次输入 PIN'),
-      newPin,
-    );
+    await tester.enterText(find.widgetWithText(TextField, '再次输入 PIN'), newPin);
     await tester.runAsync(
       () => tester.tap(find.widgetWithText(FilledButton, '保存')),
     );
@@ -770,8 +818,9 @@ void main() {
     );
 
     await _foreground(tester);
-    await tester
-        .runAsync(() => tester.tap(find.widgetWithText(FilledButton, '家长解锁')));
+    await tester.runAsync(
+      () => tester.tap(find.widgetWithText(FilledButton, '家长解锁')),
+    );
     await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
     await tester.enterText(
       find.widgetWithText(TextField, '6 位数字 PIN'),
@@ -812,19 +861,23 @@ void main() {
   });
 
   for (final configured in [false, true]) {
-    testWidgets('安全记录损坏时${configured ? '已设置' : '首次设置'}入口保持锁定，可重试缺失记录',
-        (tester) async {
+    testWidgets('安全记录损坏时${configured ? '已设置' : '首次设置'}入口保持锁定，可重试缺失记录', (
+      tester,
+    ) async {
       if (configured) await tester.runAsync(unlockParentForTesting);
       // 损坏记录模拟新一轮验证；已验证且未过期的会话在跨页时复用。
       access.lock();
       FlutterSecureStorage.setMockInitialValues({'parent_protection': '{}'});
-      final router = createAppRouter(initialLocation: AppRoutes.settings);
+      final router = createAppRouter(initialLocation: AppRoutes.llmSettings);
       await _mount(tester, router);
       await _pumpUntil(
         tester,
         () => find.widgetWithText(FilledButton, '重试').evaluate().isNotEmpty,
       );
-      expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
+      expect(
+        find.byType(LlmProviderSettingsPage, skipOffstage: false),
+        findsNothing,
+      );
       expect(
         find.byType(ParentProtectionPage, skipOffstage: false),
         findsNothing,
@@ -833,8 +886,9 @@ void main() {
       expect(access.canSetPin, isFalse);
       expect(access.needsResetNotice, isFalse);
       FlutterSecureStorage.setMockInitialValues({});
-      await tester
-          .runAsync(() => tester.tap(find.widgetWithText(FilledButton, '重试')));
+      await tester.runAsync(
+        () => tester.tap(find.widgetWithText(FilledButton, '重试')),
+      );
       await _pumpUntil(
         tester,
         () => find.byType(ParentProtectionPage).evaluate().isNotEmpty,
@@ -849,25 +903,28 @@ void main() {
     await tester.runAsync(
       () => HiveBoxes.settings.put('parent_protection_enabled', true),
     );
-    final router = createAppRouter(initialLocation: AppRoutes.settings);
+    final router = createAppRouter(initialLocation: AppRoutes.llmSettings);
     await _mount(tester, router);
     await _pumpUntil(
       tester,
       () => find.byType(ParentProtectionPage).evaluate().isNotEmpty,
     );
     expect(access.needsResetNotice, isTrue);
-    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
+    expect(
+      find.byType(LlmProviderSettingsPage, skipOffstage: false),
+      findsNothing,
+    );
     expect(access.isUnlocked, isFalse);
     await _configurePin(tester);
     await tester.runAsync(() => tester.tap(find.text('我已保存')));
     await _pumpUntil(
       tester,
-      () => find.byType(SettingsPage).evaluate().isNotEmpty,
+      () => find.byType(LlmProviderSettingsPage).evaluate().isNotEmpty,
     );
     expect(access.needsResetNotice, isFalse);
   });
 
-  testWidgets('后台立即移除设置内容和弹窗，返回前台需要重新验证', (tester) async {
+  testWidgets('后台移除受保护分组和弹窗，设置首页仍可用，返回需重新验证', (tester) async {
     await tester.runAsync(unlockParentForTesting);
     final router = createAppRouter(initialLocation: AppRoutes.settings);
     await _mount(tester, router);
@@ -875,6 +932,8 @@ void main() {
       tester,
       () => find.byType(SettingsPage).evaluate().isNotEmpty,
     );
+    await tester.runAsync(() => tester.tap(find.text('学习与内容')));
+    await _pumpUntil(tester, () => find.text('学习背景').evaluate().isNotEmpty);
     final context = tester.element(find.byType(SettingsPage));
     await tester.runAsync(() async {
       unawaited(
@@ -888,18 +947,20 @@ void main() {
     expect(find.text('有待保存的设置'), findsOneWidget);
     await _background(tester);
     await _drainFrames(tester);
-    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
+    expect(find.text('学习背景', skipOffstage: false), findsNothing);
+    expect(find.byType(SettingsPage, skipOffstage: false), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
     await _foreground(tester);
     await _drainFrames(tester);
-    await tester
-        .runAsync(() => tester.tap(find.widgetWithText(FilledButton, '家长解锁')));
+    await tester.runAsync(
+      () => tester.tap(find.widgetWithText(FilledButton, '家长解锁')),
+    );
     await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
-    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
+    expect(find.text('学习背景', skipOffstage: false), findsNothing);
   });
 
   testWidgets('首次恢复码确认中后台锁定后，家长页可重新验证并返回原目标', (tester) async {
-    final router = createAppRouter(initialLocation: AppRoutes.settings);
+    final router = createAppRouter(initialLocation: AppRoutes.llmSettings);
     await _mount(tester, router);
     await _pumpUntil(
       tester,
@@ -913,10 +974,14 @@ void main() {
       find.byType(ParentProtectionPage, skipOffstage: false),
       findsNothing,
     );
-    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
+    expect(
+      find.byType(LlmProviderSettingsPage, skipOffstage: false),
+      findsNothing,
+    );
     await _foreground(tester);
-    await tester
-        .runAsync(() => tester.tap(find.widgetWithText(FilledButton, '家长解锁')));
+    await tester.runAsync(
+      () => tester.tap(find.widgetWithText(FilledButton, '家长解锁')),
+    );
     await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
     await tester.enterText(
       find.widgetWithText(TextField, '6 位数字 PIN'),
@@ -930,9 +995,9 @@ void main() {
     await tester.runAsync(() => tester.pageBack());
     await _pumpUntil(
       tester,
-      () => find.byType(SettingsPage).evaluate().isNotEmpty,
+      () => find.byType(LlmProviderSettingsPage).evaluate().isNotEmpty,
     );
-    expect(router.routerDelegate.state.uri.path, AppRoutes.settings);
+    expect(router.routerDelegate.state.uri.path, AppRoutes.llmSettings);
   });
 
   testWidgets('后台关闭验证弹窗后晚到结果不会再弹出或误退底层路由', (tester) async {

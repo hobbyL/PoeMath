@@ -221,7 +221,7 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
             ColoredCard(
               color: theme.colorScheme.primary,
               child: Text(
-                '设置与管理需要家长密码，请先设置 6 位数字 PIN。设置后 ${ParentAccessService.unlockDuration.inMinutes} 分钟内免重复验证，切到后台立即锁定。',
+                '学习与内容、AI 与语音、家长与数据及其子页面需要家长密码；外观与反馈、应用与提醒可直接使用。请先设置 6 位数字 PIN，设置后 ${ParentAccessService.unlockDuration.inMinutes} 分钟内免重复验证，切到后台立即锁定。',
               ),
             ),
           if (_access.needsResetNotice)

@@ -380,7 +380,7 @@ class NotificationService {
             isWeeklyReportDegraded &&
             status.canDeliverWeeklyReport);
     _lastExactAlarmCapability = status.exactAlarmsEnabled;
-    // 系统授权会让家长区锁定并销毁旧页面；重新进入时也能恢复已有提醒。
+    // 从系统授权页返回或重新进入通知设置时，恢复已有提醒的调度。
     if (status.exactAlarmsEnabled != null &&
         (precisionChanged || deliveryRecovered)) {
       await _reconcileStoredSchedules();

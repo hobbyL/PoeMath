@@ -22,7 +22,7 @@ import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 
 void main() {
-  testWidgets('直接访问设置需家长验证，取消后返回我的且不能挂载设置页', (tester) async {
+  testWidgets('家长与数据分组需验证，取消后返回我的且不能挂载管理内容', (tester) async {
     await tester.runAsync(() async {
       await setUpHiveForTesting();
       await unlockParentForTesting();
@@ -42,6 +42,13 @@ void main() {
       await tester.pump();
     });
     await tester.pumpAndSettle();
+    expect(find.byType(SettingsPage), findsOneWidget);
+    expect(find.text('家长解锁'), findsNothing);
+    await tester.runAsync(() async {
+      await tester.tap(find.text('家长与数据'));
+      await tester.pump();
+    });
+    await tester.pumpAndSettle();
     expect(find.text('家长解锁'), findsWidgets);
     expect(find.text('家长保护与云额度'), findsNothing);
     // 返回我的会读取本地快照，导航帧也要在真实异步域中执行。
@@ -49,8 +56,13 @@ void main() {
       await tester.tap(find.text('取消'));
       await tester.pump();
     });
-    // 我的页有持续星空动画，等待导航过渡即可，不能等待帧调度停止。
-    await tester.pump(const Duration(seconds: 1));
+    // 我的页有持续星空动画；交替推进导航帧和真实异步，等旧路由卸载。
+    for (var frame = 0; frame < 5; frame++) {
+      await tester.runAsync(() async {
+        await tester.pump(const Duration(milliseconds: 200));
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      });
+    }
     expect(router.routerDelegate.state.uri.path, AppRoutes.profile);
     expect(ParentAccessService.instance.isUnlocked, isFalse);
     expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
@@ -65,8 +77,9 @@ void main() {
       root = await Directory.systemTemp.createTemp('encrypted_preview_');
       await unlockParentForTesting();
       await HiveBoxes.settings.put('theme_mode', 'dark');
-      final credentialNode = await encryptCredentials(
-          {'future_vendor_key': 'synthetic-key'}, 'synthetic-passphrase',);
+      final credentialNode = await encryptCredentials({
+        'future_vendor_key': 'synthetic-key',
+      }, 'synthetic-passphrase');
       encrypted = await encryptBackupPayload(
         jsonEncode({
           'version': 1,
@@ -109,8 +122,11 @@ void main() {
             body: Consumer(
               builder: (context, ref, _) => TextButton(
                 onPressed: () async {
-                  result =
-                      await previewAndRestoreBackup(context, ref, encrypted);
+                  result = await previewAndRestoreBackup(
+                    context,
+                    ref,
+                    encrypted,
+                  );
                 },
                 child: const Text('导入'),
               ),
@@ -131,7 +147,8 @@ void main() {
     while (find.text('备份预览').evaluate().isEmpty &&
         DateTime.now().isBefore(deadline)) {
       await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 20)),);
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
       await tester.pump(const Duration(milliseconds: 50));
     }
     expect(find.text('备份预览'), findsOneWidget);
@@ -147,7 +164,8 @@ void main() {
     });
     for (var i = 0; i < 250 && result == null; i++) {
       await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 20)),);
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
       await tester.pump(const Duration(milliseconds: 50));
     }
     expect(result, isNotNull);

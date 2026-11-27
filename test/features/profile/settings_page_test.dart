@@ -8,6 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
+import 'package:poemath/core/services/notification_service.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/core/widgets/app_tile.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
@@ -111,10 +114,11 @@ void main() {
       return switch (call.method) {
         'initialize' ||
         'areNotificationsEnabled' ||
+        'requestNotificationsPermission' ||
         'canScheduleExactNotifications' => true,
         'getNotificationChannels' => <Map<String, Object?>>[],
         'getNotificationAppLaunchDetails' => {'notificationLaunchedApp': false},
-        'cancel' => null,
+        'cancel' || 'zonedSchedule' => null,
         _ => throw UnsupportedError('未预期的通知调用：${call.method}'),
       };
     });
@@ -168,6 +172,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 外观与反馈：主题、明暗、页面动画、音效与触觉。
+    lockParentForTesting();
     await tester.tap(find.text('外观与反馈'));
     await tester.pumpAndSettle();
     expect(find.text('主题设置'), findsOneWidget);
@@ -175,6 +180,15 @@ void main() {
     expect(find.text('音效'), findsOneWidget);
     expect(find.text('触觉反馈'), findsOneWidget);
     expect(find.text('拼音显示'), findsNothing);
+    expect(
+      find.byType(ParentAccessBoundary, skipOffstage: false),
+      findsNothing,
+    );
+    await tester.runAsync(() => tester.tap(_switchOf('音效')));
+    await drainHiveWritesForTesting(tester);
+    await tester.pumpAndSettle();
+    expect(SettingsRepository().soundEnabled, isFalse);
+    expect(ParentAccessService.instance.isUnlocked, isFalse);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -198,8 +212,40 @@ void main() {
       await tester.pump();
     }
     expect(statusLabel, findsOneWidget);
-    await tester.pumpAndSettle();
+    // 初始化与路由动画在真实异步中开始；等转场完成、开关可点击再操作。
+    final reminderSwitch = _switchOf('每日学习提醒');
+    final notificationRoute = ModalRoute.of(tester.element(reminderSwitch))!;
+    final transitionWait = Stopwatch()..start();
+    while ((notificationRoute.animation!.status != AnimationStatus.completed ||
+            reminderSwitch.hitTestable().evaluate().isEmpty ||
+            tester.widget<Switch>(reminderSwitch).onChanged == null) &&
+        transitionWait.elapsed < const Duration(seconds: 5)) {
+      await tester.runAsync(() async {
+        await tester.pump(const Duration(milliseconds: 100));
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      });
+    }
+    expect(notificationRoute.animation!.status, AnimationStatus.completed);
+    expect(reminderSwitch.hitTestable(), findsOneWidget);
+    expect(tester.widget<Switch>(reminderSwitch).onChanged, isNotNull);
     expect(find.text('通知设置'), findsOneWidget);
+    expect(
+      find.byType(ParentAccessBoundary, skipOffstage: false),
+      findsNothing,
+    );
+    await tester.runAsync(() => tester.tap(reminderSwitch));
+    final writeWait = Stopwatch()..start();
+    while ((!NotificationService.instance.isReminderEnabled ||
+            tester.widget<Switch>(reminderSwitch).onChanged == null) &&
+        writeWait.elapsed < const Duration(seconds: 5)) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    expect(NotificationService.instance.isReminderEnabled, isTrue);
+    expect(ParentAccessService.instance.isUnlocked, isFalse);
+    await drainHiveWritesForTesting(tester);
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('关于韵算'), findsOneWidget);
@@ -207,6 +253,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 家长与数据：保护、额度与备份集中管理。
+    await tester.runAsync(unlockParentForTesting);
     await tester.tap(find.text('家长与数据'));
     await tester.pumpAndSettle();
     expect(find.text('家长保护与云额度'), findsOneWidget);

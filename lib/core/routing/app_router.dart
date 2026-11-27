@@ -864,10 +864,8 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.home}) {
       ),
       GoRoute(
         path: AppRoutes.settings,
-        pageBuilder: (context, state) => fadeSlideTransitionPage(
-          state: state,
-          child: const ParentAccessBoundary(child: SettingsPage()),
-        ),
+        pageBuilder: (context, state) =>
+            fadeSlideTransitionPage(state: state, child: const SettingsPage()),
       ),
       GoRoute(
         path: AppRoutes.speechRecognitionSettings,

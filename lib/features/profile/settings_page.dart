@@ -39,7 +39,12 @@ enum _SettingsSection {
   intelligence,
   appearance,
   data,
-  application,
+  application;
+
+  bool get requiresParentAccess => switch (this) {
+    learning || intelligence || data => true,
+    hub || appearance || application => false,
+  };
 }
 
 class SettingsPage extends ConsumerWidget {
@@ -413,9 +418,7 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => Navigator.push<void>(
                   context,
                   fadeSlideRoute(
-                    builder: (_) => const ParentAccessBoundary(
-                      child: NotificationSettingsPage(),
-                    ),
+                    builder: (_) => const NotificationSettingsPage(),
                   ),
                 ),
               ),
@@ -511,8 +514,12 @@ class SettingsPage extends ConsumerWidget {
     Navigator.push<void>(
       context,
       fadeSlideRoute(
-        builder: (_) =>
-            ParentAccessBoundary(child: SettingsPage._category(section)),
+        builder: (_) {
+          final page = SettingsPage._category(section);
+          return section.requiresParentAccess
+              ? ParentAccessBoundary(child: page)
+              : page;
+        },
       ),
     );
   }
