@@ -23,7 +23,6 @@ import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/daily_goal_activity.dart';
-import 'package:poemath/domain/daily_practice_spacing.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/home/home_check_in_header.dart';
 import 'package:poemath/features/home/home_section.dart';
@@ -563,18 +562,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         const HomeSectionHeading('今日学习目标 · 完成后可打卡'),
         const SizedBox(height: SpacingTokens.sm),
         goalGroup,
-        if (selectedGoals.contains(DailyGoalActivity.poem) ||
-            selectedGoals.contains(DailyGoalActivity.pictureStoryExpression))
-          Padding(
-            padding: const EdgeInsets.only(top: SpacingTokens.xs),
-            child: Text(
-              '同一首诗、同一道看图说话题目，$dailyPracticeSpacingDays 天内只计入一天的目标；'
-              '当天重复只计一次，当天仍显示，次日起暂时从列表隐藏。',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
         Padding(
           padding: const EdgeInsets.only(top: SpacingTokens.xs),
           child: Text(
