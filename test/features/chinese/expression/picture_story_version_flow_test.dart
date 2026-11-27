@@ -128,18 +128,16 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final container = ProviderContainer(
-      overrides: [
-        pictureStoryRepositoryProvider.overrideWithValue(repository),
-        learningActivityRepositoryProvider.overrideWithValue(
-          activityRepository,
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
+    // 容器随页面卸载，及时取消跨天定时器和 Hive 订阅。
+    // addTearDown 才释放外部容器会晚于 Flutter 的待处理定时器检查。
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
+      ProviderScope(
+        overrides: [
+          pictureStoryRepositoryProvider.overrideWithValue(repository),
+          learningActivityRepositoryProvider.overrideWithValue(
+            activityRepository,
+          ),
+        ],
         child: MaterialApp(
           theme: AppTheme.resolve(
             subject: AppSubject.poem,
@@ -155,7 +153,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    return container;
+    return ProviderScope.containerOf(
+      tester.element(find.byWidget(page)),
+      listen: false,
+    );
   }
 
   Future<void> unmount(WidgetTester tester) async {
