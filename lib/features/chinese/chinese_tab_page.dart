@@ -22,11 +22,11 @@ enum ChineseSection {
   expression;
 
   static ChineseSection? fromId(String? id) => switch (id) {
-        'textbook' => textbook,
-        'poem' => poem,
-        'expression' => expression,
-        _ => null,
-      };
+    'textbook' => textbook,
+    'poem' => poem,
+    'expression' => expression,
+    _ => null,
+  };
 }
 
 // 离开语文 Tab 后仍保留本档案的两个列表位置；不保存到学习数据中。
@@ -50,8 +50,8 @@ class _ChineseTabPageState extends ConsumerState<ChineseTabPage> {
   late final StreamSubscription<String> _profileSubscription;
 
   ChineseSection _savedSection() => ChineseSection.fromId(
-        ref.read(settingsRepositoryProvider).chineseSection,
-      )!;
+    ref.read(settingsRepositoryProvider).chineseSection,
+  )!;
 
   @override
   void initState() {
@@ -120,12 +120,14 @@ class _ChineseTabPageState extends ConsumerState<ChineseTabPage> {
   @override
   Widget build(BuildContext context) {
     final textbookCount = ref.watch(currentTextbooksProvider).length;
-    final poemCount = ref.watch(filteredPoemsProvider).length;
-    final expressionCount = ref.watch(pictureStoryPromptCountProvider);
+    final poemCount = ref.watch(availablePoemsProvider).length;
+    final expressionCount = ref
+        .watch(availablePictureStoryPromptsProvider)
+        .length;
     final labelStyle = Theme.of(context).textTheme.labelLarge!;
     final labelHeight =
         MediaQuery.textScalerOf(context).scale(labelStyle.fontSize!) *
-            (labelStyle.height ?? 1);
+        (labelStyle.height ?? 1);
     final toolbarHeight = math.max(
       kToolbarHeight,
       labelHeight + SpacingTokens.sm * 4,

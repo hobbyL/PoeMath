@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/daily_practice_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/adventure/math_adventure_providers.dart';
@@ -28,6 +29,9 @@ void invalidateLearningBackground(void Function(ProviderOrFamily) invalidate) {
 
 /// 刷新所有从 Hive 读取的缓存 Provider，确保 UI 立即反映最新数据。
 void invalidateAllHiveProviders(void Function(ProviderOrFamily) invalidate) {
+  invalidate(learningActivityHistoryProvider);
+  invalidate(poemDailyPracticeSpacingProvider);
+  invalidate(pictureStoryDailyPracticeSpacingProvider);
   invalidate(mathAdventureRepositoryProvider);
   invalidate(mathAdventureSettingsProvider);
   invalidate(mathAdventureProgressProvider);
@@ -38,6 +42,7 @@ void invalidateAllHiveProviders(void Function(ProviderOrFamily) invalidate) {
   invalidate(streakProvider);
   invalidate(userStatsProvider);
   invalidate(todayPoemCountProvider);
+  invalidate(todayLearningActivityCountsProvider);
   invalidate(todayMathCountProvider);
   invalidate(dailyPoemGoalProvider);
   invalidate(dailyMathGoalProvider);
@@ -57,12 +62,14 @@ void invalidateAllHiveProviders(void Function(ProviderOrFamily) invalidate) {
   invalidate(dueReviewCountProvider);
   invalidate(learnedCountProvider);
   invalidate(filteredPoemsProvider);
+  invalidate(availablePoemsProvider);
 
   // ---- 看图说话 ----
   invalidate(pictureStoryCatalogProvider);
   invalidate(pictureStoryPromptByIdProvider);
   invalidate(pictureStoryPromptVersionProvider);
   invalidate(pictureStoryPromptProvider);
+  invalidate(availablePictureStoryPromptsProvider);
   invalidate(pictureStoryPromptCountProvider);
   invalidate(pictureStoryHistoryProvider);
   invalidate(pictureStoryImageBytesProvider);

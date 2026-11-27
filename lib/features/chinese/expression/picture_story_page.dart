@@ -7,6 +7,7 @@ import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
+import 'package:poemath/domain/daily_practice_spacing.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_action.dart';
@@ -27,8 +28,12 @@ class PictureStoryPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     List<PictureStoryPrompt>? prompts;
+    var hiddenCount = 0;
     try {
-      prompts = ref.watch(pictureStoryPromptProvider);
+      final enabled = ref.watch(pictureStoryPromptProvider);
+      final available = ref.watch(availablePictureStoryPromptsProvider);
+      prompts = available;
+      hiddenCount = enabled.length - available.length;
     } on Object {
       // 保留损坏目录原值，恢复后可重试；不能误显示成空题库。
     }
@@ -55,25 +60,52 @@ class PictureStoryPage extends ConsumerWidget {
                 onRetry: () => ref.invalidate(pictureStoryCatalogProvider),
               )
             : prompts.isEmpty
-            ? const AppEmptyState(
-                icon: Icons.image_outlined,
-                title: '暂时没有可练习的题目',
-                description: '请家长在设置中添加或启用看图说话题目。',
-                actions: [
-                  ContentPreparationActions(
-                    managementRoute: AppRoutes.pictureStoryManagement,
-                  ),
-                ],
-              )
+            ? hiddenCount > 0
+                  ? AppEmptyState(
+                      icon: Icons.image_outlined,
+                      title: '这些题目最近已经练过了',
+                      description:
+                          '$dailyPracticeSpacingDays 天间隔结束后自动显示，也可以到练习记录中回顾。',
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              context.push(AppRoutes.pictureStoryHistory),
+                          child: const Text('查看练习记录'),
+                        ),
+                      ],
+                    )
+                  : const AppEmptyState(
+                      icon: Icons.image_outlined,
+                      title: '暂时没有可练习的题目',
+                      description: '请家长在设置中添加或启用看图说话题目。',
+                      actions: [
+                        ContentPreparationActions(
+                          managementRoute: AppRoutes.pictureStoryManagement,
+                        ),
+                      ],
+                    )
             : LayoutBuilder(
                 builder: (context, constraints) {
                   final columns = ResponsiveLayout.columns(
                     constraints.maxWidth,
                   );
                   final available = prompts!;
+                  final theme = Theme.of(context);
                   return ListView(
                     padding: const EdgeInsets.all(SpacingTokens.md),
                     children: [
+                      if (hiddenCount > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: SpacingTokens.sm,
+                          ),
+                          child: Text(
+                            '已隐藏 $hiddenCount 道近期练过的题目，$dailyPracticeSpacingDays 天间隔结束后自动显示。',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
                       for (
                         var start = 0;
                         start < available.length;

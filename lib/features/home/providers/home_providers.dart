@@ -2,20 +2,22 @@
 //
 // 首页 / 游戏化 Riverpod providers。
 
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/data/models/check_in.dart';
-import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/user_stats.dart';
+import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/daily_practice_providers.dart';
 import 'package:poemath/data/repositories/achievement_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
+
+export 'package:poemath/data/providers/daily_practice_providers.dart'
+    show DayKeyNotifier, dayKeyProvider;
 
 // ============ Repositories ============
 //
@@ -34,37 +36,6 @@ final Provider<UserStatsRepository> userStatsRepoProvider =
 
 final Provider<AchievementRepository> achievementRepoProvider =
     achievementRepositoryProvider;
-
-// ============ 日期失效源 ============
-
-/// 今日日期 key（yyyy-MM-dd）。跨天自动失效日相关 Provider。
-///
-/// Timer 每 30s 比对一次日期字符串，覆盖「前台持续跨午夜」；
-/// 「后台跨天再 resumed」由恢复后的首次比对覆盖（最多延迟 30s，可接受）。
-/// 日相关 Provider 通过 `ref.watch(dayKeyProvider)` 建立依赖，
-/// dayKey 变化时自动重建重算。
-class DayKeyNotifier extends Notifier<String> {
-  Timer? _timer;
-
-  @override
-  String build() {
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
-      final today = _todayKey();
-      if (state != today) state = today;
-    });
-    ref.onDispose(_timer!.cancel);
-    return _todayKey();
-  }
-}
-
-final dayKeyProvider = NotifierProvider<DayKeyNotifier, String>(
-  DayKeyNotifier.new,
-);
-
-String _todayKey() {
-  final now = DateTime.now();
-  return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-}
 
 // ============ 打卡 ============
 
@@ -99,17 +70,13 @@ final userStatsProvider = Provider<UserStats>((ref) {
 
 // ============ 今日活动统计 ============
 //
-// 这些 Provider 读的是**实时的** Hive 值（仓库方法每次都现查 box），但
-// `Provider` 自身不会因为 Hive 写入而失效 —— 缓存的是上一次的计算结果。
-// 因此除了 `dayKeyProvider`（跨天）之外，还必须在**活动结算点**显式
-// `ref.invalidate`，否则做完题回到首页看到的仍是进入前的旧数字。
-// 结算点的既有写法见 `poem_read_along_page.dart` 与该页的练习结算流程。
+// 目标计数监听完成活动、进度和档案变化，并通过 dayKeyProvider 跨天重算。
+// 口算等未监听 box 的统计仍需在结算点显式失效；诗词结算保留原有失效，
+// 确保回首页时立即读取已保存的结果。
 
-/// 今日诗词学习数
+/// 今日可计入目标的诗词数：同一首诗五个自然日内只计入一天。
 final todayPoemCountProvider = Provider<int>((ref) {
-  ref.watch(dayKeyProvider); // 跨天失效：dayKey 变化时重建
-  final repo = ref.watch(poemProgressRepositoryProvider);
-  return repo.todayStudiedCount;
+  return ref.watch(poemDailyPracticeSpacingProvider).countedToday;
 });
 
 /// 今日口算做题数
@@ -134,36 +101,24 @@ class TodayLearningActivityCounts {
   final int english;
 }
 
-final _learningActivityChangesProvider = StreamProvider(
-  (ref) => HiveBoxes.learningActivities.watch(),
-);
-final _expressionCompletionChangesProvider = StreamProvider(
-  (ref) => HiveBoxes.pictureStoryPractice.watch(),
-);
-
 final todayLearningActivityCountsProvider =
     Provider<TodayLearningActivityCounts>((ref) {
-      ref.watch(_learningActivityChangesProvider);
-      ref.watch(_expressionCompletionChangesProvider);
       final today = DateTime.parse(ref.watch(dayKeyProvider));
-      final activities = ref
-          .watch(learningActivityRepositoryProvider)
-          .completedBetween(
-            today,
-            DateTime(today.year, today.month, today.day + 1),
-          );
+      final tomorrow = DateTime(today.year, today.month, today.day + 1);
+      final activities = ref.watch(learningActivityHistoryProvider);
       var recognition = 0;
       var writing = 0;
-      var expression = 0;
       var english = 0;
       for (final activity in activities) {
+        if (activity.completedAt.isBefore(today) ||
+            !activity.completedAt.isBefore(tomorrow)) {
+          continue;
+        }
         switch (activity.typeOrNull) {
           case LearningActivityType.textbookRecognition:
             recognition++;
           case LearningActivityType.textbookWriting:
             writing++;
-          case LearningActivityType.pictureStoryExpression:
-            expression++;
           case LearningActivityType.englishPractice ||
               LearningActivityType.englishSpeaking:
             english++;
@@ -174,7 +129,9 @@ final todayLearningActivityCountsProvider =
       return TodayLearningActivityCounts(
         textbookRecognition: recognition,
         textbookWriting: writing,
-        pictureStoryExpression: expression,
+        pictureStoryExpression: ref
+            .watch(pictureStoryDailyPracticeSpacingProvider)
+            .countedToday,
         english: english,
       );
     });
@@ -214,7 +171,11 @@ final dailyRecommendedPoemProvider = Provider<Poem?>((ref) {
   final poemRepo = ref.watch(poemRepositoryProvider);
   final progressRepo = ref.watch(poemProgressRepositoryProvider);
   final settings = ref.watch(settingsRepositoryProvider);
-  final allPoems = poemRepo.getAll();
+  final hidden = ref.watch(poemDailyPracticeSpacingProvider).hiddenContentIds;
+  final allPoems = poemRepo
+      .getAll()
+      .where((poem) => !hidden.contains(PoemIdentity.canonical(poem.id)))
+      .toList();
   if (allPoems.isEmpty) return null;
   final textbookPoems = allPoems
       .where(

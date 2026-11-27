@@ -75,6 +75,7 @@ void main() {
         ProviderScope(
           overrides: [
             pictureStoryPromptProvider.overrideWithValue(prompts),
+            availablePictureStoryPromptsProvider.overrideWithValue(prompts),
             pictureStoryHistoryProvider.overrideWithValue(records),
             pictureStoryImageBytesProvider.overrideWith((ref, id) async {
               loads[id] = (loads[id] ?? 0) + 1;

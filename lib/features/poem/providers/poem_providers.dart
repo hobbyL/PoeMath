@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/poem_progress.dart';
+import 'package:poemath/data/poem_identity.dart';
+import 'package:poemath/data/providers/daily_practice_providers.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/poem_favorite_repository.dart';
 import 'package:poemath/data/repositories/poem_progress_repository.dart';
@@ -49,8 +51,9 @@ final selectedSemesterProvider = StateProvider<String?>(
 );
 
 /// 当前选中学习状态筛选（null = 全部）
-final selectedStatusFilterProvider =
-    StateProvider<LearningStatus?>((ref) => null);
+final selectedStatusFilterProvider = StateProvider<LearningStatus?>(
+  (ref) => null,
+);
 
 /// 搜索关键词
 final poemSearchQueryProvider = StateProvider<String>((ref) => '');
@@ -131,6 +134,15 @@ final filteredPoemsProvider = Provider<List<Poem>>((ref) {
   return poems;
 });
 
+/// 孩子的选题列表；完整筛选结果仍用于测验候选，不影响历史和详情。
+final availablePoemsProvider = Provider<List<Poem>>((ref) {
+  final poems = ref.watch(filteredPoemsProvider);
+  final hidden = ref.watch(poemDailyPracticeSpacingProvider).hiddenContentIds;
+  return poems
+      .where((poem) => !hidden.contains(PoemIdentity.canonical(poem.id)))
+      .toList();
+});
+
 /// 可用年级列表
 final availableGradesProvider = Provider<List<int>>((ref) {
   final repo = ref.watch(poemRepoProvider);
@@ -158,8 +170,10 @@ final poemByIdProvider = Provider.family<Poem?, String>((ref, id) {
 });
 
 /// 诗词进度
-final poemProgressProvider =
-    Provider.family<PoemProgress?, String>((ref, poemId) {
+final poemProgressProvider = Provider.family<PoemProgress?, String>((
+  ref,
+  poemId,
+) {
   final repo = ref.watch(poemProgressRepoProvider);
   return repo.get(poemId);
 });

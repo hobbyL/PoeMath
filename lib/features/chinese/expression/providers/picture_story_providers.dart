@@ -9,6 +9,7 @@ import 'package:poemath/core/services/picture_story_generation_service.dart';
 import 'package:poemath/core/services/picture_story_generation_controller.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/daily_practice_providers.dart';
 import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
@@ -106,6 +107,17 @@ final pictureStoryPromptProvider = Provider<List<PictureStoryPrompt>>((ref) {
 final pictureStoryPromptCountProvider = Provider<int>((ref) {
   return ref.watch(pictureStoryPromptProvider).length;
 });
+
+/// 只过滤孩子的选题列表；题库启用状态和历史查询仍使用原始目录。
+final availablePictureStoryPromptsProvider = Provider<List<PictureStoryPrompt>>(
+  (ref) {
+    final prompts = ref.watch(pictureStoryPromptProvider);
+    final hidden = ref
+        .watch(pictureStoryDailyPracticeSpacingProvider)
+        .hiddenContentIds;
+    return prompts.where((prompt) => !hidden.contains(prompt.id)).toList();
+  },
+);
 
 final pictureStoryHistoryProvider = Provider<List<PictureStoryPracticeRecord>>((
   ref,

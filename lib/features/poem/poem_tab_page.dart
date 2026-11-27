@@ -11,6 +11,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/poem_progress.dart';
+import 'package:poemath/domain/daily_practice_spacing.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/poem_card.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
@@ -128,7 +129,9 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
 
   @override
   Widget build(BuildContext context) {
-    final poems = ref.watch(filteredPoemsProvider);
+    final poems = ref.watch(availablePoemsProvider);
+    final hiddenCount = ref.watch(filteredPoemsProvider).length - poems.length;
+    final theme = Theme.of(context);
 
     return AppScaffold(
       backgroundScene: PineInkScene.branch,
@@ -189,15 +192,45 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
 
               // ============ 诗词列表 ============
               if (poems.isEmpty)
-                const SliverFillRemaining(
+                SliverFillRemaining(
                   hasScrollBody: false,
                   child: AppEmptyState(
                     icon: Icons.menu_book_outlined,
-                    title: '暂无诗词',
-                    description: '试试其他关键词或调整筛选条件。',
+                    title: hiddenCount > 0 ? '这些诗词最近已经练过了' : '暂无诗词',
+                    description: hiddenCount > 0
+                        ? '$dailyPracticeSpacingDays 天间隔结束后自动显示，也可调整筛选，练习其他诗词。'
+                        : '试试其他关键词或调整筛选条件。',
+                    actions: hiddenCount > 0
+                        ? [
+                            TextButton(
+                              onPressed: _openPanel,
+                              child: const Text('调整筛选'),
+                            ),
+                            TextButton(
+                              onPressed: () =>
+                                  context.push(AppRoutes.poemLearningPath),
+                              child: const Text('查看学习路径'),
+                            ),
+                          ]
+                        : const [],
                   ),
                 )
-              else
+              else ...[
+                if (hiddenCount > 0)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: SpacingTokens.md,
+                        vertical: SpacingTokens.sm,
+                      ),
+                      child: Text(
+                        '已隐藏 $hiddenCount 首近期练过的诗词，$dailyPracticeSpacingDays 天间隔结束后自动显示。',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: SpacingTokens.md,
@@ -221,6 +254,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                     },
                   ),
                 ),
+              ],
             ],
           );
         },
