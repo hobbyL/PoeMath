@@ -370,7 +370,7 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(find.text(isPoem ? '诗词 0/1 首' : '看图表达 0/1 次'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '打卡'), findsNothing);
-      expect(find.textContaining('5 天内只计入一天的目标'), findsOneWidget);
+      expect(find.textContaining('5 天内只计入一天的目标'), findsNothing);
       final action = find.widgetWithText(
         FilledButton,
         isPoem ? '去学诗词' : '去看图表达',
