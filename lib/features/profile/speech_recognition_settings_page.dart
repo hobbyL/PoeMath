@@ -32,12 +32,13 @@ class _SpeechRecognitionSettingsPageState
   String _storedAppId = '';
   SpeechRecognitionSettingsState _settings =
       const SpeechRecognitionSettingsState(
-    hasCredentials: false,
-    isVerified: false,
-  );
+        hasCredentials: false,
+        isVerified: false,
+      );
   bool _loadingSettings = true;
   bool _obscureSecretKey = true;
   bool _showRealtimeSettings = false;
+  bool _preferRealtime = false;
   bool _busy = false;
   bool _recording = false;
   String? _message;
@@ -71,19 +72,19 @@ class _SpeechRecognitionSettingsPageState
       _storedAppId = snapshot.credentials?.appId ?? '';
       setState(() {
         _settings = snapshot.settings;
+        _preferRealtime = snapshot.settings.preferRealtime;
         _showRealtimeSettings = _storedAppId.isNotEmpty;
         _loadingSettings = false;
       });
     } on Object catch (error) {
-      AppLogger.e(
-        '读取语音识别设置失败',
-        tag: 'Speech',
-        error: error,
-      );
+      AppLogger.e('读取语音识别设置失败', tag: 'Speech', error: error);
       if (!mounted) return;
       _secretIdController.clear();
       _secretKeyController.clear();
+      _appIdController.clear();
+      _storedAppId = '';
       setState(() {
+        _preferRealtime = false;
         _settings = const SpeechRecognitionSettingsState(
           hasCredentials: false,
           isVerified: false,
@@ -106,21 +107,23 @@ class _SpeechRecognitionSettingsPageState
   }
 
   Future<TencentAsrCredentials?> _saveFormCredentials() async {
+    final repo = ref.read(settingsRepositoryProvider);
     final credentials = _readFormCredentials();
     if (credentials == null) {
       _showMessage('请填写 SecretId 和 SecretKey', isError: true);
       return null;
     }
-    await ref.read(settingsRepositoryProvider).saveTencentAsrCredentials(
-          secretId: credentials.secretId,
-          secretKey: credentials.secretKey,
-        );
+    final preferRealtime =
+        _preferRealtime && credentials.hasRealtimeCredentials;
+    await repo.saveTencentAsrCredentials(
+      secretId: credentials.secretId,
+      secretKey: credentials.secretKey,
+    );
     if (credentials.appId.isNotEmpty || _storedAppId.isNotEmpty) {
-      await ref
-          .read(settingsRepositoryProvider)
-          .saveTencentAsrAppId(credentials.appId);
+      await repo.saveTencentAsrAppId(credentials.appId);
       _storedAppId = credentials.appId;
     }
+    await repo.setTencentAsrPreferRealtime(preferRealtime);
     return credentials;
   }
 
@@ -241,9 +244,7 @@ class _SpeechRecognitionSettingsPageState
       if (!mounted) return;
       await _loadSettings();
       if (mounted) {
-        _showMessage(
-          result.text.isEmpty ? '测试未返回文字' : '测试成功，跟读评分已可用',
-        );
+        _showMessage(result.text.isEmpty ? '测试未返回文字' : '测试成功，跟读评分已可用');
       }
     } on TencentAsrException catch (error) {
       if (!mounted) return;
@@ -356,9 +357,11 @@ class _SpeechRecognitionSettingsPageState
   Widget build(BuildContext context) {
     final settings = _settings;
     final theme = Theme.of(context);
-    final statusColor =
-        _messageIsError ? theme.colorScheme.error : theme.colorScheme.primary;
+    final statusColor = _messageIsError
+        ? theme.colorScheme.error
+        : theme.colorScheme.primary;
     final testButtonLabel = _recording ? '结束并验证' : '开始真实录音测试';
+    final hasAppId = _appIdController.text.trim().isNotEmpty;
 
     return AppScaffold(
       appBar: AppBar(
@@ -401,9 +404,8 @@ class _SpeechRecognitionSettingsPageState
                 labelText: 'SecretKey (SK)',
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
-                  onPressed: () => setState(
-                    () => _obscureSecretKey = !_obscureSecretKey,
-                  ),
+                  onPressed: () =>
+                      setState(() => _obscureSecretKey = !_obscureSecretKey),
                   icon: Icon(
                     _obscureSecretKey
                         ? Icons.visibility_outlined
@@ -419,8 +421,8 @@ class _SpeechRecognitionSettingsPageState
               onPressed: _loadingSettings || _busy || _recording
                   ? null
                   : () => setState(
-                        () => _showRealtimeSettings = !_showRealtimeSettings,
-                      ),
+                      () => _showRealtimeSettings = !_showRealtimeSettings,
+                    ),
               icon: Icon(
                 _showRealtimeSettings ? Icons.expand_less : Icons.expand_more,
               ),
@@ -430,15 +432,36 @@ class _SpeechRecognitionSettingsPageState
               TextField(
                 controller: _appIdController,
                 enabled: !_loadingSettings && !_busy && !_recording,
+                onChanged: (value) => setState(() {
+                  if (value.trim().isEmpty) _preferRealtime = false;
+                }),
                 decoration: const InputDecoration(
                   labelText: 'APPID',
                   prefixIcon: Icon(Icons.swap_horiz_outlined),
-                  helperText: '默认自动获取；无法获取时可从腾讯云账号信息页复制填写',
+                  helperText: '选填，从腾讯云账号信息页复制；留空使用一句话识别',
+                  helperMaxLines: 3,
                 ),
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.done,
               ),
             ],
+            const SizedBox(height: SpacingTokens.sm),
+            AppTile(
+              icon: Icons.graphic_eq_outlined,
+              iconColor: theme.colorScheme.primary,
+              title: '优先使用实时识别',
+              subtitle: !hasAppId
+                  ? '未配置 APPID，使用一句话识别'
+                  : _preferRealtime
+                  ? '录音时实时识别，额度用完后使用一句话识别'
+                  : '使用一句话识别，录音结束后返回结果',
+              trailing: Switch(
+                value: hasAppId && _preferRealtime,
+                onChanged: _loadingSettings || _busy || _recording || !hasAppId
+                    ? null
+                    : (value) => setState(() => _preferRealtime = value),
+              ),
+            ),
             const SizedBox(height: SpacingTokens.sm),
             Align(
               alignment: Alignment.centerRight,
@@ -447,12 +470,12 @@ class _SpeechRecognitionSettingsPageState
                     ? null
                     : _saveCredentials,
                 icon: const Icon(Icons.save_outlined),
-                label: const Text('保存密钥'),
+                label: const Text('保存设置'),
               ),
             ),
             const SizedBox(height: SpacingTokens.lg),
             Text(
-              '优先使用实时识别，仅当实时资源包耗尽时切换为一句话识别。',
+              '修改后点击「保存设置」生效；开始录音测试也会保存当前设置。',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -481,8 +504,8 @@ class _SpeechRecognitionSettingsPageState
                           settings.isVerified
                               ? '已配置 · 跟读评分可用'
                               : settings.hasCredentials
-                                  ? '密钥已保存 · 认字可用，跟读需完成录音测试'
-                                  : '未配置 · 跟读功能需先填写密钥并通过测试',
+                              ? '密钥已保存 · 认字可用，跟读需完成录音测试'
+                              : '未配置 · 跟读功能需先填写密钥并通过测试',
                           style: theme.textTheme.bodyMedium,
                         ),
                       ),
@@ -509,8 +532,8 @@ class _SpeechRecognitionSettingsPageState
                       onPressed: _loadingSettings || _busy
                           ? null
                           : _recording
-                              ? _finishTest
-                              : _startTest,
+                          ? _finishTest
+                          : _startTest,
                       icon: Icon(
                         _recording ? Icons.stop : Icons.mic_none_outlined,
                       ),
@@ -556,9 +579,7 @@ class _SpeechRecognitionSettingsPageState
               const SizedBox(height: SpacingTokens.sm),
               Text(
                 _message!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: statusColor,
-                ),
+                style: theme.textTheme.bodyMedium?.copyWith(color: statusColor),
               ),
             ],
             const SizedBox(height: SpacingTokens.md),

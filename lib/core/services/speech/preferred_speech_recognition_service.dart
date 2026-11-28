@@ -28,8 +28,8 @@ abstract interface class RetainedAudioSpeechRecognitionService {
   Uint8List? takeLastAudio();
 }
 
-/// 所有页面共用的识别编排：实时识别优先，只有腾讯云明确返回实时额度耗尽
-/// 时，才使用已经缓存在内存中的完整 PCM 回退到一句话识别。
+/// 所有页面共用的识别编排：配置 APPID 且开启实时优先时使用实时识别，
+/// 额度耗尽后回退一句话；其他情况直接使用一句话识别。
 final class PreferredSpeechRecognitionService
     implements
         SpeechRecognitionService,
@@ -134,18 +134,23 @@ final class PreferredSpeechRecognitionService
     _session = session;
     _usedFallback = false;
     _lastAudio = null;
-    _mode = 'realtime';
+    _mode = 'sentence';
     try {
-      final credentials = await session.cancelToken.wait(
-        _settingsRepository.readTencentAsrCredentials(),
+      final snapshot = await session.cancelToken.wait(
+        _settingsRepository.loadSpeechRecognitionSettingsSnapshot(),
       );
       _check(session);
+      final credentials = snapshot.credentials;
       if (credentials == null) {
         throw const TencentAsrException(
           '请先保存腾讯云密钥',
           kind: TencentAsrErrorKind.authentication,
         );
       }
+      session.preferRealtime =
+          snapshot.settings.preferRealtime &&
+          credentials.hasRealtimeCredentials;
+      _mode = session.preferRealtime ? 'realtime' : 'sentence';
       await _withRecorder(() async {
         _check(session);
         final permission = await session.cancelToken.wait(
@@ -155,23 +160,25 @@ final class PreferredSpeechRecognitionService
         if (!permission) {
           throw const SpeechPermissionDeniedException();
         }
-        try {
-          session.realtime = await _realtimeClient.connect(
-            credentials: credentials,
-            cancelToken: session.cancelToken,
-            onText: (text, {required stable}) {
-              if (!_current(session) || text.isEmpty) return;
-              _transcriptController.add(text);
-              if (stable) _finalizedTranscriptController.add(text);
-            },
-          );
-          _check(session);
-        } on TencentRealtimeAsrException catch (error) {
-          _check(session);
-          if (!_isRealtimeQuotaExhausted(error)) rethrow;
-          session.realtimeStartFailure = error;
-          _mode = 'sentence';
-          _usedFallback = true;
+        if (session.preferRealtime) {
+          try {
+            session.realtime = await _realtimeClient.connect(
+              credentials: credentials,
+              cancelToken: session.cancelToken,
+              onText: (text, {required stable}) {
+                if (!_current(session) || text.isEmpty) return;
+                _transcriptController.add(text);
+                if (stable) _finalizedTranscriptController.add(text);
+              },
+            );
+            _check(session);
+          } on TencentRealtimeAsrException catch (error) {
+            _check(session);
+            if (!_isRealtimeQuotaExhausted(error)) rethrow;
+            session.realtimeStartFailure = error;
+            _mode = 'sentence';
+            _usedFallback = true;
+          }
         }
         _check(session);
         final audioStream = await _recorder.startStream();
@@ -234,6 +241,14 @@ final class PreferredSpeechRecognitionService
       });
       _check(session);
       _lastAudio = Uint8List.fromList(pcm);
+
+      if (!session.preferRealtime) {
+        return await _recognizeSentence(
+          pcm,
+          session: session,
+          usedFallback: false,
+        );
+      }
 
       final startFailure = session.realtimeStartFailure;
       if (startFailure != null) {
@@ -308,7 +323,7 @@ final class PreferredSpeechRecognitionService
     final result = await _sentenceClient.recognizePcm16(
       pcmBytes: pcm,
       credentials: credentials,
-      reserveUsage: false,
+      reserveUsage: !usedFallback,
       cancelToken: session.cancelToken,
     );
     _check(session);
@@ -361,6 +376,7 @@ final class _RecordingSession {
   _RecordingSession(this.generation);
   final int generation;
   final cancelToken = SpeechRecognitionCancelToken();
+  bool preferRealtime = false;
   TencentRealtimeAsrSession? realtime;
   TencentRealtimeAsrException? realtimeStartFailure;
   Future<void>? cleanup;

@@ -36,11 +36,15 @@ final class SpeechRecognitionSettingsState {
     required this.hasCredentials,
     required this.isVerified,
     this.verifiedAt,
+    this.preferRealtime = false,
   });
 
   final bool hasCredentials;
   final bool isVerified;
   final DateTime? verifiedAt;
+
+  /// Effective preference: always false without a configured APPID.
+  final bool preferRealtime;
 }
 
 /// Credentials and their effective gate state loaded from one secure read.

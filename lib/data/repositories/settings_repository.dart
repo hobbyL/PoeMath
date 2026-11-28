@@ -692,6 +692,8 @@ class SettingsRepository {
   static const String _keyTencentAsrCredentialFingerprint =
       'tencent_asr_credential_fingerprint';
   static const String _keyTencentAsrVerifiedAt = 'tencent_asr_verified_at';
+  // 依赖本机安全存储中的 APPID，不单独随普通备份迁移。
+  static const String _keyTencentAsrPreferRealtime = 'tencent_asr_prefer_realtime';
   static const String _keyTtsCloudEnabled = 'tts_cloud_enabled';
   static const String _keyTtsCloudBaseUrl = 'tts_cloud_base_url';
   static const String _keyTtsCloudVoice = 'tts_cloud_voice';
@@ -1989,6 +1991,21 @@ class SettingsRepository {
       hasCredentials: credentials != null,
       isVerified: isVerified,
       verifiedAt: isVerified ? verifiedAt : null,
+      // 已配置 APPID 的旧用户保留实时优先；未配置时始终使用一句话。
+      preferRealtime: credentials?.hasRealtimeCredentials == true &&
+          HiveBoxes.settings.get(
+            _keyTencentAsrPreferRealtime,
+            defaultValue: true,
+          ) == true,
+    );
+  }
+
+  Future<void> setTencentAsrPreferRealtime(bool value) async {
+    ParentAccessService.instance.assertAllowed();
+    final credentials = await readTencentAsrCredentials();
+    await HiveBoxes.settings.put(
+      _keyTencentAsrPreferRealtime,
+      value && credentials?.hasRealtimeCredentials == true,
     );
   }
 
@@ -2017,6 +2034,9 @@ class SettingsRepository {
     if (changed) {
       await invalidateTencentAsrVerification();
     }
+    if (!keysUnchanged) {
+      await HiveBoxes.settings.put(_keyTencentAsrPreferRealtime, false);
+    }
     await _credentialStore.saveTencentAsrCredentials(credentials);
   }
 
@@ -2033,6 +2053,9 @@ class SettingsRepository {
     );
     if (_credentialFingerprint(current) != _credentialFingerprint(updated)) {
       await invalidateTencentAsrVerification();
+    }
+    if (!updated.hasRealtimeCredentials) {
+      await HiveBoxes.settings.put(_keyTencentAsrPreferRealtime, false);
     }
     await _credentialStore.saveTencentAsrCredentials(updated);
   }
@@ -2068,6 +2091,7 @@ class SettingsRepository {
   Future<void> deleteTencentAsrCredentials() async {
     ParentAccessService.instance.assertAllowed();
     await invalidateTencentAsrVerification();
+    await HiveBoxes.settings.put(_keyTencentAsrPreferRealtime, false);
     await _credentialStore.deleteTencentAsrCredentials();
   }
 

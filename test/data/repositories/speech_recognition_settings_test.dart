@@ -22,10 +22,7 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
     required String username,
     required String password,
   }) async {
-    webDavCredentials[configId] = (
-      username: username,
-      password: password,
-    );
+    webDavCredentials[configId] = (username: username, password: password);
   }
 
   @override
@@ -41,9 +38,7 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   }
 
   @override
-  Future<void> saveTencentAsrCredentials(
-    TencentAsrCredentials value,
-  ) async {
+  Future<void> saveTencentAsrCredentials(TencentAsrCredentials value) async {
     credentials = value;
   }
 
@@ -90,6 +85,127 @@ void main() {
     final state = await repository.loadSpeechRecognitionSettings();
     expect(state.hasCredentials, isTrue);
     expect(state.isVerified, isFalse);
+    expect(state.preferRealtime, isFalse);
+  });
+
+  test('未配置 APPID 时无法开启实时优先，旧偏好也不能绕过', () async {
+    await repository.setTencentAsrPreferRealtime(true);
+    expect(
+      (await repository.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+    await repository.saveTencentAsrCredentials(
+      secretId: 'AKID',
+      secretKey: 'SK',
+    );
+    await HiveBoxes.settings.put('tencent_asr_prefer_realtime', true);
+    expect(
+      (await repository.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+    await repository.setTencentAsrPreferRealtime(true);
+    expect(HiveBoxes.settings.get('tencent_asr_prefer_realtime'), isFalse);
+  });
+
+  test('新配置 APPID 后可开启实时优先，开关选择跨仓储实例保留', () async {
+    await repository.saveTencentAsrCredentials(
+      secretId: 'AKID',
+      secretKey: 'SK',
+    );
+    await repository.saveTencentAsrAppId('1250000000');
+    expect(
+      (await repository.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+    await repository.setTencentAsrPreferRealtime(true);
+    var reloaded = SettingsRepository(credentialStore: credentialStore);
+    expect(
+      (await reloaded.loadSpeechRecognitionSettings()).preferRealtime,
+      isTrue,
+    );
+
+    await reloaded.setTencentAsrPreferRealtime(false);
+    reloaded = SettingsRepository(credentialStore: credentialStore);
+    expect(
+      (await reloaded.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+    expect((await reloaded.readTencentAsrCredentials())?.appId, '1250000000');
+  });
+
+  test('已有 APPID 的旧配置保留实时优先，可手动关闭', () async {
+    credentialStore.credentials = const TencentAsrCredentials(
+      secretId: 'AKID',
+      secretKey: 'SK',
+      appId: '1250000000',
+    );
+    expect(
+      (await repository.loadSpeechRecognitionSettings()).preferRealtime,
+      isTrue,
+    );
+    await repository.setTencentAsrPreferRealtime(false);
+    expect(
+      (await repository.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+  });
+
+  test('清空 APPID 后开关持久关闭，重新填写也不会自动开启', () async {
+    await repository.saveTencentAsrCredentials(
+      secretId: 'AKID',
+      secretKey: 'SK',
+    );
+    await repository.saveTencentAsrAppId('1250000000');
+    await repository.setTencentAsrPreferRealtime(true);
+    await repository.markTencentAsrCredentialsVerified(
+      testedCredentials: credentialStore.credentials!,
+    );
+
+    await repository.saveTencentAsrAppId('   ');
+    final reloaded = SettingsRepository(credentialStore: credentialStore);
+    final snapshot = await reloaded.loadSpeechRecognitionSettingsSnapshot();
+    expect(snapshot.credentials?.appId, '');
+    expect(snapshot.credentials?.secretId, 'AKID');
+    expect(snapshot.credentials?.secretKey, 'SK');
+    expect(snapshot.settings.preferRealtime, isFalse);
+    expect(snapshot.settings.isVerified, isFalse);
+
+    await reloaded.saveTencentAsrAppId('1250000000');
+    expect(
+      (await reloaded.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+  });
+
+  test('替换或删除密钥同时关闭实时优先', () async {
+    await repository.saveTencentAsrCredentials(
+      secretId: 'AKID',
+      secretKey: 'SK',
+    );
+    await repository.saveTencentAsrAppId('1250000000');
+    await repository.setTencentAsrPreferRealtime(true);
+    await repository.saveTencentAsrCredentials(
+      secretId: 'AKID-2',
+      secretKey: 'SK-2',
+    );
+    expect((await repository.readTencentAsrCredentials())?.appId, '');
+    expect(
+      (await repository.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+    await repository.saveTencentAsrAppId('1250000001');
+    expect(
+      (await repository.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+
+    await repository.setTencentAsrPreferRealtime(true);
+    await repository.deleteTencentAsrCredentials();
+    expect(
+      (await repository.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+    expect(HiveBoxes.settings.get('tencent_asr_prefer_realtime'), isFalse);
   });
 
   test('设置快照只读取一次安全存储', () async {
@@ -122,21 +238,29 @@ void main() {
       ),
     );
     final backup = BackupService();
+    await repository.saveTencentAsrAppId('1250000000');
+    await repository.setTencentAsrPreferRealtime(true);
     final json = await backup.exportToJson();
 
     expect(json, isNot(contains('AKID-private')));
     expect(json, isNot(contains('SK-private')));
     expect(json, isNot(contains('dav-private-user')));
     expect(json, isNot(contains('dav-private-password')));
+    expect(json, isNot(contains('tencent_asr_prefer_realtime')));
 
     await backup.restoreFromJson(json);
 
     final tencent = await repository.readTencentAsrCredentials();
     expect(tencent?.secretId, 'AKID-private');
     expect(tencent?.secretKey, 'SK-private');
+    expect(
+      (await repository.loadSpeechRecognitionSettings()).preferRealtime,
+      isTrue,
+    );
     final restoredConfig = repository.webDavConfigs.single;
-    final fullConfig =
-        await repository.loadWebDavConfigWithCredentials(restoredConfig);
+    final fullConfig = await repository.loadWebDavConfigWithCredentials(
+      restoredConfig,
+    );
     expect(fullConfig.username, 'dav-private-user');
     expect(fullConfig.password, 'dav-private-password');
   });
@@ -170,8 +294,10 @@ void main() {
   });
 
   test('删除凭据清除验证状态', () async {
-    const credentials =
-        TencentAsrCredentials(secretId: 'AKID', secretKey: 'SK');
+    const credentials = TencentAsrCredentials(
+      secretId: 'AKID',
+      secretKey: 'SK',
+    );
     await repository.saveTencentAsrCredentials(
       secretId: credentials.secretId,
       secretKey: credentials.secretKey,

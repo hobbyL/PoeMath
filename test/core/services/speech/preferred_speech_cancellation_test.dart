@@ -101,8 +101,11 @@ class _ProbeClient extends http.BaseClient {
   void close() => inner.close();
 }
 
-const _credentials =
-    TencentAsrCredentials(secretId: 'synthetic-id', secretKey: 'synthetic-key');
+const _credentials = TencentAsrCredentials(
+  secretId: 'synthetic-id',
+  secretKey: 'synthetic-key',
+  appId: '100000001',
+);
 const _realtimeCredentials = TencentAsrCredentials(
   secretId: 'synthetic-id',
   secretKey: 'synthetic-key',
@@ -125,7 +128,8 @@ void main() {
     final sentence = TencentAsrClient(
       usage: usage,
       endpoint: endpoint,
-      httpClient: transport ??
+      httpClient:
+          transport ??
           MockClient((_) async {
             sends++;
             return http.Response(
@@ -137,13 +141,11 @@ void main() {
     );
     final appIdClient = TencentAppIdClient(
       httpClient: MockClient(
-        (_) async => http.Response(
-          '{"Response":{"AppId":100000001}}',
-          200,
-        ),
+        (_) async => http.Response('{"Response":{"AppId":100000001}}', 200),
       ),
     );
-    final realtimeClient = realtime ??
+    final realtimeClient =
+        realtime ??
         TencentRealtimeAsrClient(
           usage: usage,
           appIdClient: appIdClient,
@@ -171,6 +173,16 @@ void main() {
     sends = 0;
     when(() => settings.readTencentAsrCredentials())
         .thenAnswer((_) async => _credentials);
+    when(() => settings.loadSpeechRecognitionSettingsSnapshot()).thenAnswer(
+      (_) async => SpeechRecognitionSettingsSnapshot(
+        credentials: await settings.readTencentAsrCredentials(),
+        settings: const SpeechRecognitionSettingsState(
+          hasCredentials: true,
+          isVerified: false,
+          preferRealtime: true,
+        ),
+      ),
+    );
   });
 
   Future<void> cancelled(Future<SpeechRecognitionResult> operation) =>
@@ -292,8 +304,9 @@ void main() {
   test('响应正文等待期间取消底层订阅，旧结果不作为成功返回', () async {
     final entered = Completer<void>();
     final bodyCancelled = Completer<void>();
-    final body =
-        StreamController<List<int>>(onCancel: () => bodyCancelled.complete());
+    final body = StreamController<List<int>>(
+      onCancel: () => bodyCancelled.complete(),
+    );
     final transport = _StreamClient((request) async {
       entered.complete();
       return http.StreamedResponse(body.stream, 200);
@@ -394,6 +407,52 @@ void main() {
     expect(connections, 0);
     expect(recorder.starts, 0);
     expect(sends, 0);
+  });
+
+  test('直接一句话识别计入本地额度，耗尽后不发送请求', () async {
+    when(() => settings.readTencentAsrCredentials()).thenAnswer(
+      (_) async => const TencentAsrCredentials(
+        secretId: 'synthetic-id',
+        secretKey: 'synthetic-key',
+      ),
+    );
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
+    await usage.setLimit(CloudUsageKind.asr, 1);
+    var connections = 0;
+    final service = build(
+      realtime: TencentRealtimeAsrClient(
+        usage: usage,
+        connectSocket: (_) async {
+          connections++;
+          return _Socket();
+        },
+      ),
+    );
+
+    await service.start();
+    recorder.emit();
+    final result = await service.stop();
+    expect(result.text, '正常新结果');
+    expect(result.mode, 'sentence');
+    expect(result.usedFallback, isFalse);
+    expect(usage.used(CloudUsageKind.asr), 1);
+
+    await service.start();
+    recorder.emit();
+    await expectLater(
+      service.stop(),
+      throwsA(
+        isA<TencentAsrException>().having(
+          (error) => error.kind,
+          'kind',
+          TencentAsrErrorKind.quota,
+        ),
+      ),
+    );
+    expect(sends, 1);
+    expect(connections, 0);
+    expect(usage.used(CloudUsageKind.asr), 1);
   });
 }
 

@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_asr_client.dart';
 import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
+import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
@@ -16,10 +17,12 @@ import '../../helpers/streaming_speech_fake.dart';
 final class _FakeSettingsRepository extends SettingsRepository {
   TencentAsrCredentials? _credentials;
   bool _verified = false;
+  bool _preferRealtime = false;
   DateTime? _verifiedAt;
   Completer<void>? loadGate;
   Object? loadError;
   int snapshotLoadCalls = 0;
+  Object? preferenceSaveError;
 
   @override
   DateTime? get tencentAsrVerifiedAt => _verifiedAt;
@@ -29,13 +32,37 @@ final class _FakeSettingsRepository extends SettingsRepository {
     required String secretId,
     required String secretKey,
   }) async {
-    final changed = _credentials?.secretId != secretId ||
+    final changed =
+        _credentials?.secretId != secretId ||
         _credentials?.secretKey != secretKey;
     _credentials = TencentAsrCredentials(
       secretId: secretId,
       secretKey: secretKey,
+      appId: changed ? '' : _credentials?.appId ?? '',
     );
-    if (changed) await invalidateTencentAsrVerification();
+    if (changed) {
+      _preferRealtime = false;
+      await invalidateTencentAsrVerification();
+    }
+  }
+
+  @override
+  Future<void> saveTencentAsrAppId(String appId) async {
+    final current = _credentials!;
+    _credentials = TencentAsrCredentials(
+      secretId: current.secretId,
+      secretKey: current.secretKey,
+      appId: appId.trim(),
+    );
+    if (appId.trim().isEmpty) _preferRealtime = false;
+    if (current.appId != appId.trim()) await invalidateTencentAsrVerification();
+  }
+
+  @override
+  Future<void> setTencentAsrPreferRealtime(bool value) async {
+    final error = preferenceSaveError;
+    if (error != null) throw error;
+    _preferRealtime = value && _credentials?.hasRealtimeCredentials == true;
   }
 
   @override
@@ -50,7 +77,7 @@ final class _FakeSettingsRepository extends SettingsRepository {
 
   @override
   Future<SpeechRecognitionSettingsSnapshot>
-      loadSpeechRecognitionSettingsSnapshot() async {
+  loadSpeechRecognitionSettingsSnapshot() async {
     snapshotLoadCalls++;
     await loadGate?.future;
     final error = loadError;
@@ -66,6 +93,7 @@ final class _FakeSettingsRepository extends SettingsRepository {
       hasCredentials: _credentials != null,
       isVerified: _verified,
       verifiedAt: _verifiedAt,
+      preferRealtime: _preferRealtime,
     );
   }
 
@@ -94,15 +122,13 @@ final class _FakeSettingsRepository extends SettingsRepository {
   @override
   Future<void> deleteTencentAsrCredentials() async {
     _credentials = null;
+    _preferRealtime = false;
     await invalidateTencentAsrVerification();
   }
 }
 
 final class _FakeSpeechRecognitionService implements SpeechRecognitionService {
-  _FakeSpeechRecognitionService({
-    this.failCloud = false,
-    this.startGate,
-  });
+  _FakeSpeechRecognitionService({this.failCloud = false, this.startGate});
 
   final bool failCloud;
   final Completer<void>? startGate;
@@ -159,8 +185,10 @@ void main() {
 
   Future<void> pumpPage(
     WidgetTester tester,
-    SpeechRecognitionService service,
-  ) async {
+    SpeechRecognitionService service, {
+    ThemeData? theme,
+    double textScale = 1,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
@@ -169,8 +197,14 @@ void main() {
             () => service,
           ),
         ],
-        child: const MaterialApp(
-          home: SpeechRecognitionSettingsPage(),
+        child: MaterialApp(
+          theme: theme,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(textScale)),
+            child: child!,
+          ),
+          home: const SpeechRecognitionSettingsPage(),
         ),
       ),
     );
@@ -202,6 +236,187 @@ void main() {
       () => Future<void>.delayed(const Duration(milliseconds: 50)),
     );
     await tester.pump(const Duration(seconds: 1));
+  }
+
+  Future<void> tapVisible(WidgetTester tester, Finder target) async {
+    tester.testTextInput.hide();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    if (target.evaluate().isEmpty) {
+      final scrollable = find.byType(Scrollable).first;
+      tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(target, 250, scrollable: scrollable);
+    }
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+    await tester.tap(target.hitTestable());
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> configureRealtime() async {
+    await settings.saveTencentAsrCredentials(
+      secretId: 'AKID-test',
+      secretKey: 'SK-test',
+    );
+    await settings.saveTencentAsrAppId('1250000000');
+    await settings.setTencentAsrPreferRealtime(true);
+  }
+
+  testWidgets('未配置 APPID 时开关关闭且不可点击，填写后可开启并保存', (tester) async {
+    final service = _FakeSpeechRecognitionService();
+    await pumpPage(tester, service);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+    expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'SecretId (AK)'),
+      'AKID-test',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'SecretKey (SK)'),
+      'SK-test',
+    );
+    await tapVisible(tester, find.text('高级设置：手动填写 APPID'));
+    await tester.enterText(
+      find.widgetWithText(TextField, 'APPID'),
+      '1250000000',
+    );
+    await tester.pump();
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+    expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNotNull);
+    await tapVisible(tester, find.byType(Switch));
+    await tapVisible(tester, find.widgetWithText(FilledButton, '保存设置'));
+    expect(
+      (await settings.loadSpeechRecognitionSettings()).preferRealtime,
+      isTrue,
+    );
+    expect((await settings.readTencentAsrCredentials())?.appId, '1250000000');
+    expect(service.startCalls, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pumpPage(tester, service);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+    await tapVisible(tester, find.byType(Switch));
+    await tapVisible(tester, find.widgetWithText(FilledButton, '保存设置'));
+    expect(
+      (await settings.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+    expect((await settings.readTencentAsrCredentials())?.appId, '1250000000');
+  });
+
+  testWidgets('清空 APPID 立即关闭开关，保存并重进后保持关闭', (tester) async {
+    await configureRealtime();
+    final service = _FakeSpeechRecognitionService();
+    await pumpPage(tester, service);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+    await tester.enterText(find.widgetWithText(TextField, 'APPID'), '   ');
+    await tester.pump();
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+    expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
+    await tapVisible(tester, find.widgetWithText(FilledButton, '保存设置'));
+    expect((await settings.readTencentAsrCredentials())?.appId, '');
+    expect(
+      (await settings.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pumpPage(tester, service);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+    expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
+    await tapVisible(tester, find.text('高级设置：手动填写 APPID'));
+    await tester.enterText(
+      find.widgetWithText(TextField, 'APPID'),
+      '1250000000',
+    );
+    await tester.pump();
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+  });
+
+  testWidgets('清空 APPID 后直接录音测试也会保存关闭状态', (tester) async {
+    await configureRealtime();
+    final service = _FakeSpeechRecognitionService();
+    await pumpPage(tester, service);
+    await tester.enterText(find.widgetWithText(TextField, 'APPID'), '');
+    await tapVisible(tester, find.widgetWithText(FilledButton, '开始真实录音测试'));
+    expect(service.startCalls, 1);
+    expect((await settings.readTencentAsrCredentials())?.appId, '');
+    expect(
+      (await settings.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+    expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
+    await tapVisible(tester, find.text('结束并验证'));
+    expect(service.stopCalls, 1);
+    expect((await settings.loadSpeechRecognitionSettings()).isVerified, isTrue);
+    expect(find.text('实时识别额度已用完，本次使用一句话识别。'), findsNothing);
+  });
+
+  testWidgets('删除全部密钥也清空 APPID 并关闭开关', (tester) async {
+    await configureRealtime();
+    await pumpPage(tester, _FakeSpeechRecognitionService());
+    await tapVisible(tester, find.byTooltip('删除腾讯云密钥'));
+    expect(await settings.readTencentAsrCredentials(), isNull);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+    expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
+  });
+
+  testWidgets('开关保存失败提示错误并允许重试', (tester) async {
+    await configureRealtime();
+    await pumpPage(tester, _FakeSpeechRecognitionService());
+    await tapVisible(tester, find.byType(Switch));
+    settings.preferenceSaveError = StateError('write failed');
+    await tapVisible(tester, find.widgetWithText(FilledButton, '保存设置'));
+    expect(find.text('密钥保存失败，请稍后重试'), findsOneWidget);
+    expect(
+      (await settings.loadSpeechRecognitionSettings()).preferRealtime,
+      isTrue,
+    );
+    expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNotNull);
+    settings.preferenceSaveError = null;
+    await tapVisible(tester, find.widgetWithText(FilledButton, '保存设置'));
+    expect(
+      (await settings.loadSpeechRecognitionSettings()).preferRealtime,
+      isFalse,
+    );
+  });
+
+  for (final subject in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('实时开关适配 $subject $brightness 窄屏大字和横屏', (tester) async {
+        tester.view.physicalSize = const Size(320, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await configureRealtime();
+        await pumpPage(
+          tester,
+          _FakeSpeechRecognitionService(),
+          theme: AppTheme.resolve(subject: subject, brightness: brightness),
+          textScale: 2,
+        );
+        await tapVisible(tester, find.byType(Switch));
+        expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+        await tapVisible(tester, find.widgetWithText(FilledButton, '保存设置'));
+        expect(
+          (await settings.loadSpeechRecognitionSettings()).preferRealtime,
+          isFalse,
+        );
+        expect(tester.takeException(), isNull);
+
+        tester.view.physicalSize = const Size(900, 400);
+        await tester.pumpAndSettle();
+        await tapVisible(tester, find.byType(Switch));
+        expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+        await tapVisible(tester, find.widgetWithText(FilledButton, '保存设置'));
+        expect(
+          (await settings.loadSpeechRecognitionSettings()).preferRealtime,
+          isTrue,
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 
   testWidgets('首帧显示完整页面且安全设置只加载一次', (tester) async {
@@ -244,12 +459,17 @@ void main() {
     settings.loadError = StateError('secure storage unavailable');
     await pumpPage(tester, _FakeSpeechRecognitionService());
 
-    expect(find.text('读取本地密钥失败，请重新输入'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     final secretIdField = tester.widget<TextField>(
       find.widgetWithText(TextField, 'SecretId (AK)'),
     );
     expect(secretIdField.enabled, isTrue);
+    await tester.scrollUntilVisible(
+      find.text('读取本地密钥失败，请重新输入'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('读取本地密钥失败，请重新输入').hitTestable(), findsOneWidget);
   });
 
   testWidgets('保存密钥显示认字可用，不自动开始录音或伪造验证', (tester) async {
@@ -265,7 +485,7 @@ void main() {
     );
     tester.testTextInput.hide();
     FocusManager.instance.primaryFocus?.unfocus();
-    final saveButton = find.widgetWithText(FilledButton, '保存密钥');
+    final saveButton = find.widgetWithText(FilledButton, '保存设置');
     await tester.ensureVisible(saveButton);
     await tester.pumpAndSettle();
     await tester.tap(saveButton);
@@ -311,7 +531,8 @@ void main() {
     expect(state.isVerified, isTrue);
     expect(find.text('已配置 · 跟读评分可用'), findsOneWidget);
     expect(find.text('测试成功，跟读评分已可用'), findsOneWidget);
-    expect(find.byType(Switch), findsNothing);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+    expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 16));
@@ -391,7 +612,10 @@ void main() {
     await tester.tap(find.text('结束并验证'));
     await tester.pumpAndSettle();
     expect(find.text('测试未返回文字，请重新朗读'), findsOneWidget);
-    expect((await settings.loadSpeechRecognitionSettings()).isVerified, isFalse);
+    expect(
+      (await settings.loadSpeechRecognitionSettings()).isVerified,
+      isFalse,
+    );
     expect(live, findsNothing);
     expect(service.transcripts.hasListener, isFalse);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -399,10 +623,7 @@ void main() {
   });
 
   testWidgets('腾讯测试失败时撤销验证并提示密钥状态', (tester) async {
-    await pumpPage(
-      tester,
-      _FakeSpeechRecognitionService(failCloud: true),
-    );
+    await pumpPage(tester, _FakeSpeechRecognitionService(failCloud: true));
     await enterCredentialsAndStart(tester);
 
     final endButton = find.widgetWithText(FilledButton, '结束并验证');
@@ -420,10 +641,7 @@ void main() {
     expect(state.isVerified, isFalse);
     expect(state.hasCredentials, isTrue);
     expect(find.text('腾讯云密钥无效或没有识别权限'), findsOneWidget);
-    expect(
-      find.text('密钥已保存 · 认字可用，跟读需完成录音测试'),
-      findsOneWidget,
-    );
+    expect(find.text('密钥已保存 · 认字可用，跟读需完成录音测试'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 16));
@@ -442,13 +660,8 @@ void main() {
       find.widgetWithText(TextField, 'SecretKey (SK)'),
       'SK-test',
     );
-    final startButton = find.widgetWithText(
-      FilledButton,
-      '开始真实录音测试',
-    );
-    await tester.ensureVisible(startButton);
-    await tester.tap(startButton);
-    await tester.pump();
+    final startButton = find.widgetWithText(FilledButton, '开始真实录音测试');
+    await tapVisible(tester, startButton);
     expect(service.startCalls, 1);
 
     await tester.pumpWidget(const SizedBox.shrink());

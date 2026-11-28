@@ -21,7 +21,7 @@ import '../../../helpers/tencent_realtime_socket.dart';
 class _Settings extends Mock implements SettingsRepository {}
 
 class _Recorder implements SpeechAudioRecorder {
-  final _chunks = StreamController<Uint8List>.broadcast();
+  var _chunks = StreamController<Uint8List>.broadcast();
   int cancelCalls = 0;
   int startCalls = 0;
 
@@ -33,6 +33,7 @@ class _Recorder implements SpeechAudioRecorder {
   @override
   Future<Stream<Uint8List>> startStream() async {
     startCalls++;
+    if (_chunks.isClosed) _chunks = StreamController<Uint8List>.broadcast();
     return _chunks.stream;
   }
 
@@ -54,6 +55,7 @@ void main() {
   const credentials = TencentAsrCredentials(
     secretId: 'AKIDEXAMPLE',
     secretKey: 'SECRETKEYEXAMPLE',
+    appId: '1250000000',
   );
   late _Settings settings;
   late _Recorder recorder;
@@ -66,6 +68,7 @@ void main() {
   late int realtimeRequests;
   late int appIdRequests;
   late Uri realtimeUri;
+  late bool preferRealtime;
   String? appIdError;
   Object? socketError;
   bool expectClosedBeforeSentence = false;
@@ -73,8 +76,18 @@ void main() {
 
   setUp(() {
     settings = _Settings();
-    when(() => settings.readTencentAsrCredentials()).thenAnswer(
-      (_) async => credentials,
+    when(() => settings.readTencentAsrCredentials())
+        .thenAnswer((_) async => credentials);
+    preferRealtime = true;
+    when(() => settings.loadSpeechRecognitionSettingsSnapshot()).thenAnswer(
+      (_) async => SpeechRecognitionSettingsSnapshot(
+        credentials: await settings.readTencentAsrCredentials(),
+        settings: SpeechRecognitionSettingsState(
+          hasCredentials: true,
+          isVerified: false,
+          preferRealtime: preferRealtime,
+        ),
+      ),
     );
     recorder = _Recorder();
     socket = TestTencentRealtimeSocket(text: '孩子正在放风筝');
@@ -141,7 +154,7 @@ void main() {
     sentenceClient.close();
   });
 
-  test('仅有 AK/SK 时自动获取 APPID，实时返回文字且不调用一句话', () async {
+  test('配置 APPID 且开启实时优先时实时返回文字且不调用一句话', () async {
     await service.start();
     final partial = service.transcriptStream.first;
     socket.receiveText('孩子正在');
@@ -154,7 +167,7 @@ void main() {
     expect(result.mode, 'realtime');
     expect(result.usedFallback, isFalse);
     expect(service.usedFallback, isFalse);
-    expect(appIdRequests, 1);
+    expect(appIdRequests, 0);
     expect(realtimeRequests, 1);
     expect(realtimeUri.path, '/asr/v2/1250000000');
     expect(sentenceRequests, 0);
@@ -245,16 +258,72 @@ void main() {
     expect(recorder.startCalls, 0);
   });
 
-  test('自动查询 APPID 失败不降级为一句话', () async {
-    appIdError = 'RequestLimitExceeded';
-    await expectLater(
-      service.start(),
-      throwsA(isA<TencentRealtimeAsrException>()),
-    );
-    expect(appIdRequests, 1);
+  for (final appId in ['', '   ']) {
+    test('APPID 为 "$appId" 时即使遗留开关为开也直接使用一句话', () async {
+      when(() => settings.readTencentAsrCredentials()).thenAnswer(
+        (_) async => TencentAsrCredentials(
+          secretId: credentials.secretId,
+          secretKey: credentials.secretKey,
+          appId: appId,
+        ),
+      );
+      appIdError = 'RequestLimitExceeded';
+      await service.start();
+      expect(service.recognitionMode, 'sentence');
+      expect(service.usedFallback, isFalse);
+      final pcm = List<int>.filled(32, 2);
+      recorder.emit(Uint8List.fromList(pcm));
+      final result = await service.stop();
+
+      expect(result.text, '一句话回退结果');
+      expect(result.mode, 'sentence');
+      expect(result.usedFallback, isFalse);
+      expect(uploadedPcm, pcm);
+      expect(appIdRequests, 0);
+      expect(realtimeRequests, 0);
+      expect(sentenceRequests, 1);
+    });
+  }
+
+  test('配置 APPID 但关闭实时优先时直接使用一句话', () async {
+    preferRealtime = false;
+    await service.start();
+    expect(service.recognitionMode, 'sentence');
+    recorder.emit(Uint8List.fromList(List<int>.filled(32, 1)));
+    final result = await service.stop();
+
+    expect(result.mode, 'sentence');
+    expect(result.usedFallback, isFalse);
     expect(realtimeRequests, 0);
-    expect(sentenceRequests, 0);
-    expect(recorder.startCalls, 0);
+    expect(appIdRequests, 0);
+    expect(sentenceRequests, 1);
+  });
+
+  test('同一服务下一次录音重新读取开关与 APPID，不沿用上次实时模式', () async {
+    await service.start();
+    recorder.emit(Uint8List.fromList(List<int>.filled(32, 1)));
+    expect((await service.stop()).mode, 'realtime');
+
+    preferRealtime = false;
+    await service.start();
+    recorder.emit(Uint8List.fromList(List<int>.filled(32, 1)));
+    expect((await service.stop()).mode, 'sentence');
+
+    preferRealtime = true;
+    when(() => settings.readTencentAsrCredentials()).thenAnswer(
+      (_) async => const TencentAsrCredentials(
+        secretId: 'AKIDEXAMPLE',
+        secretKey: 'SECRETKEYEXAMPLE',
+      ),
+    );
+    await service.start();
+    recorder.emit(Uint8List.fromList(List<int>.filled(32, 1)));
+    final result = await service.stop();
+    expect(result.mode, 'sentence');
+    expect(result.usedFallback, isFalse);
+    expect(realtimeRequests, 1);
+    expect(appIdRequests, 0);
+    expect(sentenceRequests, 2);
   });
 
   test('实时识别没有有效文字时报告错误，仍不降级', () async {
@@ -292,8 +361,11 @@ void main() {
     await expectLater(
       service.stop(),
       throwsA(
-        isA<TencentRealtimeAsrException>()
-            .having((error) => error.code, 'code', 4006),
+        isA<TencentRealtimeAsrException>().having(
+          (error) => error.code,
+          'code',
+          4006,
+        ),
       ),
     );
     expect(sentenceRequests, 0);
