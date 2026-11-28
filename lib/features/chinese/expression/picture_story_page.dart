@@ -90,22 +90,9 @@ class PictureStoryPage extends ConsumerWidget {
                     constraints.maxWidth,
                   );
                   final available = prompts!;
-                  final theme = Theme.of(context);
                   return ListView(
                     padding: const EdgeInsets.all(SpacingTokens.md),
                     children: [
-                      if (hiddenCount > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            bottom: SpacingTokens.sm,
-                          ),
-                          child: Text(
-                            '已隐藏 $hiddenCount 道近期练过的题目，$dailyPracticeSpacingDays 天间隔结束后自动显示。',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
                       for (
                         var start = 0;
                         start < available.length;

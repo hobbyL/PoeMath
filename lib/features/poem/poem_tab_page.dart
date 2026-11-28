@@ -131,7 +131,6 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   Widget build(BuildContext context) {
     final poems = ref.watch(availablePoemsProvider);
     final hiddenCount = ref.watch(filteredPoemsProvider).length - poems.length;
-    final theme = Theme.of(context);
 
     return AppScaffold(
       backgroundScene: PineInkScene.branch,
@@ -216,21 +215,6 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                   ),
                 )
               else ...[
-                if (hiddenCount > 0)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: SpacingTokens.md,
-                        vertical: SpacingTokens.sm,
-                      ),
-                      child: Text(
-                        '已隐藏 $hiddenCount 首近期练过的诗词，$dailyPracticeSpacingDays 天间隔结束后自动显示。',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: SpacingTokens.md,
