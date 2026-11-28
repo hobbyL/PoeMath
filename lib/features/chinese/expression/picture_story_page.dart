@@ -20,10 +20,14 @@ class PictureStoryPage extends ConsumerWidget {
     super.key,
     this.navigationTitle,
     this.navigationToolbarHeight,
+    this.showAppBar = true,
+    this.bodySwipeWrapper,
   });
 
   final Widget? navigationTitle;
   final double? navigationToolbarHeight;
+  final bool showAppBar;
+  final Widget Function(Widget child)? bodySwipeWrapper;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -37,99 +41,106 @@ class PictureStoryPage extends ConsumerWidget {
     } on Object {
       // 保留损坏目录原值，恢复后可重试；不能误显示成空题库。
     }
+    Widget body = SafeArea(
+      top: false,
+      child: prompts == null
+          ? PictureStoryUnavailableView(
+              message: '题库暂时无法读取，请家长检查题库或恢复有效备份。',
+              onRetry: () => ref.invalidate(pictureStoryCatalogProvider),
+            )
+          : prompts.isEmpty
+          ? hiddenCount > 0
+                ? AppEmptyState(
+                    icon: Icons.image_outlined,
+                    title: '这些题目最近已经练过了',
+                    description:
+                        '$dailyPracticeSpacingDays 天间隔结束后自动显示，也可以到练习记录中回顾。',
+                    actions: [
+                      TextButton(
+                        onPressed: () =>
+                            context.push(AppRoutes.pictureStoryHistory),
+                        child: const Text('查看练习记录'),
+                      ),
+                    ],
+                  )
+                : const AppEmptyState(
+                    icon: Icons.image_outlined,
+                    title: '暂时没有可练习的题目',
+                    description: '请家长在设置中添加或启用看图说话题目。',
+                    actions: [
+                      ContentPreparationActions(
+                        managementRoute: AppRoutes.pictureStoryManagement,
+                      ),
+                    ],
+                  )
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = ResponsiveLayout.columns(constraints.maxWidth);
+                final available = prompts!;
+                return ListView(
+                  padding: const EdgeInsets.all(SpacingTokens.md),
+                  children: [
+                    for (
+                      var start = 0;
+                      start < available.length;
+                      start += columns
+                    ) ...[
+                      if (start > 0) const SizedBox(height: SpacingTokens.sm),
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (
+                              var column = 0;
+                              column < columns;
+                              column++
+                            ) ...[
+                              if (column > 0)
+                                const SizedBox(width: SpacingTokens.sm),
+                              Expanded(
+                                child: start + column < available.length
+                                    ? _PromptCard(
+                                        key: ValueKey(
+                                          available[start + column].id,
+                                        ),
+                                        prompt: available[start + column],
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+    );
+    body = bodySwipeWrapper?.call(body) ?? body;
     return AppScaffold(
       backgroundScene: PineInkScene.study,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        centerTitle: navigationTitle != null,
-        title: navigationTitle ?? const Text('表达'),
-        toolbarHeight: navigationToolbarHeight,
-        actions: [
-          IconButton(
-            onPressed: () => context.push(AppRoutes.pictureStoryHistory),
-            icon: const Icon(Icons.history_outlined),
-            tooltip: '全部记录',
-          ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: prompts == null
-            ? PictureStoryUnavailableView(
-                message: '题库暂时无法读取，请家长检查题库或恢复有效备份。',
-                onRetry: () => ref.invalidate(pictureStoryCatalogProvider),
-              )
-            : prompts.isEmpty
-            ? hiddenCount > 0
-                  ? AppEmptyState(
-                      icon: Icons.image_outlined,
-                      title: '这些题目最近已经练过了',
-                      description:
-                          '$dailyPracticeSpacingDays 天间隔结束后自动显示，也可以到练习记录中回顾。',
-                      actions: [
-                        TextButton(
-                          onPressed: () =>
-                              context.push(AppRoutes.pictureStoryHistory),
-                          child: const Text('查看练习记录'),
-                        ),
-                      ],
-                    )
-                  : const AppEmptyState(
-                      icon: Icons.image_outlined,
-                      title: '暂时没有可练习的题目',
-                      description: '请家长在设置中添加或启用看图说话题目。',
-                      actions: [
-                        ContentPreparationActions(
-                          managementRoute: AppRoutes.pictureStoryManagement,
-                        ),
-                      ],
-                    )
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  final columns = ResponsiveLayout.columns(
-                    constraints.maxWidth,
-                  );
-                  final available = prompts!;
-                  return ListView(
-                    padding: const EdgeInsets.all(SpacingTokens.md),
-                    children: [
-                      for (
-                        var start = 0;
-                        start < available.length;
-                        start += columns
-                      ) ...[
-                        if (start > 0) const SizedBox(height: SpacingTokens.sm),
-                        IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              for (
-                                var column = 0;
-                                column < columns;
-                                column++
-                              ) ...[
-                                if (column > 0)
-                                  const SizedBox(width: SpacingTokens.sm),
-                                Expanded(
-                                  child: start + column < available.length
-                                      ? _PromptCard(
-                                          key: ValueKey(
-                                            available[start + column].id,
-                                          ),
-                                          prompt: available[start + column],
-                                        )
-                                      : const SizedBox.shrink(),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  );
-                },
-              ),
-      ),
+      appBar: showAppBar
+          ? AppBar(
+              automaticallyImplyLeading: false,
+              centerTitle: navigationTitle != null,
+              titleSpacing: navigationTitle != null ? SpacingTokens.sm : null,
+              leadingWidth: navigationTitle != null ? SpacingTokens.xxl : null,
+              leading: navigationTitle != null ? const SizedBox.shrink() : null,
+              title: navigationTitle ?? const Text('表达'),
+              toolbarHeight: navigationToolbarHeight,
+              actions: [
+                if (navigationTitle != null)
+                  const SizedBox(width: SpacingTokens.xxl),
+                IconButton(
+                  onPressed: () => context.push(AppRoutes.pictureStoryHistory),
+                  icon: const Icon(Icons.history_outlined),
+                  tooltip: '全部记录',
+                ),
+              ],
+            )
+          : null,
+      body: body,
     );
   }
 }

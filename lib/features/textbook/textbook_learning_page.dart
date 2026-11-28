@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
@@ -22,6 +23,7 @@ class TextbookLearningPage extends ConsumerStatefulWidget {
     this.centerTitle = false,
     this.subject = TextbookSubject.chinese,
     this.showAppBar = true,
+    this.bodySwipeWrapper,
   });
 
   final Widget? navigationTitle;
@@ -29,6 +31,7 @@ class TextbookLearningPage extends ConsumerStatefulWidget {
   final bool centerTitle;
   final TextbookSubject subject;
   final bool showAppBar;
+  final Widget Function(Widget child)? bodySwipeWrapper;
 
   @override
   ConsumerState<TextbookLearningPage> createState() =>
@@ -51,11 +54,68 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
     final books = widget.subject == TextbookSubject.chinese
         ? ref.watch(currentTextbooksProvider)
         : ref.watch(subjectTextbooksProvider(widget.subject));
+    final body = SafeArea(
+      top: false,
+      bottom: false,
+      child: PineInkSurface(
+        scene: PineInkScene.study,
+        page: true,
+        child: CustomScrollView(
+          key: PageStorageKey('textbook-list-${widget.subject.name}-$volume'),
+          slivers: [
+            if (books.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: AppEmptyState(
+                  icon: Icons.menu_book_outlined,
+                  title:
+                      '暂无$volume${switch (widget.subject) {
+                        TextbookSubject.math => '数学',
+                        TextbookSubject.english => '英语',
+                        _ => '',
+                      }}课本',
+                  description: '请家长在“设置 → 学习与内容 → 书籍管理”中添加。',
+                  actions: const [
+                    ContentPreparationActions(
+                      managementRoute: AppRoutes.textbookManagement,
+                    ),
+                  ],
+                ),
+              )
+            else
+              TextbookCoverGrid(
+                itemCount: books.length,
+                itemBuilder: (context, index) => _bookCard(books[index]),
+              ),
+          ],
+        ),
+      ),
+    );
     return Scaffold(
       appBar: widget.showAppBar
           ? AppBar(
               automaticallyImplyLeading: false,
               centerTitle: widget.centerTitle || widget.navigationTitle != null,
+              // 与同一学科的工具栏保留相同空间，栏目标签不随工具数量跳动。
+              titleSpacing: widget.navigationTitle != null
+                  ? SpacingTokens.sm
+                  : null,
+              leadingWidth: widget.navigationTitle != null
+                  ? SpacingTokens.xxl *
+                        (widget.subject == TextbookSubject.math ? 2 : 1)
+                  : null,
+              leading: widget.navigationTitle != null
+                  ? const SizedBox.shrink()
+                  : null,
+              actions: widget.navigationTitle != null
+                  ? [
+                      SizedBox(
+                        width:
+                            SpacingTokens.xxl *
+                            (widget.subject == TextbookSubject.math ? 1 : 2),
+                      ),
+                    ]
+                  : null,
               title:
                   widget.navigationTitle ??
                   Text(
@@ -66,43 +126,7 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
               toolbarHeight: widget.navigationToolbarHeight,
             )
           : null,
-      body: SafeArea(
-        top: false,
-        bottom: false,
-        child: PineInkSurface(
-          scene: PineInkScene.study,
-          page: true,
-          child: CustomScrollView(
-            key: PageStorageKey('textbook-list-${widget.subject.name}-$volume'),
-            slivers: [
-              if (books.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: AppEmptyState(
-                    icon: Icons.menu_book_outlined,
-                    title:
-                        '暂无$volume${switch (widget.subject) {
-                          TextbookSubject.math => '数学',
-                          TextbookSubject.english => '英语',
-                          _ => '',
-                        }}课本',
-                    description: '请家长在“设置 → 学习与内容 → 书籍管理”中添加。',
-                    actions: const [
-                      ContentPreparationActions(
-                        managementRoute: AppRoutes.textbookManagement,
-                      ),
-                    ],
-                  ),
-                )
-              else
-                TextbookCoverGrid(
-                  itemCount: books.length,
-                  itemBuilder: (context, index) => _bookCard(books[index]),
-                ),
-            ],
-          ),
-        ),
-      ),
+      body: widget.bodySwipeWrapper?.call(body) ?? body,
     );
   }
 

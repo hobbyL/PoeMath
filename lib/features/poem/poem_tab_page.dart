@@ -21,10 +21,14 @@ class PoemTabPage extends ConsumerStatefulWidget {
     super.key,
     this.navigationTitle,
     this.navigationToolbarHeight,
+    this.showAppBar = true,
+    this.bodySwipeWrapper,
   });
 
   final Widget? navigationTitle;
   final double? navigationToolbarHeight;
+  final bool showAppBar;
+  final Widget Function(Widget child)? bodySwipeWrapper;
 
   @override
   ConsumerState<PoemTabPage> createState() => _PoemTabPageState();
@@ -132,117 +136,126 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
     final poems = ref.watch(availablePoemsProvider);
     final hiddenCount = ref.watch(filteredPoemsProvider).length - poems.length;
 
-    return AppScaffold(
-      backgroundScene: PineInkScene.branch,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final columns = ResponsiveLayout.columns(constraints.maxWidth);
-          return CustomScrollView(
-            key: const PageStorageKey('poem-list'),
-            slivers: [
-              // ============ AppBar（精简版） ============
+    final leading = IconButton(
+      onPressed: () => context.push(AppRoutes.poemLearningPath),
+      icon: const Icon(Icons.route_rounded),
+      tooltip: '学习路径',
+    );
+    final actions = [
+      IconButton(
+        onPressed: () => context.push(AppRoutes.poemFavorites),
+        icon: const Icon(Icons.favorite_border),
+        tooltip: '我的收藏',
+      ),
+      IconButton(
+        onPressed: _panelOpen ? _closePanel : _openPanel,
+        icon: Badge(
+          isLabelVisible: _hasActiveFilters && !_panelOpen,
+          child: Icon(_panelOpen ? Icons.search_off : Icons.search),
+        ),
+        tooltip: '搜索筛选',
+      ),
+    ];
+    final body = LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = ResponsiveLayout.columns(constraints.maxWidth);
+        return CustomScrollView(
+          key: const PageStorageKey('poem-list'),
+          slivers: [
+            // ============ AppBar（精简版） ============
+            if (widget.showAppBar && widget.navigationTitle == null)
               SliverAppBar(
-                pinned: widget.navigationTitle != null,
                 floating: true,
                 snap: true,
-                centerTitle: widget.navigationTitle != null ? true : null,
-                titleSpacing: widget.navigationTitle != null
-                    ? SpacingTokens.sm
-                    : null,
-                leadingWidth: widget.navigationTitle != null
-                    ? SpacingTokens.xxl
-                    : null,
                 toolbarHeight: widget.navigationToolbarHeight ?? kToolbarHeight,
                 automaticallyImplyLeading: false,
-                leading: IconButton(
-                  onPressed: () => context.push(AppRoutes.poemLearningPath),
-                  icon: const Icon(Icons.route_rounded),
-                  tooltip: '学习路径',
-                ),
-                title: widget.navigationTitle ?? Text('诗词(${poems.length})'),
-                actions: [
-                  IconButton(
-                    onPressed: () => context.push(AppRoutes.poemFavorites),
-                    icon: const Icon(Icons.favorite_border),
-                    tooltip: '我的收藏',
-                  ),
-                  IconButton(
-                    onPressed: _panelOpen ? _closePanel : _openPanel,
-                    icon: Badge(
-                      isLabelVisible: _hasActiveFilters && !_panelOpen,
-                      child: Icon(_panelOpen ? Icons.search_off : Icons.search),
-                    ),
-                    tooltip: '搜索筛选',
-                  ),
-                ],
+                leading: leading,
+                title: Text('诗词(${poems.length})'),
+                actions: actions,
               ),
 
-              // ============ 可收起搜索面板 ============
-              SliverToBoxAdapter(
-                child: AnimatedSize(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeInOut,
-                  alignment: Alignment.topCenter,
-                  child: _panelOpen
-                      ? _buildSearchPanel(context)
-                      : const SizedBox.shrink(),
+            // ============ 可收起搜索面板 ============
+            SliverToBoxAdapter(
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                alignment: Alignment.topCenter,
+                child: _panelOpen
+                    ? _buildSearchPanel(context)
+                    : const SizedBox.shrink(),
+              ),
+            ),
+
+            // ============ 诗词列表 ============
+            if (poems.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: AppEmptyState(
+                  icon: Icons.menu_book_outlined,
+                  title: hiddenCount > 0 ? '这些诗词最近已经练过了' : '暂无诗词',
+                  description: hiddenCount > 0
+                      ? '$dailyPracticeSpacingDays 天间隔结束后自动显示，也可调整筛选，练习其他诗词。'
+                      : '试试其他关键词或调整筛选条件。',
+                  actions: hiddenCount > 0
+                      ? [
+                          TextButton(
+                            onPressed: _openPanel,
+                            child: const Text('调整筛选'),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                context.push(AppRoutes.poemLearningPath),
+                            child: const Text('查看学习路径'),
+                          ),
+                        ]
+                      : const [],
+                ),
+              )
+            else ...[
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.md,
+                  vertical: SpacingTokens.sm,
+                ).copyWith(bottom: 100),
+                sliver: SliverCardGrid(
+                  columnCount: columns,
+                  itemCount: poems.length,
+                  itemBuilder: (context, index) {
+                    final poem = poems[index];
+                    final isFav = ref.watch(isFavoriteProvider(poem.id));
+                    final progress = ref.watch(poemProgressProvider(poem.id));
+                    return PoemCard(
+                      poem: poem,
+                      isFavorite: isFav,
+                      learningStatus: progress?.status,
+                      onTap: () {
+                        context.push(AppRoutes.poemDetailOf(poem.id));
+                      },
+                    ).animateListItem(context, index: index);
+                  },
                 ),
               ),
-
-              // ============ 诗词列表 ============
-              if (poems.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: AppEmptyState(
-                    icon: Icons.menu_book_outlined,
-                    title: hiddenCount > 0 ? '这些诗词最近已经练过了' : '暂无诗词',
-                    description: hiddenCount > 0
-                        ? '$dailyPracticeSpacingDays 天间隔结束后自动显示，也可调整筛选，练习其他诗词。'
-                        : '试试其他关键词或调整筛选条件。',
-                    actions: hiddenCount > 0
-                        ? [
-                            TextButton(
-                              onPressed: _openPanel,
-                              child: const Text('调整筛选'),
-                            ),
-                            TextButton(
-                              onPressed: () =>
-                                  context.push(AppRoutes.poemLearningPath),
-                              child: const Text('查看学习路径'),
-                            ),
-                          ]
-                        : const [],
-                  ),
-                )
-              else ...[
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: SpacingTokens.md,
-                    vertical: SpacingTokens.sm,
-                  ).copyWith(bottom: 100),
-                  sliver: SliverCardGrid(
-                    columnCount: columns,
-                    itemCount: poems.length,
-                    itemBuilder: (context, index) {
-                      final poem = poems[index];
-                      final isFav = ref.watch(isFavoriteProvider(poem.id));
-                      final progress = ref.watch(poemProgressProvider(poem.id));
-                      return PoemCard(
-                        poem: poem,
-                        isFavorite: isFav,
-                        learningStatus: progress?.status,
-                        onTap: () {
-                          context.push(AppRoutes.poemDetailOf(poem.id));
-                        },
-                      ).animateListItem(context, index: index);
-                    },
-                  ),
-                ),
-              ],
             ],
-          );
-        },
-      ),
+          ],
+        );
+      },
+    );
+    final appBar = widget.showAppBar && widget.navigationTitle != null
+        ? AppBar(
+            automaticallyImplyLeading: false,
+            centerTitle: true,
+            titleSpacing: SpacingTokens.sm,
+            leadingWidth: SpacingTokens.xxl,
+            toolbarHeight: widget.navigationToolbarHeight ?? kToolbarHeight,
+            leading: leading,
+            title: widget.navigationTitle,
+            actions: actions,
+          )
+        : null;
+    return AppScaffold(
+      backgroundScene: PineInkScene.branch,
+      appBar: appBar,
+      body: widget.bodySwipeWrapper?.call(body) ?? body,
     );
   }
 

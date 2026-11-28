@@ -29,10 +29,12 @@ class MathTabPage extends ConsumerWidget {
     this.navigationTitle,
     this.navigationToolbarHeight,
     this.showAppBar = true,
+    this.bodySwipeWrapper,
   });
   final Widget? navigationTitle;
   final double? navigationToolbarHeight;
   final bool showAppBar;
+  final Widget Function(Widget child)? bodySwipeWrapper;
 
   /// 册次简写：`2` + `上` → `二上`（用于 AppBar 标题后缀）。
   ///
@@ -190,10 +192,12 @@ class MathTabPage extends ConsumerWidget {
     final titleStyle = theme.textTheme.titleLarge!;
     final titleScale =
         textScaler.scale(titleStyle.fontSize!) / titleStyle.fontSize!;
-    final expandedTools = isWide && titleScale <= 1.3;
+    final expandedTools =
+        navigationTitle == null && isWide && titleScale <= 1.3;
     final stackedTitle = navigationTitle == null && !isWide && titleScale > 1.3;
     // 按枚举声明顺序渲染卡片，与 MathEntryKind 的文档约定一致。
     final visible = MathEntryKind.values.where(kinds.contains).toList();
+    Widget wrapBody(Widget body) => bodySwipeWrapper?.call(body) ?? body;
 
     return Scaffold(
       appBar: showAppBar
@@ -213,6 +217,7 @@ class MathTabPage extends ConsumerWidget {
                             SpacingTokens.md
                       : kToolbarHeight),
               centerTitle: navigationTitle != null ? true : null,
+              titleSpacing: navigationTitle != null ? SpacingTokens.sm : null,
               title:
                   navigationTitle ??
                   Text(
@@ -223,7 +228,9 @@ class MathTabPage extends ConsumerWidget {
                     style: stackedTitle ? theme.textTheme.titleMedium : null,
                   ),
               automaticallyImplyLeading: false,
-              leadingWidth: mistakeCount > 0
+              leadingWidth: navigationTitle != null
+                  ? SpacingTokens.xxl * 2
+                  : mistakeCount > 0
                   ? (expandedTools ? 160.0 : 96.0)
                   : null,
               leading: mistakeCount > 0
@@ -268,102 +275,105 @@ class MathTabPage extends ConsumerWidget {
               ],
             )
           : null,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // 文字放大时同步增加目标列宽；小屏允许单列，保留完整入口名。
-            final gridWidth = constraints.maxWidth - SpacingTokens.md * 2;
-            final entryFontSize = theme.textTheme.titleSmall!.fontSize!;
-            final entryScale = textScaler.scale(entryFontSize) / entryFontSize;
-            final columns = switch (theme.appearance.visualStyle) {
-              AppVisualStyle.space =>
-                (gridWidth / (360 * entryScale)).floor().clamp(1, 2),
-              AppVisualStyle.ink =>
-                (gridWidth / (320 * entryScale)).floor().clamp(1, 2),
-              AppVisualStyle.storybook =>
-                (gridWidth / (220 * entryScale)).floor().clamp(
-                  entryScale > 1.3 ? 1 : 2,
-                  3,
-                ),
-              AppVisualStyle.pine =>
-                (gridWidth / (160 * entryScale)).floor().clamp(
-                  entryScale > 1.3 ? 1 : 2,
-                  4,
-                ),
-            };
-
-            final list = ListView(
-              // 为首张卡片的外侧描边留出空间，避免被滚动视口裁掉顶边。
-              // 手账已有阅读面留白，且统计不绘制独立边框。
-              padding: EdgeInsets.fromLTRB(
-                theme.appearance.storybook ? 0 : SpacingTokens.md,
-                theme.appearance.storybook ? 0 : SpacingTokens.sm,
-                theme.appearance.storybook ? 0 : SpacingTokens.md,
-                SpacingTokens.md,
-              ),
-              children: [
-                // 统计概览
-                if (totalProblems > 0)
-                  StatOverviewCard(
-                    items: [
-                      StatOverviewItem(value: '$totalProblems', label: '已做题'),
-                      StatOverviewItem(
-                        value: '${(accuracy * 100).toStringAsFixed(0)}%',
-                        label: '正确率',
-                      ),
-                      StatOverviewItem(value: '$mistakeCount', label: '错题'),
-                    ],
+      body: wrapBody(
+        SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // 文字放大时同步增加目标列宽；小屏允许单列，保留完整入口名。
+              final gridWidth = constraints.maxWidth - SpacingTokens.md * 2;
+              final entryFontSize = theme.textTheme.titleSmall!.fontSize!;
+              final entryScale =
+                  textScaler.scale(entryFontSize) / entryFontSize;
+              final columns = switch (theme.appearance.visualStyle) {
+                AppVisualStyle.space =>
+                  (gridWidth / (360 * entryScale)).floor().clamp(1, 2),
+                AppVisualStyle.ink =>
+                  (gridWidth / (320 * entryScale)).floor().clamp(1, 2),
+                AppVisualStyle.storybook =>
+                  (gridWidth / (220 * entryScale)).floor().clamp(
+                    entryScale > 1.3 ? 1 : 2,
+                    3,
                   ),
-                // 统计卡与下方入口的间距：卡片自带 margin 已去掉
-                //（见 StatOverviewCard 注释），这里显式给出。
-                const SizedBox(height: SpacingTokens.md),
+                AppVisualStyle.pine =>
+                  (gridWidth / (160 * entryScale)).floor().clamp(
+                    entryScale > 1.3 ? 1 : 2,
+                    4,
+                  ),
+              };
 
-                if (visible.isEmpty)
-                  // 学习背景里把四类全关时会走到这里；仓储层已拦空集合，
-                  // 此处是异常数据（如手工改 Hive）的兜底展示。
-                  const AppEmptyState(
-                    icon: Icons.calculate_outlined,
-                    title: '尚未开启任何练习类型',
-                    description: '请在设置 → 学习背景中至少选择一类。',
-                  )
-                else
-                  for (
-                    var row = 0;
-                    row < (visible.length / columns).ceil();
-                    row++
-                  ) ...[
-                    if (row > 0) const SizedBox(height: SpacingTokens.sm),
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (var col = 0; col < columns; col++) ...[
-                            if (col > 0)
-                              const SizedBox(width: SpacingTokens.sm),
-                            Expanded(
-                              child: row * columns + col < visible.length
-                                  ? _entryCard(
-                                      context,
-                                      ref,
-                                      visible[row * columns + col],
-                                      theme,
-                                    )
-                                  // 末行不足时留空占位，保持已排卡片同宽。
-                                  : const SizedBox.shrink(),
-                            ),
-                          ],
-                        ],
-                      ),
+              final list = ListView(
+                // 为首张卡片的外侧描边留出空间，避免被滚动视口裁掉顶边。
+                // 手账已有阅读面留白，且统计不绘制独立边框。
+                padding: EdgeInsets.fromLTRB(
+                  theme.appearance.storybook ? 0 : SpacingTokens.md,
+                  theme.appearance.storybook ? 0 : SpacingTokens.sm,
+                  theme.appearance.storybook ? 0 : SpacingTokens.md,
+                  SpacingTokens.md,
+                ),
+                children: [
+                  // 统计概览
+                  if (totalProblems > 0)
+                    StatOverviewCard(
+                      items: [
+                        StatOverviewItem(value: '$totalProblems', label: '已做题'),
+                        StatOverviewItem(
+                          value: '${(accuracy * 100).toStringAsFixed(0)}%',
+                          label: '正确率',
+                        ),
+                        StatOverviewItem(value: '$mistakeCount', label: '错题'),
+                      ],
                     ),
-                  ],
-                const SizedBox(height: SpacingTokens.md),
-                const MathAdventureEntry(),
-              ],
-            );
-            return theme.appearance.storybook
-                ? ThemePagePanel(child: list)
-                : list;
-          },
+                  // 统计卡与下方入口的间距：卡片自带 margin 已去掉
+                  //（见 StatOverviewCard 注释），这里显式给出。
+                  const SizedBox(height: SpacingTokens.md),
+
+                  if (visible.isEmpty)
+                    // 学习背景里把四类全关时会走到这里；仓储层已拦空集合，
+                    // 此处是异常数据（如手工改 Hive）的兜底展示。
+                    const AppEmptyState(
+                      icon: Icons.calculate_outlined,
+                      title: '尚未开启任何练习类型',
+                      description: '请在设置 → 学习背景中至少选择一类。',
+                    )
+                  else
+                    for (
+                      var row = 0;
+                      row < (visible.length / columns).ceil();
+                      row++
+                    ) ...[
+                      if (row > 0) const SizedBox(height: SpacingTokens.sm),
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (var col = 0; col < columns; col++) ...[
+                              if (col > 0)
+                                const SizedBox(width: SpacingTokens.sm),
+                              Expanded(
+                                child: row * columns + col < visible.length
+                                    ? _entryCard(
+                                        context,
+                                        ref,
+                                        visible[row * columns + col],
+                                        theme,
+                                      )
+                                    // 末行不足时留空占位，保持已排卡片同宽。
+                                    : const SizedBox.shrink(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  const SizedBox(height: SpacingTokens.md),
+                  const MathAdventureEntry(),
+                ],
+              );
+              return theme.appearance.storybook
+                  ? ThemePagePanel(child: list)
+                  : list;
+            },
+          ),
         ),
       ),
     );
