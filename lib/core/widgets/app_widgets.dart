@@ -24,5 +24,6 @@ export 'package:poemath/core/widgets/pine_ink_surface.dart';
 export 'package:poemath/core/widgets/responsive_card_grid.dart';
 export 'package:poemath/core/widgets/startup_failure_view.dart';
 export 'package:poemath/core/widgets/stat_overview_card.dart';
+export 'package:poemath/core/widgets/swipe_navigation_region.dart';
 export 'package:poemath/core/widgets/theme_character_art.dart';
 export 'package:poemath/core/widgets/theme_page_panel.dart';
