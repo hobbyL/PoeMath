@@ -10,8 +10,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/app.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
+import 'package:poemath/core/widgets/swipe_navigation_region.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
+import 'package:poemath/features/chinese/chinese_tab_page.dart';
 import 'package:poemath/features/profile/parent_protection_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
 
@@ -112,6 +114,97 @@ void main() {
     expect(container.read(activeSubjectProvider), initialSubject);
 
     // 排空 Hive 写链，否则 tearDown 的 Hive.close() 在 fake 时钟下永不返回。
+    await drainHiveWritesForTesting(tester);
+  });
+
+  testWidgets('Tab 和内层栏目拖动时都显示真实相邻页面', (tester) async {
+    final container = ProviderContainer(overrides: [staticDayKeyOverride()]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const App()),
+    );
+    await _pumpPastSplashAndAnimations(tester);
+
+    final rootRegion = find.byType(SwipeNavigationRegion).first;
+    double rootContentOffset() => tester
+        .widget<Transform>(
+          find
+              .descendant(
+                of: rootRegion,
+                matching: find.byKey(
+                  const ValueKey('swipe-navigation-content'),
+                ),
+              )
+              .first,
+        )
+        .transform
+        .getTranslation()
+        .x;
+    var gesture = await tester.startGesture(tester.getCenter(rootRegion));
+    await gesture.moveBy(const Offset(-120, 0));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('swipe-tab-preview-1')), findsOneWidget);
+    expect(find.byType(ChineseTabPage), findsOneWidget);
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
+    await tester.pump();
+    expect(_selectedTab(tester), 1);
+    expect(rootContentOffset(), 0, reason: '拖动预览应直接交给语文路由');
+
+    final chineseRegion = find.byType(SwipeNavigationRegion).last;
+    gesture = await tester.startGesture(tester.getCenter(chineseRegion));
+    await gesture.moveBy(const Offset(-120, 0));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('chinese-section-preview-expression')),
+      findsOneWidget,
+    );
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
+    await tester.pump();
+
+    final poemRegion = find.byType(SwipeNavigationRegion).last;
+    gesture = await tester.startGesture(tester.getCenter(poemRegion));
+    await gesture.moveBy(const Offset(-120, 0));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('chinese-section-preview-poem')),
+      findsOneWidget,
+    );
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
+    await tester.pump();
+
+    final chineseEndRegion = find.byType(SwipeNavigationRegion).last;
+    gesture = await tester.startGesture(tester.getCenter(chineseEndRegion));
+    await gesture.moveBy(const Offset(-120, 0));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('swipe-tab-preview-2')), findsOneWidget);
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
+    await tester.pump();
+    expect(_selectedTab(tester), 2);
+    expect(rootContentOffset(), 0, reason: '栏目边界预览应直接交给数学路由');
+
+    final mathRegion = find.byType(SwipeNavigationRegion).last;
+    gesture = await tester.startGesture(tester.getCenter(mathRegion));
+    await gesture.moveBy(const Offset(-120, 0));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('math-section-preview-textbook')),
+      findsOneWidget,
+    );
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
+    await tester.pump();
+    expect(_selectedTab(tester), 2);
+
     await drainHiveWritesForTesting(tester);
   });
 

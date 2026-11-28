@@ -14,6 +14,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
+import 'package:poemath/core/widgets/swipe_navigation_region.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/services/notification_service.dart';
@@ -33,6 +34,10 @@ import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 typedef UpdateCheckControllerFactory = UpdateCheckController Function(
   UpdateAvailableCallback onAvailable,
 );
+typedef MainTabSwipePreviewBuilder = Widget Function(
+  int index, {
+  required bool forward,
+});
 
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({
@@ -40,6 +45,7 @@ class MainShell extends ConsumerStatefulWidget {
     required this.child,
     this.updateControllerFactory,
     this.notifications,
+    this.swipePreviewBuilder,
   });
 
   final Widget child;
@@ -47,6 +53,7 @@ class MainShell extends ConsumerStatefulWidget {
   /// 自动更新检测控制器工厂（测试注入 seam；生产不传，走真实依赖）。
   final UpdateCheckControllerFactory? updateControllerFactory;
   final NotificationService? notifications;
+  final MainTabSwipePreviewBuilder? swipePreviewBuilder;
 
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
@@ -88,6 +95,7 @@ class _MainShellState extends ConsumerState<MainShell>
   ];
 
   UpdateCheckController? _updateController;
+  double _pageTransitionDirection = 1;
   late final NotificationService _notifications =
       widget.notifications ?? NotificationService.instance;
 
@@ -266,7 +274,24 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 
   void _switch(int i) {
+    final currentIndex = _indexFromRoute(context);
+    if (i != currentIndex) {
+      _pageTransitionDirection = i > currentIndex ? 1 : -1;
+    }
+    FocusScope.of(context).unfocus();
     context.go(_routes[i]);
+  }
+
+  void _swipeTo(int index, {required bool forward}) {
+    // 滑动从相邻栏目的边缘进入；点击底栏仍恢复该栏目上次的位置。
+    final route = switch (index) {
+      1 => AppRoutes.chineseSectionOf(forward ? 'textbook' : 'poem'),
+      2 => AppRoutes.mathSectionOf(forward ? 'practice' : 'textbook'),
+      _ => _routes[index],
+    };
+    _pageTransitionDirection = forward ? 1 : -1;
+    FocusScope.of(context).unfocus();
+    context.go(route);
   }
 
   @override
@@ -295,11 +320,31 @@ class _MainShellState extends ConsumerState<MainShell>
           ),
       ],
     );
+    WidgetBuilder? tabPreview(int index, {required bool forward}) {
+      final builder = widget.swipePreviewBuilder;
+      return builder == null ? null : (_) => builder(index, forward: forward);
+    }
 
     return Scaffold(
       body: Stack(
         children: <Widget>[
-          widget.child,
+          SwipeNavigationRegion(
+            transitionKey: ValueKey(currentIndex),
+            transitionDirection: _pageTransitionDirection,
+            onNext: currentIndex < _routes.length - 1
+                ? () => _swipeTo(currentIndex + 1, forward: true)
+                : null,
+            onPrevious: currentIndex > 0
+                ? () => _swipeTo(currentIndex - 1, forward: false)
+                : null,
+            nextPageBuilder: currentIndex < _routes.length - 1
+                ? tabPreview(currentIndex + 1, forward: true)
+                : null,
+            previousPageBuilder: currentIndex > 0
+                ? tabPreview(currentIndex - 1, forward: false)
+                : null,
+            child: widget.child,
+          ),
           if (assistantEnabled) const DraggableAssistantBubble(),
         ],
       ),

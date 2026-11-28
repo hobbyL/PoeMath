@@ -111,6 +111,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return router;
 });
 
+/// 构建主 Tab 的拖动预览页；Chinese/Math 的栏目参数与实际滑入路由保持一致。
+Widget _buildTabSwipePreview(int index, {required bool forward}) =>
+    KeyedSubtree(
+      key: ValueKey('swipe-tab-preview-$index'),
+      child: switch (index) {
+        0 => const HomePage(),
+        1 => ChineseTabPage(
+          section: forward ? ChineseSection.textbook : ChineseSection.poem,
+          previewOnly: true,
+        ),
+        2 => MathHomePage(
+          section: forward ? MathSection.practice : MathSection.textbook,
+          previewOnly: true,
+        ),
+        3 => const EnglishTabPage(),
+        4 => const ProfilePage(),
+        _ => const SizedBox.shrink(),
+      },
+    );
+
 /// 构造应用路由器。
 ///
 /// [initialLocation] 可用于首启分流或测试直达某条深层路由。
@@ -129,7 +149,8 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.home}) {
         builder: (context, state) => const OnboardingPage(),
       ),
       ShellRoute(
-        builder: (context, state, child) => MainShell(child: child),
+        builder: (context, state, child) =>
+            MainShell(swipePreviewBuilder: _buildTabSwipePreview, child: child),
         // 同级主栏目直接切换，避免每次点击叠加两张全屏页面的淡入淡出。
         // 推入详情页仍使用下面的 Material 页面转场。
         routes: <RouteBase>[

@@ -8,6 +8,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/widgets/swipe_navigation_region.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/features/math/math_tab_page.dart';
@@ -27,8 +28,9 @@ final _mathPageStorageProvider = Provider.family<PageStorageBucket, String>(
 );
 
 class MathHomePage extends ConsumerStatefulWidget {
-  const MathHomePage({super.key, this.section});
+  const MathHomePage({super.key, this.section, this.previewOnly = false});
   final MathSection? section;
+  final bool previewOnly;
   @override
   ConsumerState<MathHomePage> createState() => _MathHomePageState();
 }
@@ -36,6 +38,7 @@ class MathHomePage extends ConsumerStatefulWidget {
 class _MathHomePageState extends ConsumerState<MathHomePage> {
   late String _profileId;
   late MathSection _section;
+  double _transitionDirection = 1;
   late final StreamSubscription<String> _profileSubscription;
   final _visited = <MathSection>{};
   static String _key(String profile) =>
@@ -50,6 +53,9 @@ class _MathHomePageState extends ConsumerState<MathHomePage> {
     _profileId = ProfileScope.currentId;
     _section = widget.section ?? _saved();
     _visited.add(_section);
+    if (widget.section != null && !widget.previewOnly) {
+      unawaited(_rememberSection());
+    }
     _profileSubscription = ProfileScope.changes.listen((id) {
       if (!mounted) return;
       setState(() {
@@ -65,22 +71,31 @@ class _MathHomePageState extends ConsumerState<MathHomePage> {
   @override
   void didUpdateWidget(MathHomePage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.section != null && widget.section != oldWidget.section) {
+    if (widget.section != null &&
+        widget.section != oldWidget.section &&
+        widget.section != _section) {
+      _transitionDirection = widget.section!.index > _section.index ? 1 : -1;
       _section = widget.section!;
       _visited.add(_section);
+      if (!widget.previewOnly) unawaited(_rememberSection());
     }
   }
 
   Future<void> _select(MathSection section) async {
-    if (_section == section) return;
+    if (widget.previewOnly || _section == section) return;
     FocusScope.of(context).unfocus();
     setState(() {
+      _transitionDirection = section.index > _section.index ? 1 : -1;
       _section = section;
       _visited.add(section);
     });
     context.go(AppRoutes.mathSectionOf(section.name));
+    await _rememberSection();
+  }
+
+  Future<void> _rememberSection() async {
     try {
-      await HiveBoxes.settings.put(_key(_profileId), section.name);
+      await HiveBoxes.settings.put(_key(_profileId), _section.name);
     } on Object catch (error, stackTrace) {
       AppLogger.e(
         '数学栏目偏好保存失败',
@@ -110,57 +125,95 @@ class _MathHomePageState extends ConsumerState<MathHomePage> {
       kToolbarHeight,
       height + SpacingTokens.sm * 4,
     );
-    final switcher = SegmentedButton<MathSection>(
-      showSelectedIcon: false,
-      style: SegmentedButton.styleFrom(
-        minimumSize: const Size(0, SpacingTokens.xxl),
-        padding: const EdgeInsets.all(SpacingTokens.sm),
-      ),
-      segments: [
-        const ButtonSegment(
-          value: MathSection.practice,
-          label: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text('练习', maxLines: 1),
+    Widget switcherFor(MathSection selected) =>
+        SwipeNavigationSegmentedButton<MathSection>(
+          style: SegmentedButton.styleFrom(
+            minimumSize: const Size(0, SpacingTokens.xxl),
+            padding: const EdgeInsets.all(SpacingTokens.sm),
           ),
+          segments: [
+            const ButtonSegment(
+              value: MathSection.practice,
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('练习', maxLines: 1),
+              ),
+            ),
+            ButtonSegment(
+              value: MathSection.textbook,
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('课本($count)', maxLines: 1),
+              ),
+            ),
+          ],
+          selected: selected,
+          onSelectionChanged: (values) {
+            unawaited(_select(values.single));
+          },
+        );
+    Widget sectionPage(MathSection section, {bool preview = false}) {
+      final Widget Function(Widget)? bodySwipeWrapper = preview
+          ? null
+          : (child) =>
+                SwipeNavigationBody(enabled: section == _section, child: child);
+      final page = switch (section) {
+        MathSection.practice => MathTabPage(
+          navigationTitle: preview ? null : switcherFor(section),
+          navigationToolbarHeight: toolbarHeight,
+          showAppBar: !preview,
+          bodySwipeWrapper: bodySwipeWrapper,
         ),
-        ButtonSegment(
-          value: MathSection.textbook,
-          label: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text('课本($count)', maxLines: 1),
-          ),
+        MathSection.textbook => TextbookLearningPage(
+          subject: TextbookSubject.math,
+          navigationTitle: preview ? null : switcherFor(section),
+          navigationToolbarHeight: toolbarHeight,
+          showAppBar: !preview,
+          bodySwipeWrapper: bodySwipeWrapper,
         ),
-      ],
-      selected: {_section},
-      onSelectionChanged: (values) => _select(values.single),
-    );
-    return PageStorage(
-      bucket: ref.watch(_mathPageStorageProvider(_profileId)),
-      child: IndexedStack(
-        key: ValueKey(_profileId),
-        index: _section.index,
-        children: [
-          TickerMode(
-            enabled: _section == MathSection.practice,
-            child: _visited.contains(MathSection.practice)
-                ? MathTabPage(
-                    navigationTitle: switcher,
-                    navigationToolbarHeight: toolbarHeight,
-                  )
-                : const SizedBox.shrink(),
+      };
+      return TickerMode(
+        enabled: preview || section == _section,
+        child: preview || _visited.contains(section)
+            ? page
+            : const SizedBox.shrink(),
+      );
+    }
+
+    final pageStorage = ref.watch(_mathPageStorageProvider(_profileId));
+    WidgetBuilder sectionPreview(MathSection section) =>
+        (_) => KeyedSubtree(
+          key: ValueKey('math-section-preview-${section.name}'),
+          child: PageStorage(
+            bucket: pageStorage,
+            child: sectionPage(section, preview: true),
           ),
-          TickerMode(
-            enabled: _section == MathSection.textbook,
-            child: _visited.contains(MathSection.textbook)
-                ? TextbookLearningPage(
-                    subject: TextbookSubject.math,
-                    navigationTitle: switcher,
-                    navigationToolbarHeight: toolbarHeight,
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
+        );
+    return SwipeNavigationRegion(
+      animateBodyOnly: true,
+      transitionKey: _section,
+      transitionDirection: _transitionDirection,
+      onNext: _section == MathSection.practice
+          ? () => unawaited(_select(MathSection.textbook))
+          : null,
+      nextPageBuilder: _section == MathSection.practice
+          ? sectionPreview(MathSection.textbook)
+          : null,
+      onPrevious: _section == MathSection.textbook
+          ? () => unawaited(_select(MathSection.practice))
+          : null,
+      previousPageBuilder: _section == MathSection.textbook
+          ? sectionPreview(MathSection.practice)
+          : null,
+      child: PageStorage(
+        bucket: pageStorage,
+        child: IndexedStack(
+          key: ValueKey(_profileId),
+          index: _section.index,
+          children: [
+            for (final section in MathSection.values) sectionPage(section),
+          ],
+        ),
       ),
     );
   }

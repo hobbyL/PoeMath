@@ -8,6 +8,8 @@ import 'package:poemath/core/services/backup_history_service.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/widgets/swipe_navigation_region.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/textbook.dart';
@@ -17,7 +19,11 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/features/chinese/chinese_tab_page.dart';
 import 'package:poemath/features/chinese/expression/picture_story_page.dart';
+import 'package:poemath/features/english/english_tab_page.dart';
 import 'package:poemath/features/home/home_page.dart';
+import 'package:poemath/features/math/math_home_page.dart';
+import 'package:poemath/features/math/math_tab_page.dart';
+import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/poem/poem_favorites_page.dart';
 import 'package:poemath/features/poem/poem_learning_path_page.dart';
 import 'package:poemath/features/poem/poem_tab_page.dart';
@@ -47,6 +53,7 @@ Future<({GoRouter router, ProviderContainer container})> _pumpAt(
   WidgetTester tester, {
   String location = AppRoutes.chineseTab,
   double textScale = 1,
+  ThemeData? theme,
 }) async {
   final router = createAppRouter(initialLocation: location);
   final container = ProviderContainer(
@@ -65,6 +72,7 @@ Future<({GoRouter router, ProviderContainer container})> _pumpAt(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp.router(
+        theme: theme,
         routerConfig: router,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context)
@@ -112,6 +120,8 @@ void _expectPoemSection(WidgetTester tester) {
 Future<void> _pumpHome(WidgetTester tester) async {
   // 首页待打卡卡片会持续重绘；导航完成以实际页面和底栏选中项为准。
   // 只推进有限的入场动画，不等待整页动画停止，也不关闭真实动效。
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
   expect(find.byType(HomePage), findsOneWidget);
@@ -296,6 +306,291 @@ void main() {
     );
     await _finish(tester);
   });
+
+  testWidgets('左右滑动沿栏目顺序切换，到达边界后衔接底部 Tab', (tester) async {
+    await _pumpAt(tester);
+    _expectTextbookSection(tester);
+
+    Future<void> swipe(Finder page, double dx) async {
+      await tester.drag(page, Offset(dx, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    // 首页左划进入语文课本，语文栏目向左依次前进。
+    await swipe(find.byType(ChineseTabPage), 120);
+    await _pumpHome(tester);
+    await swipe(find.byType(HomePage), -120);
+    _expectTextbookSection(tester);
+
+    // 语文栏目按顶部标签从左到右移动，中间栏目不会误切到底部 Tab。
+    await swipe(find.byType(ChineseTabPage), -120);
+    expect(
+      tester
+          .widget<SegmentedButton<ChineseSection>>(
+            find.byType(SegmentedButton<ChineseSection>),
+          )
+          .selected,
+      {ChineseSection.expression},
+    );
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      1,
+    );
+
+    await swipe(find.byType(ChineseTabPage), -120);
+    _expectPoemSection(tester);
+
+    // 语文末尾左划进入数学练习，继续左划经过数学课本和英语到我的。
+    await swipe(find.byType(ChineseTabPage), -120);
+    expect(find.byType(MathHomePage), findsOneWidget);
+    expect(find.byType(MathTabPage), findsOneWidget);
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      2,
+    );
+    await swipe(find.byType(MathHomePage), -120);
+    expect(
+      tester
+          .widget<SegmentedButton<MathSection>>(
+            find.byType(SegmentedButton<MathSection>),
+          )
+          .selected,
+      {MathSection.textbook},
+    );
+
+    // 数学末尾进入英语，再从我的页反向回到英语和数学课本。
+    await swipe(find.byType(MathHomePage), -120);
+    expect(find.byType(EnglishTabPage), findsOneWidget);
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      3,
+    );
+    await swipe(find.byType(EnglishTabPage), -120);
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      4,
+    );
+    // 反向手指右划依次返回英语、数学课本、数学练习和语文诗词。
+    await swipe(find.byType(ProfilePage), 120);
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      3,
+    );
+    await swipe(find.byType(EnglishTabPage), 120);
+    expect(
+      tester
+          .widget<SegmentedButton<MathSection>>(
+            find.byType(SegmentedButton<MathSection>),
+          )
+          .selected,
+      {MathSection.textbook},
+    );
+    await swipe(find.byType(MathHomePage), 120);
+    expect(find.byType(MathTabPage), findsOneWidget);
+    await swipe(find.byType(MathHomePage), 120);
+    _expectPoemSection(tester);
+
+    // 语文反向依次穿过诗词、表达、课本，右划返回首页。
+    for (final section in [
+      ChineseSection.expression,
+      ChineseSection.textbook,
+    ]) {
+      await swipe(find.byType(ChineseTabPage), 120);
+      final switcher = tester.widget<SegmentedButton<ChineseSection>>(
+        find.byType(SegmentedButton<ChineseSection>),
+      );
+      expect(switcher.selected, {section});
+    }
+    await swipe(find.byType(ChineseTabPage), 120);
+    await _pumpHome(tester);
+    await _finish(tester);
+  });
+
+  for (final subject in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('内部滑动只移动正文，顶部导航和底栏固定：$subject/$brightness', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(411, 800);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final app = await _pumpAt(
+          tester,
+          textScale: 2,
+          theme: AppTheme.resolve(subject: subject, brightness: brightness),
+        );
+
+        Future<void> swipeInside(
+          Finder switcher,
+          double dx, {
+          bool fromToolbar = false,
+        }) async {
+          final toolbar = find.byType(AppBar);
+          final navigation = find.byType(NavigationBar);
+          final toolbarRect = tester.getRect(toolbar);
+          final switcherRect = tester.getRect(switcher);
+          final navigationRect = tester.getRect(navigation);
+          final selectedTab = tester
+              .widget<NavigationBar>(navigation)
+              .selectedIndex;
+          final body = find.byType(SwipeNavigationBody);
+          final bodyRect = tester.getRect(body);
+          final scrollable = find
+              .descendant(of: body, matching: find.byType(Scrollable))
+              .last;
+          final contentRect = tester.getRect(scrollable);
+          final sourceButton = tester.widget(switcher);
+          final direction = dx < 0 ? 1 : -1;
+          final (sourceIndex, segmentCount) = switch (sourceButton) {
+            SegmentedButton<ChineseSection>(:final selected) => (
+              ChineseSection.navigationOrder.indexOf(selected.single),
+              ChineseSection.navigationOrder.length,
+            ),
+            SegmentedButton<MathSection>(:final selected) => (
+              selected.single.index,
+              MathSection.values.length,
+            ),
+            _ => throw StateError('未知栏目分段按钮'),
+          };
+          final buttonGroup = find.ancestor(
+            of: switcher,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is SwipeNavigationSegmentedButton<ChineseSection> ||
+                  widget is SwipeNavigationSegmentedButton<MathSection>,
+            ),
+          );
+          void expectLinkedSelection(double progress) {
+            final overlay = find.descendant(
+              of: buttonGroup,
+              matching: find.byKey(
+                const ValueKey('swipe-navigation-selection'),
+              ),
+            );
+            expect(overlay, findsOneWidget);
+            final clip = tester
+                .widget<ClipRect>(overlay)
+                .clipper!
+                .getClip(tester.getSize(overlay));
+            final segmentWidth = switcherRect.width / segmentCount;
+            expect(clip.width, closeTo(segmentWidth, .01));
+            expect(
+              clip.left,
+              closeTo((sourceIndex + direction * progress) * segmentWidth, .01),
+            );
+          }
+
+          final gesture = await tester.startGesture(
+            tester.getCenter(fromToolbar ? switcher : scrollable),
+          );
+          await gesture.moveBy(Offset(dx, 0));
+          await tester.pump();
+
+          void expectChromeFixed() {
+            expect(tester.getRect(toolbar), toolbarRect);
+            expect(tester.getRect(switcher), switcherRect);
+            expect(tester.getRect(navigation), navigationRect);
+            expect(
+              tester.widget<NavigationBar>(navigation).selectedIndex,
+              selectedTab,
+            );
+          }
+
+          expectChromeFixed();
+          final dragProgress = dx.abs() / bodyRect.width;
+          expectLinkedSelection(dragProgress);
+          expect(
+            tester.getRect(scrollable).left,
+            closeTo(contentRect.left + dx, .01),
+          );
+          final preview = find.byKey(
+            ValueKey(
+              dx < 0
+                  ? 'swipe-navigation-next-preview'
+                  : 'swipe-navigation-previous-preview',
+            ),
+          );
+          expect(preview, findsOneWidget);
+          final previewPage = find
+              .descendant(of: preview, matching: find.byType(Scaffold))
+              .first;
+          expect(
+            tester.getRect(previewPage).top,
+            bodyRect.top,
+            reason: '相邻正文须在固定导航下直接接入，不能带入第二个导航栏',
+          );
+          expect(
+            find.descendant(of: preview, matching: find.byType(AppBar)),
+            findsNothing,
+          );
+
+          await gesture.up();
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 110));
+          expectChromeFixed();
+          expectLinkedSelection(
+            dragProgress +
+                (1 - dragProgress) * Curves.easeOutCubic.transform(.5),
+          );
+          await tester.pump(const Duration(milliseconds: 120));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(
+            tester.widget<NavigationBar>(navigation).selectedIndex,
+            selectedTab,
+          );
+          expect(tester.getRect(navigation), navigationRect);
+          expect(
+            tester.getRect(switcher),
+            switcherRect,
+            reason: '切换完成后顶部栏目的位置和宽度也应保持一致',
+          );
+        }
+
+        final chineseSwitcher = find
+            .byType(SegmentedButton<ChineseSection>)
+            .first;
+        final mathSwitcher = find.byType(SegmentedButton<MathSection>).first;
+        for (final size in [const Size(320, 720), const Size(844, 390)]) {
+          tester.view.physicalSize = size;
+          app.router.go(AppRoutes.chineseSectionOf('textbook'));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pump();
+          await swipeInside(chineseSwitcher, -80);
+          expect(
+            tester
+                .widget<SegmentedButton<ChineseSection>>(chineseSwitcher)
+                .selected,
+            {ChineseSection.expression},
+          );
+          await swipeInside(chineseSwitcher, -80, fromToolbar: true);
+          _expectPoemSection(tester);
+          await swipeInside(chineseSwitcher, 80);
+          await swipeInside(chineseSwitcher, 80);
+          _expectTextbookSection(tester);
+
+          app.router.go(AppRoutes.mathSectionOf('practice'));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pump();
+          await swipeInside(mathSwitcher, -80);
+          expect(
+            tester.widget<SegmentedButton<MathSection>>(mathSwitcher).selected,
+            {MathSection.textbook},
+          );
+          await swipeInside(mathSwitcher, 80, fromToolbar: true);
+          expect(
+            tester.widget<SegmentedButton<MathSection>>(mathSwitcher).selected,
+            {MathSection.practice},
+          );
+        }
+        await _finish(tester);
+      });
+    }
+  }
 
   testWidgets('背景改变后课本立即换册，设置管理仍展示所有教材', (tester) async {
     final app = await _pumpAt(tester);
