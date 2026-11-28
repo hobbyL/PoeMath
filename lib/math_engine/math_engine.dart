@@ -342,6 +342,7 @@ class MathEngine {
     }
     final counts = operationCounts.values.toList()..shuffle(rng);
     final problems = <MathProblem>[];
+    final compareCounts = <CompareRelation, int>{};
     for (var i = 0; i < counts.length; i++) {
       final quota =
           count ~/ counts.length + (i < count % counts.length ? 1 : 0);
@@ -354,6 +355,7 @@ class MathEngine {
           difficulty: difficulty,
           random: rng,
           operationCount: counts[i],
+          compareCounts: compareCounts,
         ),
       );
     }
@@ -371,10 +373,18 @@ class MathEngine {
     bool verticalProcessOnly = false,
     GradeConfig? curriculum,
     int? operationCount,
+    Map<CompareRelation, int>? compareCounts,
   }) {
     if (count < 0) throw RangeError.value(count, 'count');
     if (count == 0) return [];
     final rng = random ?? Random();
+    final config =
+        curriculum ??
+        DifficultyAdjuster.adjust(
+          GradePresets.get(grade, semester),
+          difficulty ?? DifficultyLevel.medium,
+        );
+    final converter = AdditionSubtractionGen(config, random: rng);
     final pool = <String, MathProblem>{};
     for (var i = 0; i < count * 3 + 12; i++) {
       final problem = generate(
@@ -393,6 +403,7 @@ class MathEngine {
     final result = <MathProblem>[];
     final skills = <String?, int>{};
     final modes = <ProblemMode, int>{};
+    final relations = compareCounts ?? <CompareRelation, int>{};
     var remaining = pool.values.toList();
     for (var i = 0; i < count; i++) {
       // 小范围题库耗尽后才允许重复；重试始终有界，不能扩大课程范围补题。
@@ -403,11 +414,20 @@ class MathEngine {
       for (var j = 1; j < remaining.length; j++) {
         if (load(remaining[j]) < load(remaining[selected])) selected = j;
       }
-      final problem = remaining.removeAt(selected);
+      var problem = remaining.removeAt(selected);
+      if (problem.mode == ProblemMode.compare) {
+        // 算式去重和知识点选择完成后再平衡答案，避免候选池缺少某种关系。
+        problem = converter.toCompare(problem, relationCounts: relations);
+      }
       result.add(problem);
       skills[problem.skillId] = (skills[problem.skillId] ?? 0) + 1;
       modes[problem.mode] = (modes[problem.mode] ?? 0) + 1;
+      if (problem.compareRelation case final relation?) {
+        relations[relation] = (relations[relation] ?? 0) + 1;
+      }
     }
+    // 平衡后的答案不能按固定的三题循环展示。
+    if (result.any((p) => p.mode == ProblemMode.compare)) result.shuffle(rng);
     return result;
   }
 

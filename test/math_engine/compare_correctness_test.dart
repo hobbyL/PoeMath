@@ -5,7 +5,7 @@
 //   的实际关系一致（用测试内独立实现的求值器交叉验证，不依赖
 //   ExpressionEvaluator）。
 // - findMissing 源题（有 expressionResult）比较基准正确。
-// - 非整数基准（分数/小数）不产负 offset。
+// - 整数、小数、分数的合法比较关系等概率，目标不越过课程边界。
 
 import 'dart:math';
 
@@ -56,8 +56,8 @@ String relationOf(Fraction a, Fraction b) {
 
 /// 仅用 to* 模式转换方法的测试生成器。
 class _ConvGen extends BaseGenerator {
-  _ConvGen({required Random random})
-      : super(_convConfig, random: random);
+  _ConvGen({required Random random, GradeConfig config = _convConfig})
+    : super(config, random: random);
 
   @override
   MathProblem generate() => throw UnimplementedError();
@@ -118,13 +118,14 @@ void main() {
         expectCompareConsistent(cmp);
 
         // target = 63 + offset，offset ∈ [-3, 3]
-        final diff = cmp.compareTarget!.asFraction - src.expressionResult!.asFraction;
+        final diff =
+            cmp.compareTarget!.asFraction - src.expressionResult!.asFraction;
         expect(diff.isInteger, isTrue);
         expect(diff.asInteger, inInclusiveRange(-3, 3));
       }
     });
 
-    test('分数源题（非整数基准）不产负 offset', () {
+    test('分数源题覆盖三种比较关系且目标非负', () {
       // 1/2 + 1/3 = 5/6
       final src = MathProblem(
         operands: [
@@ -138,21 +139,110 @@ void main() {
         resultForm: ResultForm.fraction,
       );
 
-      for (var seed = 0; seed < 40; seed++) {
+      final relations = <CompareRelation>{};
+      for (var seed = 0; seed < 100; seed++) {
         final gen = _ConvGen(random: Random(seed));
         final cmp = gen.toCompare(src);
 
         expectCompareConsistent(cmp);
 
-        // 非整数基准：target ≥ base（offset ∈ [0, 3]），不出现 greaterThan
-        final base = src.result.asFraction;
-        final diff = cmp.compareTarget!.asFraction - base;
-        expect(diff.numerator >= 0, isTrue, reason: '分数基准出现负 offset');
-        expect(
-          cmp.compareRelation,
-          isNot(CompareRelation.greaterThan),
-          reason: '分数基准不应产出 > 关系',
+        expect(cmp.compareTarget!.isNegative, isFalse);
+        relations.add(cmp.compareRelation!);
+      }
+      expect(relations, CompareRelation.values.toSet());
+    });
+
+    for (final (label, left, right, result) in [
+      (
+        '整数',
+        NumberValue.fromInt(25),
+        NumberValue.fromInt(38),
+        NumberValue.fromInt(63),
+      ),
+      (
+        '小数',
+        NumberValue.fromDouble(0.5),
+        NumberValue.fromDouble(0.75),
+        NumberValue.fromDouble(1.25),
+      ),
+      (
+        '分数',
+        NumberValue.fromFraction(1, 2),
+        NumberValue.fromFraction(1, 3),
+        NumberValue.fromFraction(5, 6),
+      ),
+      (
+        '接近上限',
+        NumberValue.fromInt(9999),
+        NumberValue.fromDouble(0.9),
+        NumberValue.fromDouble(9999.9),
+      ),
+    ]) {
+      test('$label的三种合法答案接近等概率', () {
+        final source = MathProblem(
+          operands: [left, right],
+          operators: const [Operator.add],
+          result: result,
+          mode: ProblemMode.findResult,
+          grade: 6,
+          resultForm: MathProblem.formFor(result),
         );
+        final generator = _ConvGen(random: Random(20261128));
+        final counts = {for (final r in CompareRelation.values) r: 0};
+        for (var i = 0; i < 900; i++) {
+          final problem = generator.toCompare(source);
+          expectCompareConsistent(problem);
+          expect(problem.compareTarget!.asDouble, inInclusiveRange(0, 10000));
+          counts[problem.compareRelation!] =
+              counts[problem.compareRelation!]! + 1;
+        }
+        // 固定种子的大样本：旧 offset 均匀抽样下等号只有约 1/7。
+        expect(
+          counts.values,
+          everyElement(inInclusiveRange(240, 360)),
+          reason: '$label答案分布：$counts',
+        );
+      });
+    }
+
+    test('边界只能选择合法关系，单值范围也能结束', () {
+      for (final (value, maxResult, allowNegative, expected) in [
+        (0, 10, false, {CompareRelation.lessThan, CompareRelation.equal}),
+        (10, 10, false, {CompareRelation.greaterThan, CompareRelation.equal}),
+        (-10, 10, true, {CompareRelation.lessThan, CompareRelation.equal}),
+        (0, 10, true, CompareRelation.values.toSet()),
+        (0, 0, false, {CompareRelation.equal}),
+      ]) {
+        final config = GradeConfig(
+          grade: 6,
+          semester: '下',
+          label: '比较边界',
+          allowedOperators: const {Operator.add},
+          allowedModes: const {ProblemMode.compare},
+          minOperand: allowNegative ? -10 : 0,
+          maxOperand: 10,
+          maxResult: maxResult,
+          allowNegative: allowNegative,
+        );
+        final source = MathProblem(
+          operands: [NumberValue.fromInt(value), NumberValue.fromInt(0)],
+          operators: const [Operator.add],
+          result: NumberValue.fromInt(value),
+          mode: ProblemMode.findResult,
+          grade: 6,
+        );
+        final generator = _ConvGen(config: config, random: Random(42));
+        final seen = <CompareRelation>{};
+        for (var i = 0; i < 100; i++) {
+          final problem = generator.toCompare(source);
+          expectCompareConsistent(problem);
+          expect(
+            problem.compareTarget!.asDouble,
+            inInclusiveRange(allowNegative ? -maxResult : 0, maxResult),
+          );
+          seen.add(problem.compareRelation!);
+        }
+        expect(seen, expected, reason: 'value=$value max=$maxResult');
       }
     });
 
@@ -187,14 +277,7 @@ void main() {
 
   group('compare 批量生成正确性（MathEngine）', () {
     // 覆盖整数、小数、分数、负数、findMissing（简易方程）源题
-    const specs = [
-      (2, '上'),
-      (2, '下'),
-      (4, '下'),
-      (5, '上'),
-      (6, '上'),
-      (6, '下'),
-    ];
+    const specs = [(2, '上'), (2, '下'), (4, '下'), (5, '上'), (6, '上'), (6, '下')];
 
     for (final (grade, semester) in specs) {
       test('$grade年级$semester学期 compare 题关系一致', () {

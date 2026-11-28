@@ -24,6 +24,170 @@ List<MathProblem> _generate(int grade, String semester, int seed) {
 }
 
 void main() {
+  test('比较专练每组平衡三种答案，保持约束、判分和算式去重', () {
+    for (final base in GradePresets.all) {
+      for (final level in [DifficultyLevel.medium, DifficultyLevel.hard]) {
+        final config = DifficultyAdjuster.adjust(base, level);
+        if (!config.allowedModes.contains(ProblemMode.compare)) continue;
+        for (final seed in [12, 31, 48]) {
+          final problems = MathEngine.generateBatch(
+            grade: base.grade,
+            semester: base.semester,
+            mode: ProblemMode.compare,
+            difficulty: level,
+            count: 20,
+            random: Random(seed),
+          );
+          final counts = {for (final r in CompareRelation.values) r: 0};
+          expect(problems, hasLength(20));
+          for (final p in problems) {
+            expect(p.mode, ProblemMode.compare);
+            expect(
+              ConstraintChecker.check(p, config),
+              isNull,
+              reason: p.problemText,
+            );
+            expect(MathEngine.judge(p, p.answerText).isCorrect, isTrue);
+            counts[p.compareRelation!] = counts[p.compareRelation!]! + 1;
+          }
+          expect(
+            counts.values,
+            everyElement(inInclusiveRange(6, 7)),
+            reason: '${base.label} ${level.name} seed=$seed: $counts',
+          );
+          expect(
+            problems
+                .map(
+                  (p) =>
+                      '${p.operands}|${p.operators}|'
+                      '${p.bracketRange}',
+                )
+                .toSet(),
+            hasLength(20),
+          );
+        }
+      }
+    }
+  });
+
+  test('自选运算次数共享整组答案计数，余题随机分配且顺序打乱', () {
+    final orders = <String>{};
+    for (final count in [1, 2, 3, 7, 10, 20, 21]) {
+      for (final seed in [12, 31, 48]) {
+        final problems = MathEngine.generateBatch(
+          grade: 3,
+          semester: '下',
+          mode: ProblemMode.compare,
+          count: count,
+          operationCounts: OperationCounts([1, 2, 3]),
+          random: Random(seed),
+        );
+        final relations = {for (final r in CompareRelation.values) r: 0};
+        final steps = {
+          for (final n in [1, 2, 3]) n: 0,
+        };
+        expect(problems, hasLength(count));
+        for (final p in problems) {
+          expect(p.mode, ProblemMode.compare);
+          expect(ConstraintChecker.check(p, GradePresets.grade3b), isNull);
+          expect(MathEngine.judge(p, p.answerText).isCorrect, isTrue);
+          relations[p.compareRelation!] = relations[p.compareRelation!]! + 1;
+          steps[p.operators.length] = steps[p.operators.length]! + 1;
+        }
+        final quota = inInclusiveRange(count ~/ 3, (count + 2) ~/ 3);
+        expect(relations.values, everyElement(quota), reason: '$count/$seed');
+        expect(steps.values, everyElement(quota));
+        if (count == 20) orders.add(problems.map((p) => p.answerText).join());
+      }
+    }
+    expect(orders, hasLength(3));
+  });
+
+  test('比较专练不按三种答案循环展示，同一种子仍可复现', () {
+    List<MathProblem> batch() => MathEngine.generateBatch(
+      grade: 2,
+      semester: '上',
+      mode: ProblemMode.compare,
+      count: 21,
+      random: Random(42),
+    );
+    final first = batch();
+    final second = batch();
+    expect(first.map((p) => p.toJson()), second.map((p) => p.toJson()));
+    // 若忘记打乱，每连续三题都会各出现一种答案，孩子可以据此猜题。
+    final triples = [
+      for (var i = 0; i < first.length; i += 3)
+        first.skip(i).take(3).map((p) => p.answerText).toSet().length,
+    ];
+    expect(triples, contains(lessThan(3)));
+  });
+
+  test('综合练习中的比较题也平衡答案，专项仍保留知识点', () {
+    for (final level in [DifficultyLevel.medium, DifficultyLevel.hard]) {
+      final problems = MathEngine.generateBatch(
+        grade: 2,
+        semester: '上',
+        difficulty: level,
+        count: 60,
+        random: Random(20261128),
+      );
+      final counts = {for (final r in CompareRelation.values) r: 0};
+      for (final p in problems.where((p) => p.mode == ProblemMode.compare)) {
+        counts[p.compareRelation!] = counts[p.compareRelation!]! + 1;
+      }
+      expect(counts.values, everyElement(greaterThanOrEqualTo(1)));
+      expect(
+        counts.values.reduce(max) - counts.values.reduce(min),
+        lessThanOrEqualTo(1),
+      );
+    }
+    final targeted = MathEngine.generateBatch(
+      grade: 2,
+      semester: '上',
+      mode: ProblemMode.compare,
+      skillId: 'division',
+      difficulty: DifficultyLevel.hard,
+      count: 20,
+      random: Random(81),
+    );
+    expect(targeted.map((p) => p.skillId), everyElement('division'));
+    expect(
+      targeted.map((p) => p.operators.single),
+      everyElement(Operator.divide),
+    );
+    final counts = {
+      for (final r in CompareRelation.values)
+        r: targeted.where((p) => p.compareRelation == r).length,
+    };
+    expect(counts.values, everyElement(inInclusiveRange(6, 7)));
+  });
+
+  test('范围只有零时比较题有界补齐，不为平衡答案越界', () {
+    const config = GradeConfig(
+      grade: 2,
+      semester: '上',
+      label: '单值范围',
+      allowedOperators: {Operator.add},
+      allowedModes: {ProblemMode.compare},
+      maxOperand: 0,
+      maxResult: 0,
+    );
+    final problems = MathEngine.generateBatch(
+      grade: config.grade,
+      semester: config.semester,
+      mode: ProblemMode.compare,
+      curriculum: config,
+      count: 20,
+      random: Random(42),
+    );
+    expect(problems, hasLength(20));
+    for (final p in problems) {
+      expect(p.answerText, '=');
+      expect(p.compareTarget, NumberValue.fromInt(0));
+      expect(ConstraintChecker.check(p, config), isNull);
+    }
+  });
+
   test('二上困难档提高进退位比例并减少乘除1，简单档仍无进退位', () {
     final regroupRates = <DifficultyLevel, double>{};
     for (final level in DifficultyLevel.values) {
@@ -118,8 +282,9 @@ void main() {
         count: 20,
         random: Random(723),
       );
-      final expressions =
-          problems.map((p) => '${p.operands}|${p.operators}').toSet();
+      final expressions = problems
+          .map((p) => '${p.operands}|${p.operators}')
+          .toSet();
       expect(expressions, hasLength(20));
       if (level != DifficultyLevel.easy) {
         final operators = {
@@ -162,11 +327,7 @@ void main() {
           contains(problem.mode),
           reason: '${config.label} 出现了配置外的题型 ${problem.mode.name}',
         );
-        expect(
-          problem.grade,
-          grade,
-          reason: '${config.label} 的题目年级标记错误',
-        );
+        expect(problem.grade, grade, reason: '${config.label} 的题目年级标记错误');
       }
     }
   });
@@ -179,7 +340,8 @@ void main() {
       expect(
         modes.length,
         greaterThanOrEqualTo(2),
-        reason: '${config.label} 只出了 ${modes.map((m) => m.name).join('/')}，'
+        reason:
+            '${config.label} 只出了 ${modes.map((m) => m.name).join('/')}，'
             '题型多样性退化',
       );
     }
@@ -195,8 +357,9 @@ void main() {
 
       // 综合为普通方案，竖式由开始时单独选择，其余允许题型必须覆盖。
       expect(counts[ProblemMode.vertical] ?? 0, 0);
-      for (final mode
-          in config.allowedModes.difference({ProblemMode.vertical})) {
+      for (final mode in config.allowedModes.difference({
+        ProblemMode.vertical,
+      })) {
         expect(
           counts[mode] ?? 0,
           greaterThan(0),
@@ -209,7 +372,8 @@ void main() {
         expect(
           entry.value / _sampleSize,
           lessThan(0.8),
-          reason: '${config.label} 的 ${entry.key.name} 占比 '
+          reason:
+              '${config.label} 的 ${entry.key.name} 占比 '
               '${(entry.value / _sampleSize * 100).toStringAsFixed(0)}% 过高',
         );
       }
@@ -246,7 +410,8 @@ void main() {
           expect(
             operand.asDouble,
             greaterThanOrEqualTo(config.minOperand.toDouble()),
-            reason: '${config.label} 操作数 ${operand.asDouble} '
+            reason:
+                '${config.label} 操作数 ${operand.asDouble} '
                 '低于 minOperand ${config.minOperand}',
           );
         }

@@ -87,36 +87,46 @@ abstract class BaseGenerator {
   /// 答案（x）而非表达式值，必须用 [MathProblem.expressionResult]；
   /// findResult 源题无 expressionResult，result 即表达式值。
   ///
-  /// 非整数基准（分数/小数）只取非负 offset，避免五年级分数题产出
-  /// 「5/6 ○ 负数」这类超纲负数比较；整数偏移也须同时满足
-  /// config.allowNegative 与 config.maxResult。
+  /// 先等概率选择合法关系，再选择对应目标，避免多个偏移量把等号挤少。
+  /// 以基准的最简分母为步长单位（整数为 1），分数/小数也可向两侧偏移，
+  /// 同时遵守 config.allowNegative 与 config.maxResult。
+  /// [relationCounts] 可传入当前组已选答案数，在合法关系中优先补足较少者。
   ///
-  /// 目标值用 [NumberValue] 分数精确加法构造（5/6 + 3 = 23/6），
+  /// 目标值用 [NumberValue] 分数精确加法构造（5/6 - 1/6 = 2/3），
   /// 杜绝 asInteger 截断（5/6 截断为 0 会产出 5/6 = 0 的错题）。
   ///
   /// 注意：不透传 [MathProblem.displayText]（取舍同 toFindMissing），
   /// 转换后按通用形态渲染（如 80 × 0.3 ○ 24），数学仍正确。
-  MathProblem toCompare(MathProblem problem) {
+  MathProblem toCompare(
+    MathProblem problem, {
+    Map<CompareRelation, int> relationCounts = const {},
+  }) {
     final base = problem.expressionResult ?? problem.result;
 
-    final isWhole = base.isInteger;
-    final offsets = [
-      for (var i = isWhole ? -3 : 0; i <= 3; i++)
-        if ((config.allowNegative || base.asDouble + i >= 0) &&
-            (base.asDouble + i).abs() <= config.maxResult)
-          i,
-    ];
-    final offset = offsets.isEmpty ? 0 : randomChoice(offsets);
-
-    // 精确构造：offset=0 时 target 即 base（任意 resultForm 精确相等）；
-    // 否则用分数加法（如 5/6 + 3 = 23/6）。
-    final target = offset == 0 ? base : base + NumberValue.fromInt(offset);
-
-    final CompareRelation relation = offset > 0
-        ? CompareRelation.lessThan
-        : offset < 0
-        ? CompareRelation.greaterThan
-        : CompareRelation.equal;
+    final targets = <CompareRelation, List<NumberValue>>{
+      CompareRelation.equal: [base],
+    };
+    for (var offset = -3; offset <= 3; offset++) {
+      if (offset == 0) continue;
+      final target =
+          base + NumberValue.fromFraction(offset, base.asFraction.denominator);
+      if ((!config.allowNegative && target.isNegative) ||
+          target.asDouble.abs() > config.maxResult) {
+        continue;
+      }
+      final relation = offset < 0
+          ? CompareRelation.greaterThan
+          : CompareRelation.lessThan;
+      (targets[relation] ??= []).add(target);
+    }
+    final leastCount = targets.keys
+        .map((relation) => relationCounts[relation] ?? 0)
+        .reduce(min);
+    final relation = randomChoice([
+      for (final relation in targets.keys)
+        if ((relationCounts[relation] ?? 0) == leastCount) relation,
+    ]);
+    final target = randomChoice(targets[relation]!);
 
     return MathProblem(
       operands: problem.operands,
@@ -131,6 +141,8 @@ abstract class BaseGenerator {
       compareRelation: relation,
       compareTarget: target,
       bracketRange: problem.bracketRange,
+      skillId: problem.skillId,
+      semester: problem.semester,
     );
   }
 
